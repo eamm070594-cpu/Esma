@@ -195,7 +195,7 @@
         <div style="height:10px;"></div>
         <div class="field">
           <span class="muted">🔎</span>
-          <input id="search" placeholder="Buscar proyecto..." autocomplete="off" autocorrect="off" autocapitalize="off"/>
+          <input id="proyBuscar" placeholder="Buscar proyecto..." autocomplete="off" autocorrect="off" autocapitalize="off"/>
         </div>
 
         <div style="height:10px;"></div>
@@ -1750,8 +1750,10 @@ function boot(){
   on($("segDone"),"click", ()=>setSeg("done"));
 
   on($("sortProjects"),"change", ()=>{ sortMode=$("sortProjects").value; renderProjectsList(); });
-  on($("search"),"input", ()=>{ searchTerm=$("search").value; renderProjectsList(); });
-  on($("btnClearFilters"),"click", ()=>{ $("search").value=""; searchTerm=""; $("sortProjects").value="delivery"; sortMode="delivery"; renderProjectsList(); });
+  on($("proyBuscar"),"input", ()=>{ searchTerm=$("proyBuscar").value; renderProjectsList(); });
+  // Limpiar autofill del navegador (email metido automaticamente)
+  setTimeout(()=>{ const s=$("proyBuscar"); if(s && s.value && s.value.includes("@")){ s.value=""; searchTerm=""; renderProjectsList(); } }, 800);
+  on($("btnClearFilters"),"click", ()=>{ $("proyBuscar").value=""; searchTerm=""; $("sortProjects").value="delivery"; sortMode="delivery"; renderProjectsList(); });
 
   on($("btnNewProject"),"click", createProject);
   on($("btnNewQuote"),"click", ()=>{ const p=db.projects.find(x=>x.id===selectedProjectId); if(!p) return; openQuoteEditor(createQuote(p.id)); renderProjectsList(); });
