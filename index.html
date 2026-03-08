@@ -1812,16 +1812,23 @@ function boot(){
     const raw = localStorage.getItem(key);
     const size = raw ? (raw.length / 1024).toFixed(1) + " KB" : "0";
     const parsed = raw ? (() => { try { const d = JSON.parse(raw); return `Proyectos: ${d.projects?.length||0}, Cotizaciones: ${d.quotes?.length||0}`; } catch(e){ return "Error al parsear JSON"; } })() : "Sin datos";
+    const projDetail = (db?.projects||[]).map(p => {
+      const hasAuth = db.quotes.some(q=>q.projectId===p.id && q.status==="authorized");
+      const tasks = db.tasks.filter(t=>t.projectId===p.id);
+      const allDone = tasks.length>0 && tasks.every(t=>!!t.done);
+      const isDone = hasAuth && (allDone || !!p.manualDone);
+      const seg = isDone ? "done" : (hasAuth ? "auth" : "noauth");
+      return "  ["+seg+"] " + (p.name||"Sin nombre");
+    }).join("\n");
     alert(
       "=== DIAGNÓSTICO ESMA ===\n\n" +
       "Clave: " + key + "\n" +
       "Datos guardados: " + (raw ? "SÍ" : "NO") + "\n" +
-      "Tamaño: " + size + "\n" +
-      "Contenido: " + parsed + "\n\n" +
-      "DB en memoria:\n" +
-      "  Proyectos: " + (db?.projects?.length||0) + "\n" +
-      "  Cotizaciones: " + (db?.quotes?.length||0) + "\n" +
-      "  Usuario activo: " + (db?.settings?.session?.userId||"ninguno")
+      "Tamaño: " + size + "\n\n" +
+      "Proyectos en memoria: " + (db?.projects?.length||0) + "\n" +
+      projDetail + "\n\n" +
+      "Segmento activo: " + seg + "\n" +
+      "Usuario activo: " + (db?.settings?.session?.userId||"ninguno")
     );
   });
 
