@@ -357,11 +357,12 @@ async function gsPush(){
   if(!GS_URL || _gsPushing) return;
   _gsPushing = true;
   try {
+    const form = new FormData();
+    form.append("data", JSON.stringify(db));
     await fetch(GS_URL, {
       method:"POST",
       mode:"no-cors",
-      headers:{"Content-Type":"application/json"},
-      body: JSON.stringify(db)
+      body: form
     });
     const el = document.getElementById("syncStatus");
     if(el){ el.textContent = "✓ Sync " + new Date().toLocaleTimeString("es-MX",{hour:"2-digit",minute:"2-digit"}); el.style.color="green"; }
