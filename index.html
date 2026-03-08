@@ -324,7 +324,7 @@ function normalizeDB(){
   db.settings.breakEven = db.settings.breakEven || defaultDB().settings.breakEven;
   db.projects = Array.isArray(db.projects)? db.projects : [];
   db.quotes = Array.isArray(db.quotes)? db.quotes : [];
-  db.settings.empresa = db.settings.empresa || {nombre:"ESMA INDUSTRIAL", tel:"", email:"", web:"", redes:"", direccion:"", logoB64:"", marcaAgua:""};
+  db.settings.empresa = db.settings.empresa || {nombre:"ESMA INDUSTRIAL", tel:"", email:"", web:"", redes:"", direccion:"", logoB64:"", titulo:"Propuesta de Servicios"};
   db.installs = Array.isArray(db.installs)? db.installs : [];
   db.purchases = Array.isArray(db.purchases)? db.purchases : [];
   db.tasks = Array.isArray(db.tasks)? db.tasks : [];
@@ -849,7 +849,7 @@ function createProject(){
 }
 function createQuote(projectId){
   const num = db.quotes.filter(x=>x.projectId===projectId).length + 1;
-  const q={id:uid(), projectId, name:"Cotización "+num, status:"draft", saleType:"manufactured", marginPct:25, createdAt:todayISO(), products:[], routes:[], extras:[]};
+  const q={id:uid(), projectId, name:"Cotización "+num, qty:1, status:"draft", saleType:"manufactured", marginPct:25, createdAt:todayISO(), products:[], routes:[], extras:[]};
   db.quotes.unshift(q); save(); return q;
 }
 function routeByName(name){ return (db.settings.routeDB||[]).find(r=>r.name===name)||null; }
@@ -864,6 +864,10 @@ function openQuoteEditor(q){
   $("mainContent").innerHTML=`
     <div class="row" style="flex-wrap:wrap; gap:8px;">
       <input id="qNameInput" value="${escapeAttr(q.name||"Cotización")}" style="font-weight:700; font-size:15px; border:1.5px solid var(--border); border-radius:8px; padding:5px 10px; min-width:200px; flex:1;" placeholder="Nombre de cotización...">
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px;white-space:nowrap;">
+        <span style="color:var(--muted);">Cantidad:</span>
+        <input id="qQtyInput" type="number" min="1" value="${Number(q.qty||1)}" style="width:70px;border:1.5px solid var(--border);border-radius:8px;padding:5px 8px;font-size:14px;font-weight:700;">
+      </label>
       <span class="pill">Estado: <b>${q.status==="authorized"?"Autorizada":"Borrador"}</b></span>
       <div class="right"></div>
       <button class="btn small" id="btnQuotePDF2">🖨 PDF / Imprimir</button>
@@ -1039,6 +1043,8 @@ function openQuoteEditor(q){
   on($("addExtra"),"click", ()=>{ q.extras=q.extras||[]; q.extras.push({id:uid(), label:"", amount:0}); save(); renderLines(); });
 
   on($("qNameInput"),"blur", ()=>{ q.name=$("qNameInput").value.trim()||"Cotización"; save(); });
+  on($("qQtyInput"),"blur", ()=>{ q.qty=Math.max(1,Number($("qQtyInput").value||1)); save(); renderLines(); });
+  on($("qQtyInput"),"keydown",(e)=>{ if(e.key==="Enter"){ e.preventDefault(); $("qQtyInput").blur(); }});
   on($("btnToggleAuth"),"click", ()=>{ q.status=(q.status==="authorized")?"draft":"authorized"; save(); renderProjectsList(); renderMain(); });
   on($("btnBackQuotes"),"click", ()=>{ mainTab="quotes"; renderMain(); });
   on($("btnQuotePDF2"),"click", ()=>{
@@ -1157,6 +1163,11 @@ function renderEmpresaPanel(){
         </div>
 
         <div style="grid-column:1/-1;">
+          <label style="font-size:12px;font-weight:700;color:var(--muted);display:block;margin-bottom:4px;">TÍTULO DEL PDF (encabezado de cotización)</label>
+          <input id="empTitulo" value="${escapeAttr(emp.titulo||"Propuesta de Servicios")}" placeholder="Propuesta de Servicios" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;">
+        </div>
+
+        <div style="grid-column:1/-1;">
           <label style="font-size:12px;font-weight:700;color:var(--muted);display:block;margin-bottom:4px;">LOGO (para PDF)</label>
           <div style="display:flex;gap:12px;align-items:center;">
             ${emp.logoB64 ? `<img src="${emp.logoB64}" style="height:60px;background:#000;border-radius:8px;padding:4px 8px;">` : '<span style="color:var(--muted);font-size:13px;">Sin logo cargado</span>'}
@@ -1192,6 +1203,7 @@ function renderEmpresaPanel(){
       redes: $("empRedes").value.trim(),
       direccion: $("empDir").value.trim(),
       logoB64: db.settings.empresa.logoB64||"",
+      titulo: $("empTitulo").value.trim() || "Propuesta de Servicios",
     };
     save();
     alert("✅ Datos guardados. Se usarán en todos los PDFs.");
@@ -1725,9 +1737,11 @@ function buildQuotePDFHTML(p, q, extraQuotes, includeIVA){
 
   allQuotes.forEach((cot, ci) => {
     const t = quoteSellTotals(cot);
-    grandTotal += t.venta;
     const cotName = escapeHTML(cot.name || ("Cotización "+(ci+1)));
-    rowsHTML += `<tr><td>${cotName}</td><td style="text-align:right;font-weight:700;">$${money(t.venta)}</td></tr>`;
+    const qty = Number(cot.qty||1);
+    const totalConQty = t.venta * qty;
+    grandTotal += totalConQty;
+    rowsHTML += `<tr><td>${cotName}${qty>1?` <span style="color:#888;font-size:11px;">(x${qty})</span>`:""}</td><td style="text-align:right;font-weight:700;">$${money(totalConQty)}</td></tr>`;
   });
 
   const subtotal = grandTotal;
@@ -1800,7 +1814,7 @@ function buildQuotePDFHTML(p, q, extraQuotes, includeIVA){
     <!-- HEADER -->
     <div class="header">
       <div class="logo-wrap">
-        ${logoSrc ? `<img src="${logoSrc}" alt="${escapeHTML(emp.nombre||"ESMA Industrial")}" style="height:72px;background:#000;border-radius:8px;padding:4px 10px;">` : `<div style="font-size:22px;font-weight:900;color:#1a3a6b;">${escapeHTML(emp.nombre||"ESMA INDUSTRIAL")}</div>`}
+        ${logoSrc ? `<img src="${logoSrc}" alt="${escapeHTML(emp.nombre||"ESMA Industrial")}" style="height:200px;background:#000;border-radius:10px;padding:6px 14px;">` : `<div style="font-size:22px;font-weight:900;color:#1a3a6b;">${escapeHTML(emp.nombre||"ESMA INDUSTRIAL")}</div>`}
       </div>
       <div class="company-info">
         <b>${escapeHTML(emp.nombre||"ESMA INDUSTRIAL")}</b><br>
@@ -1812,7 +1826,7 @@ function buildQuotePDFHTML(p, q, extraQuotes, includeIVA){
 
     <!-- TITLE -->
     <div class="doc-title">
-      Propuesta de Servicios
+      ${escapeHTML(emp.titulo||"Propuesta de Servicios")}
       <div class="folio">Folio: ${escapeHTML(q.id.slice(0,8).toUpperCase())} &nbsp;·&nbsp; Fecha: ${escapeHTML(dt)}</div>
     </div>
 
