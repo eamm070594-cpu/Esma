@@ -383,7 +383,7 @@ async function gsPullOnBoot(){
       db = data;
       normalizeDB();
       localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
-      renderProjectsList(); renderMain();
+      setSeg(seg); renderMain();
       syncStatusUpdate("↓ Sincronizado", "green");
     } else if(json.ok && !json.data){
       // Sheets is empty, push local data up
