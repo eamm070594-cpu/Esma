@@ -152,6 +152,7 @@
           <div style="display:flex;gap:6px">
             <button class="btn small" id="btnGsPush">⬆ Subir</button>
             <button class="btn small" id="btnGsPull">⬇ Descargar</button>
+            <button class="btn small danger" id="btnResetSync" title="Borra datos locales y descarga desde Sheets">↺ Resetear</button>
             <span id="syncStatus" style="font-size:11px;color:var(--muted);align-self:center"></span>
           </div>
           <div class="menuTitle">Datos</div>
@@ -1739,6 +1740,14 @@ function downloadQuotePDF(){ alert('Función PDF no encontrada en esta versión.
 
   document.getElementById("btnGsPush")?.addEventListener("click", gsPush);
   document.getElementById("btnGsPull")?.addEventListener("click", gsPullOnBoot);
+  document.getElementById("btnResetSync")?.addEventListener("click", async ()=>{
+    if(!GS_URL){ alert("Primero guarda la URL de Apps Script"); return; }
+    if(!confirm("¿Borrar datos locales y descargar todo desde Google Sheets?")) return;
+    localStorage.removeItem(STORAGE_KEY);
+    db = defaultDB();
+    syncStatusUpdate("Descargando...", "orange");
+    await gsPullOnBoot();
+  });
 })();
 
 </script>
