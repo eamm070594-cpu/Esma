@@ -341,7 +341,8 @@ function load(){
 //  GOOGLE SHEETS SYNC
 // ============================================================
 const GS_KEY = "esma_gs_url";
-let GS_URL = localStorage.getItem(GS_KEY) || "";
+const DEFAULT_GS_URL = "https://script.google.com/macros/s/AKfycbyn9__H4FS_tp1lUKrdPTuKGhIwats7M3iNT33raDR1M0qCZqwUaKYCJTtFGpX6M7jmTQ/exec";
+let GS_URL = localStorage.getItem(GS_KEY) || DEFAULT_GS_URL;
 let _syncInProgress = false;
 let _lastSaveTime = 0;
 
@@ -379,19 +380,14 @@ async function gsPullOnBoot(){
     // Accept both {ok:true, data:{...}} and direct DB object
     const data = (json.ok && json.data) ? json.data : (!json.error && json.projects) ? json : null;
     if(data && data.projects){
-      // Only load remote data if local is empty
-      const localCount = db.projects ? db.projects.length : 0;
-      if(localCount === 0){
-        db = data;
-        normalizeDB();
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
-        renderProjectsList(); renderMain();
-        syncStatusUpdate("↓ Sincronizado", "green");
-      } else {
-        syncStatusUpdate("✓ Conectado", "green");
-      }
+      db = data;
+      normalizeDB();
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
+      renderProjectsList(); renderMain();
+      syncStatusUpdate("↓ Sincronizado", "green");
     } else if(json.ok && !json.data){
-      syncStatusUpdate("✓ Conectado", "green");
+      // Sheets is empty, push local data up
+      syncStatusUpdate("Sheets vacío, subiendo...", "orange");
       _syncInProgress = false;
       await gsPush();
       return;
@@ -403,7 +399,7 @@ async function gsPullOnBoot(){
 
 // Auto-sync every 30s if no recent save
 // Auto-sync disabled
-// setInterval(()=>{ if(GS_URL && !_syncInProgress && (Date.now()-_lastSaveTime)>60000) gsPullOnBoot(); }, 30000);
+setInterval(()=>{ if(GS_URL && !_syncInProgress && (Date.now()-(_lastSaveTime||0))>60000) gsPullOnBoot(); }, 30000);
 
 function currentUser(){
   const id = db.settings.session?.userId;
@@ -1730,8 +1726,8 @@ function seedDemo(){
 
 function boot(){
   load();
-  // Auto-pull disabled
-  // gsPullOnBoot();
+  // Pull from Sheets on startup
+  gsPullOnBoot();
   const u=currentUser();
   $("whoami").textContent = u ? (u.name+" · "+u.role.toUpperCase()) : "No autenticado";
   $("btnLogout").style.display = u ? "" : "none";
