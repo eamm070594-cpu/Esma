@@ -350,7 +350,7 @@ function gsPushDebounced(){
   _lastSaveTime = Date.now();
   if(!GS_URL) return;
   clearTimeout(_gsPushTimer);
-  _gsPushTimer = setTimeout(gsPush, 500);
+  _gsPushTimer = setTimeout(gsPush, 2000);
 }
 
 async function gsPush(){
@@ -376,17 +376,41 @@ async function gsPull(){
     const r = await fetch(GS_URL + "?t=" + Date.now());
     const remote = await r.json();
     if(remote && !remote.error && remote.projects){
-      db = remote;
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
-      renderProjectsList(); renderMain();
-      const el = document.getElementById("syncStatus");
-      if(el){ el.textContent = "↓ Descargado " + new Date().toLocaleTimeString("es-MX",{hour:"2-digit",minute:"2-digit"}); el.style.color="green"; }
+      // Only overwrite if remote has data OR local is empty
+      const localCount = (db.projects||[]).length + (db.quotes||[]).length;
+      const remoteCount = (remote.projects||[]).length + (remote.quotes||[]).length;
+      if(remoteCount >= localCount){
+        db = remote;
+        normalizeDB();
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
+        renderProjectsList(); renderMain();
+        const el = document.getElementById("syncStatus");
+        if(el){ el.textContent = "↓ Descargado " + new Date().toLocaleTimeString("es-MX",{hour:"2-digit",minute:"2-digit"}); el.style.color="green"; }
+      }
     }
   } catch(e) { console.warn("gsPull error", e); }
 }
 
-// Auto-pull every 30s if no recent save
-setInterval(()=>{ if(GS_URL && (Date.now()-_lastSaveTime) > 60000) gsPull(); }, 30000);
+// Pull only once on startup, not on interval
+async function gsPullOnBoot(){
+  if(!GS_URL) return;
+  try {
+    const r = await fetch(GS_URL + "?t=" + Date.now());
+    const remote = await r.json();
+    if(remote && !remote.error && remote.projects){
+      const localCount = (db.projects||[]).length + (db.quotes||[]).length;
+      const remoteCount = (remote.projects||[]).length + (remote.quotes||[]).length;
+      if(remoteCount >= localCount){
+        db = remote;
+        normalizeDB();
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
+        renderProjectsList(); renderMain();
+        const el = document.getElementById("syncStatus");
+        if(el){ el.textContent = "↓ Sincronizado"; el.style.color="green"; }
+      }
+    }
+  } catch(e) { console.warn("gsPull error", e); }
+}
 
 function currentUser(){
   const id = db.settings.session?.userId;
@@ -1655,6 +1679,8 @@ function seedDemo(){
 
 function boot(){
   load();
+  // Pull from Sheets on startup only
+  gsPullOnBoot();
   const u=currentUser();
   $("whoami").textContent = u ? (u.name+" · "+u.role.toUpperCase()) : "No autenticado";
   $("btnLogout").style.display = u ? "" : "none";
@@ -1726,12 +1752,11 @@ function downloadQuotePDF(){ alert('Función PDF no encontrada en esta versión.
     GS_URL = val;
     localStorage.setItem(GS_KEY, GS_URL);
     const el = document.getElementById("syncStatus");
-    if(el){ el.textContent = "URL guardada. Probando..."; el.style.color="var(--muted)"; }
-    gsPull();
+    if(el){ el.textContent = "✓ URL guardada"; el.style.color="green"; }
   });
 
   document.getElementById("btnGsPush")?.addEventListener("click", gsPush);
-  document.getElementById("btnGsPull")?.addEventListener("click", gsPull);
+  document.getElementById("btnGsPull")?.addEventListener("click", gsPullOnBoot);
 })();
 
 </script>
