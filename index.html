@@ -335,84 +335,64 @@ function load(){
   }catch(e){ db=defaultDB(); }
   normalizeDB();
 }
-function save(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(db)); gsPushDebounced(); }
-
 // ============================================================
 //  GOOGLE SHEETS SYNC
 // ============================================================
 const GS_KEY = "esma_gs_url";
 let GS_URL = localStorage.getItem(GS_KEY) || "";
-let _gsPushing = false;
-let _gsPushTimer = null;
+let _syncInProgress = false;
 let _lastSaveTime = 0;
 
-function gsPushDebounced(){
+function save(){
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
   _lastSaveTime = Date.now();
-  if(!GS_URL) return;
-  clearTimeout(_gsPushTimer);
-  _gsPushTimer = setTimeout(gsPush, 2000);
+  if(GS_URL){ clearTimeout(save._t); save._t = setTimeout(gsPush, 300); }
+}
+
+function syncStatusUpdate(msg, color){
+  const el = document.getElementById("syncStatus");
+  if(el){ el.textContent = msg; el.style.color = color||"var(--muted)"; }
 }
 
 async function gsPush(){
-  if(!GS_URL || _gsPushing) return;
-  _gsPushing = true;
+  if(!GS_URL || _syncInProgress) return;
+  _syncInProgress = true;
+  syncStatusUpdate("Sincronizando...", "orange");
   try {
-    const form = new FormData();
-    form.append("data", JSON.stringify(db));
-    await fetch(GS_URL, {
-      method:"POST",
-      mode:"no-cors",
-      body: form
-    });
-    const el = document.getElementById("syncStatus");
-    if(el){ el.textContent = "✓ Sync " + new Date().toLocaleTimeString("es-MX",{hour:"2-digit",minute:"2-digit"}); el.style.color="green"; }
+    const payload = JSON.stringify({action:"save", data:db});
+    await fetch(GS_URL, {method:"POST", mode:"no-cors", headers:{"Content-Type":"text/plain"}, body:payload});
+    syncStatusUpdate("✓ Sync " + new Date().toLocaleTimeString("es-MX",{hour:"2-digit",minute:"2-digit"}), "green");
   } catch(e) {
-    const el = document.getElementById("syncStatus");
-    if(el){ el.textContent = "⚠ Sin conexión"; el.style.color="orange"; }
-  } finally { _gsPushing = false; }
+    syncStatusUpdate("⚠ Sin conexión", "orange");
+  } finally { _syncInProgress = false; }
 }
 
-async function gsPull(){
-  if(!GS_URL) return;
-  try {
-    const r = await fetch(GS_URL + "?t=" + Date.now());
-    const remote = await r.json();
-    if(remote && !remote.error && remote.projects){
-      // Only overwrite if remote has data OR local is empty
-      const localCount = (db.projects||[]).length + (db.quotes||[]).length;
-      const remoteCount = (remote.projects||[]).length + (remote.quotes||[]).length;
-      if(remoteCount >= localCount){
-        db = remote;
-        normalizeDB();
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
-        renderProjectsList(); renderMain();
-        const el = document.getElementById("syncStatus");
-        if(el){ el.textContent = "↓ Descargado " + new Date().toLocaleTimeString("es-MX",{hour:"2-digit",minute:"2-digit"}); el.style.color="green"; }
-      }
-    }
-  } catch(e) { console.warn("gsPull error", e); }
-}
-
-// Pull only once on startup, not on interval
 async function gsPullOnBoot(){
   if(!GS_URL) return;
+  _syncInProgress = true;
+  syncStatusUpdate("Descargando...", "orange");
   try {
-    const r = await fetch(GS_URL + "?t=" + Date.now());
-    const remote = await r.json();
-    if(remote && !remote.error && remote.projects){
-      const localCount = (db.projects||[]).length + (db.quotes||[]).length;
-      const remoteCount = (remote.projects||[]).length + (remote.quotes||[]).length;
-      if(remoteCount >= localCount){
-        db = remote;
-        normalizeDB();
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
-        renderProjectsList(); renderMain();
-        const el = document.getElementById("syncStatus");
-        if(el){ el.textContent = "↓ Sincronizado"; el.style.color="green"; }
-      }
-    }
-  } catch(e) { console.warn("gsPull error", e); }
+    const res = await fetch(GS_URL + "?action=load");
+    const json = await res.json();
+    if(json.ok && json.data){
+      db = json.data;
+      normalizeDB();
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
+      renderProjectsList(); renderMain();
+      syncStatusUpdate("↓ Sincronizado", "green");
+    } else if(json.ok && !json.data){
+      syncStatusUpdate("✓ Conectado", "green");
+      _syncInProgress = false;
+      await gsPush();
+      return;
+    } else { throw new Error(json.error||"Error"); }
+  } catch(e) {
+    syncStatusUpdate("⚠ Error al descargar", "orange");
+  } finally { _syncInProgress = false; }
 }
+
+// Auto-sync every 30s if no recent save
+setInterval(()=>{ if(GS_URL && !_syncInProgress && (Date.now()-_lastSaveTime)>60000) gsPullOnBoot(); }, 30000);
 
 function currentUser(){
   const id = db.settings.session?.userId;
