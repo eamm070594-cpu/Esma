@@ -157,7 +157,9 @@
           </div>
           <div class="menuTitle">Datos</div>
           <button class="btn small" id="btnBackup">⬇ Respaldo local</button>
-          <button class="btn small" id="btnRestore">⬆ Restaurar local</button>
+          <button class="btn small" id="btnRestore">⬆ Restaurar archivo</button>
+          <button class="btn small" id="btnRestoreText">📋 Restaurar desde texto</button>
+          <button class="btn small" id="btnDiag" title="Ver estado del almacenamiento">🔍 Diagnóstico</button>
           <input type="file" id="restoreFile" accept="application/json" style="display:none">
         </div>
       </details>
@@ -330,15 +332,9 @@ function normalizeDB(){
   db.projects.forEach(p=>{ p.photos = p.photos||[]; });
   db.settings.materialDB.forEach(m=>{ m.cost = Number(m.cost||0); });
 }
-// In-memory fallback (for environments where localStorage is unavailable)
-const _memStore = {};
-function _storageGet(key){ try{ return localStorage.getItem(key); }catch(e){ return _memStore[key]||null; } }
-function _storageSet(key, val){ try{ localStorage.setItem(key, val); }catch(e){ _memStore[key]=val; } }
-function _storageRemove(key){ try{ localStorage.removeItem(key); }catch(e){ delete _memStore[key]; } }
-
 function load(){
   try{
-    const raw = _storageGet(STORAGE_KEY);
+    const raw = localStorage.getItem(STORAGE_KEY);
     db = raw ? JSON.parse(raw) : defaultDB();
   }catch(e){ db=defaultDB(); }
   normalizeDB();
@@ -347,12 +343,17 @@ function load(){
 //  GOOGLE SHEETS SYNC
 // ============================================================
 const GS_KEY = "esma_gs_url";
-let GS_URL = _storageGet(GS_KEY) || "";
+let GS_URL = localStorage.getItem(GS_KEY) || "";
 let _syncInProgress = false;
 let _lastSaveTime = 0;
 
 function save(){
-  _storageSet(STORAGE_KEY, JSON.stringify(db));
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
+  } catch(e) {
+    console.error("Error al guardar:", e);
+    alert("Error al guardar datos: " + e.message);
+  }
   _lastSaveTime = Date.now();
   if(GS_URL){ clearTimeout(save._t); save._t = setTimeout(gsPush, 300); }
 }
@@ -387,7 +388,7 @@ async function gsPullOnBoot(){
     if(data){
       db = data;
       normalizeDB();
-      _storageSet(STORAGE_KEY, JSON.stringify(db));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
       renderProjectsList(); renderMain();
       syncStatusUpdate("↓ Sincronizado", "green");
     } else if(json.ok && !json.data){
@@ -1684,13 +1685,50 @@ function buildQuotePDFHTML(p,q){
 }
 
 function exportJSON(){
-  const blob=new Blob([JSON.stringify(db,null,2)],{type:"application/json"});
-  const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="ESMA_respaldo.json"; a.click(); URL.revokeObjectURL(a.href);
+  // Try native download first; fall back to copy-to-clipboard modal
+  try {
+    const json = JSON.stringify(db, null, 2);
+    const blob = new Blob([json], {type:"application/json"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = "ESMA_respaldo.json";
+    document.body.appendChild(a); a.click();
+    setTimeout(()=>{ document.body.removeChild(a); URL.revokeObjectURL(url); }, 500);
+  } catch(e) {
+    showBackupModal();
+  }
+}
+function showBackupModal(){
+  const json = JSON.stringify(db, null, 2);
+  let modal = document.getElementById("backupModal");
+  if(!modal){
+    modal = document.createElement("div");
+    modal.id = "backupModal";
+    modal.style.cssText = "position:fixed;inset:0;background:rgba(2,6,23,.6);display:flex;align-items:center;justify-content:center;z-index:999;";
+    modal.innerHTML = `
+      <div style="background:#fff;border-radius:18px;padding:20px;width:90vw;max-width:600px;max-height:80vh;display:flex;flex-direction:column;gap:12px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <b style="font-size:16px;">💾 Respaldo de datos</b>
+          <button onclick="document.getElementById('backupModal').remove()" style="border:none;background:none;font-size:20px;cursor:pointer;">✕</button>
+        </div>
+        <p style="color:#64748b;font-size:13px;margin:0;">Copia todo el texto y guárdalo en un archivo .json para restaurarlo después.</p>
+        <textarea id="backupText" style="flex:1;min-height:300px;border:1px solid #e5e7eb;border-radius:10px;padding:10px;font-size:11px;font-family:monospace;resize:none;" readonly></textarea>
+        <button onclick="navigator.clipboard.writeText(document.getElementById('backupText').value).then(()=>alert('¡Copiado al portapapeles!'))" style="background:#0f172a;color:#fff;border:none;border-radius:12px;padding:10px;font-weight:800;cursor:pointer;">📋 Copiar al portapapeles</button>
+      </div>`;
+    document.body.appendChild(modal);
+  }
+  document.getElementById("backupText").value = json;
 }
 function restoreJSON(file){
   const reader=new FileReader();
-  reader.onload=()=>{ try{ db=JSON.parse(reader.result); normalizeDB(); save(); location.reload(); }catch(e){ alert("Archivo inválido."); } };
+  reader.onload=()=>{ try{ db=JSON.parse(reader.result); normalizeDB(); save(); renderProjectsList(); renderMain(); alert("¡Datos restaurados!"); }catch(e){ alert("Archivo inválido."); } };
   reader.readAsText(file);
+}
+function restoreFromText(){
+  const text = prompt("Pega el JSON de tu respaldo:");
+  if(!text) return;
+  try{ db=JSON.parse(text); normalizeDB(); save(); renderProjectsList(); renderMain(); alert("¡Datos restaurados!"); }
+  catch(e){ alert("JSON inválido."); }
 }
 function downloadCSV(filename, rows){
   const esc=(v)=> `"${String(v??"").replaceAll('"','""')}"`;
@@ -1768,6 +1806,24 @@ function boot(){
   on($("btnBackup"),"click", exportJSON);
   on($("btnRestore"),"click", ()=>$("restoreFile").click());
   on($("restoreFile"),"change", ()=>{ const f=$("restoreFile").files?.[0]; if(f) restoreJSON(f); });
+  on($("btnRestoreText"),"click", restoreFromText);
+  on($("btnDiag"),"click", ()=>{
+    const key = STORAGE_KEY;
+    const raw = localStorage.getItem(key);
+    const size = raw ? (raw.length / 1024).toFixed(1) + " KB" : "0";
+    const parsed = raw ? (() => { try { const d = JSON.parse(raw); return `Proyectos: ${d.projects?.length||0}, Cotizaciones: ${d.quotes?.length||0}`; } catch(e){ return "Error al parsear JSON"; } })() : "Sin datos";
+    alert(
+      "=== DIAGNÓSTICO ESMA ===\n\n" +
+      "Clave: " + key + "\n" +
+      "Datos guardados: " + (raw ? "SÍ" : "NO") + "\n" +
+      "Tamaño: " + size + "\n" +
+      "Contenido: " + parsed + "\n\n" +
+      "DB en memoria:\n" +
+      "  Proyectos: " + (db?.projects?.length||0) + "\n" +
+      "  Cotizaciones: " + (db?.quotes?.length||0) + "\n" +
+      "  Usuario activo: " + (db?.settings?.session?.userId||"ninguno")
+    );
+  });
 
   on($("btnReports"),"click", ()=>{
     const pick=prompt("Reportes:\n1) Proyectos (CSV)\n2) Cotizaciones autorizadas (CSV)\nEscribe 1 o 2:", "1");
@@ -1800,7 +1856,7 @@ function downloadQuotePDF(){ alert('Función PDF no encontrada en esta versión.
     const val = (document.getElementById("gsUrlInput")?.value||"").trim();
     if(!val){ alert("Pega la URL de tu Apps Script"); return; }
     GS_URL = val;
-    _storageSet(GS_KEY, GS_URL);
+    localStorage.setItem(GS_KEY, GS_URL);
     const el = document.getElementById("syncStatus");
     if(el){ el.textContent = "✓ URL guardada"; el.style.color="green"; }
   });
@@ -1810,7 +1866,7 @@ function downloadQuotePDF(){ alert('Función PDF no encontrada en esta versión.
   document.getElementById("btnResetSync")?.addEventListener("click", async ()=>{
     if(!GS_URL){ alert("Primero guarda la URL de Apps Script"); return; }
     if(!confirm("¿Borrar datos locales y descargar todo desde Google Sheets?")) return;
-    _storageRemove(STORAGE_KEY);
+    localStorage.removeItem(STORAGE_KEY);
     db = defaultDB();
     syncStatusUpdate("Descargando...", "orange");
     await gsPullOnBoot();
