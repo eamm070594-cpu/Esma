@@ -1727,31 +1727,7 @@ function buildQuotePDFHTML(p, q, extraQuotes, includeIVA){
     const t = quoteSellTotals(cot);
     grandTotal += t.venta;
     const cotName = escapeHTML(cot.name || ("Cotización "+(ci+1)));
-
-    // Conceptos = productos con descripción, rutas como mano de obra, extras
-    const prods = (cot.products||[]).filter(r=>r.desc||r.matPick);
-    const routes = (cot.routes||[]).filter(r=>r.routeName||r.hours);
-    const extras = (cot.extras||[]).filter(r=>r.label);
-
-    rowsHTML += `<tr class="section-header"><td colspan="3">${cotName}</td><td style="text-align:right;">$${money(t.venta)}</td></tr>`;
-
-    prods.forEach(r=>{
-      const desc = escapeHTML(r.desc||r.matPick||"");
-      const qty = Number(r.qty||0);
-      const unit = Number(r.unitPrice||0);
-      // price shown to client uses margin
-      const sell = unit * qty;
-      rowsHTML += `<tr><td style="padding-left:20px;">${desc}</td><td style="text-align:center;">${qty}</td><td style="text-align:right;">$${money(unit)}</td><td style="text-align:right;">$${money(sell)}</td></tr>`;
-    });
-
-    routes.forEach(r=>{
-      const hrs = Number(r.hours||0);
-      rowsHTML += `<tr><td style="padding-left:20px;">Mano de obra — ${escapeHTML(r.routeName||"")}</td><td style="text-align:center;">${hrs} hrs</td><td style="text-align:right;">—</td><td style="text-align:right;">$${money(Number(r.rate||0)*hrs)}</td></tr>`;
-    });
-
-    extras.forEach(r=>{
-      rowsHTML += `<tr><td style="padding-left:20px;">${escapeHTML(r.label||"")}</td><td style="text-align:center;">—</td><td style="text-align:right;">—</td><td style="text-align:right;">$${money(Number(r.amount||0))}</td></tr>`;
-    });
+    rowsHTML += `<tr><td>${cotName}</td><td style="text-align:right;font-weight:700;">$${money(t.venta)}</td></tr>`;
   });
 
   const subtotal = grandTotal;
@@ -1860,10 +1836,8 @@ function buildQuotePDFHTML(p, q, extraQuotes, includeIVA){
     <table>
       <thead>
         <tr>
-          <th>Descripción</th>
-          <th style="width:80px; text-align:right;">Cant.</th>
-          <th style="width:110px; text-align:right;">Unitario</th>
-          <th style="width:120px; text-align:right;">Importe</th>
+          <th>Concepto</th>
+          <th style="width:140px; text-align:right;">Importe</th>
         </tr>
       </thead>
       <tbody>
