@@ -178,8 +178,8 @@
       </div>
       <div class="pad">
         <div class="segbox">
-          <div class="seg active" id="segAuth">Autorizados</div>
-          <div class="seg" id="segNoAuth">No autorizados</div>
+          <div class="seg" id="segAuth">Autorizados</div>
+          <div class="seg active" id="segNoAuth">No autorizados</div>
           <div class="seg" id="segDone">Terminados</div>
         </div>
 
@@ -416,7 +416,7 @@ function login(email, pass){
 }
 function logout(){ db.settings.session.userId=""; save(); location.reload(); }
 
-let seg="auth", sortMode="delivery", searchTerm="", selectedProjectId="", mainTab="overview", drawerMode="calendar";
+let seg="noauth", sortMode="delivery", searchTerm="", selectedProjectId="", mainTab="overview", drawerMode="calendar";
 let salesCursor=new Date(); salesCursor.setDate(1);
 let calCursor=new Date(); calCursor.setDate(1);
 let calSelectedDay="";
@@ -1776,8 +1776,8 @@ function seedDemo(){
 
 function boot(){
   load();
-  // Pull from Sheets on startup only
-  gsPullOnBoot();
+  // Auto-pull disabled: use manual sync buttons to avoid CORS issues on boot
+  // gsPullOnBoot();
   const u=currentUser();
   $("whoami").textContent = u ? (u.name+" · "+u.role.toUpperCase()) : "No autenticado";
   $("btnLogout").style.display = u ? "" : "none";
