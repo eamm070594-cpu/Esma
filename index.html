@@ -157,9 +157,7 @@
           </div>
           <div class="menuTitle">Datos</div>
           <button class="btn small" id="btnBackup">⬇ Respaldo local</button>
-          <button class="btn small" id="btnRestore">⬆ Restaurar archivo</button>
-          <button class="btn small" id="btnRestoreText">📋 Restaurar desde texto</button>
-          <button class="btn small" id="btnDiag" title="Ver estado del almacenamiento">🔍 Diagnóstico</button>
+          <button class="btn small" id="btnRestore">⬆ Restaurar local</button>
           <input type="file" id="restoreFile" accept="application/json" style="display:none">
         </div>
       </details>
@@ -343,20 +341,14 @@ function load(){
 //  GOOGLE SHEETS SYNC
 // ============================================================
 const GS_KEY = "esma_gs_url";
-let GS_URL = localStorage.getItem(GS_KEY) || ""; // Load URL but no auto-sync
+let GS_URL = localStorage.getItem(GS_KEY) || "";
 let _syncInProgress = false;
 let _lastSaveTime = 0;
 
 function save(){
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
-  } catch(e) {
-    console.error("Error al guardar:", e);
-    alert("Error al guardar datos: " + e.message);
-  }
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
   _lastSaveTime = Date.now();
-  // Auto-push disabled: use manual sync buttons
-  // if(GS_URL){ clearTimeout(save._t); save._t = setTimeout(gsPush, 300); }
+  if(GS_URL){ clearTimeout(save._t); save._t = setTimeout(gsPush, 300); }
 }
 
 function syncStatusUpdate(msg, color){
@@ -387,7 +379,6 @@ async function gsPullOnBoot(){
     // Accept both {ok:true, data:{...}} and direct DB object
     const data = (json.ok && json.data) ? json.data : (!json.error && json.projects) ? json : null;
     if(data && data.projects && data.projects.length > 0){
-      // Only overwrite local if sheets has actual data
       db = data;
       normalizeDB();
       localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
@@ -396,18 +387,15 @@ async function gsPullOnBoot(){
     } else if(json.ok && !json.data){
       syncStatusUpdate("✓ Conectado", "green");
       _syncInProgress = false;
-      // Don't auto-push, let user decide
       return;
-    } else {
-      syncStatusUpdate("⚠ Sin datos en Sheets", "orange");
-    }
+    } else { throw new Error(json.error||"Error"); }
   } catch(e) {
     syncStatusUpdate("⚠ Error al descargar", "orange");
   } finally { _syncInProgress = false; }
 }
 
 // Auto-sync every 30s if no recent save
-// Auto-sync interval disabled to prevent overwriting local data on failed requests
+// Auto-sync disabled to prevent data loss on failed requests
 // setInterval(()=>{ if(GS_URL && !_syncInProgress && (Date.now()-_lastSaveTime)>60000) gsPullOnBoot(); }, 30000);
 
 function currentUser(){
@@ -512,44 +500,35 @@ function setSeg(newSeg){
 }
 
 function renderProjectsList(){
-  try {
-    const box=$("projectsList");
-    if(!box){ console.error("No se encontró #projectsList"); return; }
-    const term=searchTerm.trim().toLowerCase();
-    const items=db.projects.map(p=>{
-      const auth=projectHasAuthorized(p.id);
-      const done=projectIsDone(p.id);
-      const pseg= done ? "done" : (auth ? "auth" : "noauth");
-      return {...p, __seg:pseg, __authTotal: projectAuthorizedTotal(p.id)};
-    }).filter(p=>{
-      if(seg==="auth" && p.__seg!=="auth") return false;
-      if(seg==="noauth" && p.__seg!=="noauth") return false;
-      if(seg==="done" && p.__seg!=="done") return false;
-      if(term && !(String(p.name||"").toLowerCase().includes(term) || String(p.client||"").toLowerCase().includes(term))) return false;
-      return true;
-    });
+  const box=$("projectsList");
+  const term=searchTerm.trim().toLowerCase();
+  const items=db.projects.map(p=>{
+    const auth=projectHasAuthorized(p.id);
+    const done=projectIsDone(p.id);
+    const pseg= done ? "done" : (auth ? "auth" : "noauth");
+    return {...p, __seg:pseg, __authTotal: projectAuthorizedTotal(p.id)};
+  }).filter(p=>{
+    if(seg==="auth" && p.__seg!=="auth") return false;
+    if(seg==="noauth" && p.__seg!=="noauth") return false;
+    if(seg==="done" && p.__seg!=="done") return false;
+    if(term && !(String(p.name||"").toLowerCase().includes(term) || String(p.client||"").toLowerCase().includes(term))) return false;
+    return true;
+  });
 
-    items.sort((a,b)=>{
-      if(sortMode==="name") return String(a.name||"").localeCompare(String(b.name||""));
-      if(sortMode==="created") return String(a.createdAt||"").localeCompare(String(b.createdAt||""));
-      if(sortMode==="cost") return (b.__authTotal - a.__authTotal);
-      return String(a.deliveryDate||"9999-12-31").localeCompare(String(b.deliveryDate||"9999-12-31"));
-    });
+  items.sort((a,b)=>{
+    if(sortMode==="name") return String(a.name||"").localeCompare(String(b.name||""));
+    if(sortMode==="created") return String(a.createdAt||"").localeCompare(String(b.createdAt||""));
+    if(sortMode==="cost") return (b.__authTotal - a.__authTotal);
+    return String(a.deliveryDate||"9999-12-31").localeCompare(String(b.deliveryDate||"9999-12-31"));
+  });
 
-    console.log("renderProjectsList: seg="+seg+" items="+items.length+" total="+db.projects.length);
+  box.innerHTML = items.length ? items.map(p=>{
+    const dotClass = p.__seg==="auth" ? "ok" : (p.__seg==="done" ? "done" : "no");
+    const sub=[p.client?("Cliente: "+p.client):null, p.deliveryDate?("Entrega: "+p.deliveryDate):"Entrega: —", ("$"+money(p.__authTotal)+" autoriz.")].filter(Boolean).join(" · ");
+    return `<div class="proj" data-id="${p.id}"><div class="dot ${dotClass}"></div><div style="min-width:0;"><b>${escapeHTML(p.name||"Sin nombre")}</b><div class="meta">${escapeHTML(sub)}</div></div></div>`;
+  }).join("") : `<div class="muted" style="padding:10px 2px;">Sin proyectos aquí.</div>`;
 
-    box.innerHTML = items.length ? items.map(p=>{
-      const dotClass = p.__seg==="auth" ? "ok" : (p.__seg==="done" ? "done" : "no");
-      const sub=[p.client?("Cliente: "+p.client):null, p.deliveryDate?("Entrega: "+p.deliveryDate):"Entrega: —", ("$"+money(p.__authTotal)+" autoriz.")].filter(Boolean).join(" · ");
-      return `<div class="proj" data-id="${escapeAttr(p.id)}"><div class="dot ${dotClass}"></div><div style="min-width:0;"><b>${escapeHTML(p.name||"Sin nombre")}</b><div class="meta">${escapeHTML(sub)}</div></div></div>`;
-    }).join("") : `<div class="muted" style="padding:10px 2px;">Sin proyectos aquí.</div>`;
-
-    box.querySelectorAll(".proj").forEach(el=>on(el,"click", ()=>{ selectedProjectId=el.dataset.id; mainTab="overview"; renderMain(); }));
-  } catch(e) {
-    console.error("Error en renderProjectsList:", e);
-    const box=$("projectsList");
-    if(box) box.innerHTML = `<div style="color:red;padding:10px;">Error al mostrar proyectos: ${e.message}</div>`;
-  }
+  box.querySelectorAll(".proj").forEach(el=>on(el,"click", ()=>{ selectedProjectId=el.dataset.id; mainTab="overview"; renderMain(); }));
 }
 
 function renderMain(){
@@ -1699,50 +1678,13 @@ function buildQuotePDFHTML(p,q){
 }
 
 function exportJSON(){
-  // Try native download first; fall back to copy-to-clipboard modal
-  try {
-    const json = JSON.stringify(db, null, 2);
-    const blob = new Blob([json], {type:"application/json"});
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url; a.download = "ESMA_respaldo.json";
-    document.body.appendChild(a); a.click();
-    setTimeout(()=>{ document.body.removeChild(a); URL.revokeObjectURL(url); }, 500);
-  } catch(e) {
-    showBackupModal();
-  }
-}
-function showBackupModal(){
-  const json = JSON.stringify(db, null, 2);
-  let modal = document.getElementById("backupModal");
-  if(!modal){
-    modal = document.createElement("div");
-    modal.id = "backupModal";
-    modal.style.cssText = "position:fixed;inset:0;background:rgba(2,6,23,.6);display:flex;align-items:center;justify-content:center;z-index:999;";
-    modal.innerHTML = `
-      <div style="background:#fff;border-radius:18px;padding:20px;width:90vw;max-width:600px;max-height:80vh;display:flex;flex-direction:column;gap:12px;">
-        <div style="display:flex;justify-content:space-between;align-items:center;">
-          <b style="font-size:16px;">💾 Respaldo de datos</b>
-          <button onclick="document.getElementById('backupModal').remove()" style="border:none;background:none;font-size:20px;cursor:pointer;">✕</button>
-        </div>
-        <p style="color:#64748b;font-size:13px;margin:0;">Copia todo el texto y guárdalo en un archivo .json para restaurarlo después.</p>
-        <textarea id="backupText" style="flex:1;min-height:300px;border:1px solid #e5e7eb;border-radius:10px;padding:10px;font-size:11px;font-family:monospace;resize:none;" readonly></textarea>
-        <button onclick="navigator.clipboard.writeText(document.getElementById('backupText').value).then(()=>alert('¡Copiado al portapapeles!'))" style="background:#0f172a;color:#fff;border:none;border-radius:12px;padding:10px;font-weight:800;cursor:pointer;">📋 Copiar al portapapeles</button>
-      </div>`;
-    document.body.appendChild(modal);
-  }
-  document.getElementById("backupText").value = json;
+  const blob=new Blob([JSON.stringify(db,null,2)],{type:"application/json"});
+  const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="ESMA_respaldo.json"; a.click(); URL.revokeObjectURL(a.href);
 }
 function restoreJSON(file){
   const reader=new FileReader();
-  reader.onload=()=>{ try{ db=JSON.parse(reader.result); normalizeDB(); save(); renderProjectsList(); renderMain(); alert("¡Datos restaurados!"); }catch(e){ alert("Archivo inválido."); } };
+  reader.onload=()=>{ try{ db=JSON.parse(reader.result); normalizeDB(); save(); location.reload(); }catch(e){ alert("Archivo inválido."); } };
   reader.readAsText(file);
-}
-function restoreFromText(){
-  const text = prompt("Pega el JSON de tu respaldo:");
-  if(!text) return;
-  try{ db=JSON.parse(text); normalizeDB(); save(); renderProjectsList(); renderMain(); alert("¡Datos restaurados!"); }
-  catch(e){ alert("JSON inválido."); }
 }
 function downloadCSV(filename, rows){
   const esc=(v)=> `"${String(v??"").replaceAll('"','""')}"`;
@@ -1780,10 +1722,8 @@ function seedDemo(){
 }
 
 function boot(){
-  // Clear any stored GS URL to prevent auto-sync issues
-  // User must re-enter it manually each session if needed
   load();
-  // Auto-pull disabled: use manual sync buttons to avoid CORS issues on boot
+  // Pull from Sheets on startup only - DISABLED (causes data loss on CORS error)
   // gsPullOnBoot();
   const u=currentUser();
   $("whoami").textContent = u ? (u.name+" · "+u.role.toUpperCase()) : "No autenticado";
@@ -1822,31 +1762,6 @@ function boot(){
   on($("btnBackup"),"click", exportJSON);
   on($("btnRestore"),"click", ()=>$("restoreFile").click());
   on($("restoreFile"),"change", ()=>{ const f=$("restoreFile").files?.[0]; if(f) restoreJSON(f); });
-  on($("btnRestoreText"),"click", restoreFromText);
-  on($("btnDiag"),"click", ()=>{
-    const key = STORAGE_KEY;
-    const raw = localStorage.getItem(key);
-    const size = raw ? (raw.length / 1024).toFixed(1) + " KB" : "0";
-    const parsed = raw ? (() => { try { const d = JSON.parse(raw); return `Proyectos: ${d.projects?.length||0}, Cotizaciones: ${d.quotes?.length||0}`; } catch(e){ return "Error al parsear JSON"; } })() : "Sin datos";
-    const projDetail = (db?.projects||[]).map(p => {
-      const hasAuth = db.quotes.some(q=>q.projectId===p.id && q.status==="authorized");
-      const tasks = db.tasks.filter(t=>t.projectId===p.id);
-      const allDone = tasks.length>0 && tasks.every(t=>!!t.done);
-      const isDone = hasAuth && (allDone || !!p.manualDone);
-      const seg = isDone ? "done" : (hasAuth ? "auth" : "noauth");
-      return "  ["+seg+"] " + (p.name||"Sin nombre");
-    }).join("\n");
-    alert(
-      "=== DIAGNÓSTICO ESMA ===\n\n" +
-      "Clave: " + key + "\n" +
-      "Datos guardados: " + (raw ? "SÍ" : "NO") + "\n" +
-      "Tamaño: " + size + "\n\n" +
-      "Proyectos en memoria: " + (db?.projects?.length||0) + "\n" +
-      projDetail + "\n\n" +
-      "Segmento activo: " + seg + "\n" +
-      "Usuario activo: " + (db?.settings?.session?.userId||"ninguno")
-    );
-  });
 
   on($("btnReports"),"click", ()=>{
     const pick=prompt("Reportes:\n1) Proyectos (CSV)\n2) Cotizaciones autorizadas (CSV)\nEscribe 1 o 2:", "1");
