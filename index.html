@@ -348,7 +348,7 @@ let _lastSaveTime = 0;
 function save(){
   localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
   _lastSaveTime = Date.now();
-  if(GS_URL){ clearTimeout(save._t); save._t = setTimeout(gsPush, 300); }
+  // Auto-push removed: use manual sync buttons only
 }
 
 function syncStatusUpdate(msg, color){
@@ -366,7 +366,9 @@ async function gsPush(){
     syncStatusUpdate("✓ Sync " + new Date().toLocaleTimeString("es-MX",{hour:"2-digit",minute:"2-digit"}), "green");
   } catch(e) {
     syncStatusUpdate("⚠ Sin conexión", "orange");
-  } finally { _syncInProgress = false; }
+  } finally {
+    _syncInProgress = false; // Always release, even on error
+  }
 }
 
 async function gsPullOnBoot(){
