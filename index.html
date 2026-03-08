@@ -343,7 +343,7 @@ function load(){
 //  GOOGLE SHEETS SYNC
 // ============================================================
 const GS_KEY = "esma_gs_url";
-let GS_URL = localStorage.getItem(GS_KEY) || "";
+let GS_URL = ""; // Never auto-load GS_URL to prevent accidental syncs
 let _syncInProgress = false;
 let _lastSaveTime = 0;
 
@@ -1780,6 +1780,8 @@ function seedDemo(){
 }
 
 function boot(){
+  // Clear any stored GS URL to prevent auto-sync issues
+  // User must re-enter it manually each session if needed
   load();
   // Auto-pull disabled: use manual sync buttons to avoid CORS issues on boot
   // gsPullOnBoot();
