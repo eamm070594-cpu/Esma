@@ -348,7 +348,7 @@ let _lastSaveTime = 0;
 function save(){
   localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
   _lastSaveTime = Date.now();
-  // Auto-push removed: use manual sync buttons only
+  if(GS_URL){ clearTimeout(save._t); save._t = setTimeout(gsPush, 500); }
 }
 
 function syncStatusUpdate(msg, color){
@@ -373,27 +373,39 @@ async function gsPush(){
 
 async function gsPullOnBoot(){
   if(!GS_URL) return;
+  if(_syncInProgress) return;
   _syncInProgress = true;
   syncStatusUpdate("Descargando...", "orange");
   try {
-    const res = await fetch(GS_URL + "?action=load");
+    const res = await fetch(GS_URL + "?action=load", {signal: AbortSignal.timeout(8000)});
     const json = await res.json();
-    // Accept both {ok:true, data:{...}} and direct DB object
     const data = (json.ok && json.data) ? json.data : (!json.error && json.projects) ? json : null;
-    if(data && data.projects && data.projects.length > 0){
-      db = data;
-      normalizeDB();
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
-      renderProjectsList(); renderMain();
-      syncStatusUpdate("↓ Sincronizado", "green");
+    if(data && data.projects && Array.isArray(data.projects)){
+      // Only overwrite local if remote has MORE projects (avoid data loss)
+      const localCount = db.projects ? db.projects.length : 0;
+      const remoteCount = data.projects.length;
+      if(remoteCount >= localCount){
+        db = data;
+        normalizeDB();
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
+        renderProjectsList(); renderMain();
+        syncStatusUpdate("↓ Sincronizado (" + remoteCount + " proy.)", "green");
+      } else {
+        syncStatusUpdate("✓ Local más reciente", "green");
+        // Push local to sheets since it has more data
+        setTimeout(gsPush, 500);
+      }
     } else if(json.ok && !json.data){
-      syncStatusUpdate("✓ Conectado", "green");
-      _syncInProgress = false;
-      return;
-    } else { throw new Error(json.error||"Error"); }
+      syncStatusUpdate("✓ Sheets vacío, subiendo local...", "green");
+      setTimeout(gsPush, 500);
+    } else {
+      throw new Error(json.error||"Respuesta inválida");
+    }
   } catch(e) {
-    syncStatusUpdate("⚠ Error al descargar", "orange");
-  } finally { _syncInProgress = false; }
+    syncStatusUpdate("⚠ Sin conexión a Sheets", "orange");
+  } finally {
+    _syncInProgress = false;
+  }
 }
 
 // Auto-sync every 30s if no recent save
@@ -1725,8 +1737,8 @@ function seedDemo(){
 
 function boot(){
   load();
-  // Pull from Sheets on startup only - DISABLED (causes data loss on CORS error)
-  // gsPullOnBoot();
+  // Pull from Sheets on startup
+  gsPullOnBoot();
   const u=currentUser();
   $("whoami").textContent = u ? (u.name+" · "+u.role.toUpperCase()) : "No autenticado";
   $("btnLogout").style.display = u ? "" : "none";
