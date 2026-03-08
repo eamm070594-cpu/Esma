@@ -343,7 +343,7 @@ function load(){
 //  GOOGLE SHEETS SYNC
 // ============================================================
 const GS_KEY = "esma_gs_url";
-let GS_URL = ""; // Never auto-load GS_URL to prevent accidental syncs
+let GS_URL = localStorage.getItem(GS_KEY) || ""; // Load URL but no auto-sync
 let _syncInProgress = false;
 let _lastSaveTime = 0;
 
