@@ -507,35 +507,44 @@ function setSeg(newSeg){
 }
 
 function renderProjectsList(){
-  const box=$("projectsList");
-  const term=searchTerm.trim().toLowerCase();
-  const items=db.projects.map(p=>{
-    const auth=projectHasAuthorized(p.id);
-    const done=projectIsDone(p.id);
-    const pseg= done ? "done" : (auth ? "auth" : "noauth");
-    return {...p, __seg:pseg, __authTotal: projectAuthorizedTotal(p.id)};
-  }).filter(p=>{
-    if(seg==="auth" && p.__seg!=="auth") return false;
-    if(seg==="noauth" && p.__seg!=="noauth") return false;
-    if(seg==="done" && p.__seg!=="done") return false;
-    if(term && !(String(p.name||"").toLowerCase().includes(term) || String(p.client||"").toLowerCase().includes(term))) return false;
-    return true;
-  });
+  try {
+    const box=$("projectsList");
+    if(!box){ console.error("No se encontró #projectsList"); return; }
+    const term=searchTerm.trim().toLowerCase();
+    const items=db.projects.map(p=>{
+      const auth=projectHasAuthorized(p.id);
+      const done=projectIsDone(p.id);
+      const pseg= done ? "done" : (auth ? "auth" : "noauth");
+      return {...p, __seg:pseg, __authTotal: projectAuthorizedTotal(p.id)};
+    }).filter(p=>{
+      if(seg==="auth" && p.__seg!=="auth") return false;
+      if(seg==="noauth" && p.__seg!=="noauth") return false;
+      if(seg==="done" && p.__seg!=="done") return false;
+      if(term && !(String(p.name||"").toLowerCase().includes(term) || String(p.client||"").toLowerCase().includes(term))) return false;
+      return true;
+    });
 
-  items.sort((a,b)=>{
-    if(sortMode==="name") return String(a.name||"").localeCompare(String(b.name||""));
-    if(sortMode==="created") return String(a.createdAt||"").localeCompare(String(b.createdAt||""));
-    if(sortMode==="cost") return (b.__authTotal - a.__authTotal);
-    return String(a.deliveryDate||"9999-12-31").localeCompare(String(b.deliveryDate||"9999-12-31"));
-  });
+    items.sort((a,b)=>{
+      if(sortMode==="name") return String(a.name||"").localeCompare(String(b.name||""));
+      if(sortMode==="created") return String(a.createdAt||"").localeCompare(String(b.createdAt||""));
+      if(sortMode==="cost") return (b.__authTotal - a.__authTotal);
+      return String(a.deliveryDate||"9999-12-31").localeCompare(String(b.deliveryDate||"9999-12-31"));
+    });
 
-  box.innerHTML = items.length ? items.map(p=>{
-    const dotClass = p.__seg==="auth" ? "ok" : (p.__seg==="done" ? "done" : "no");
-    const sub=[p.client?("Cliente: "+p.client):null, p.deliveryDate?("Entrega: "+p.deliveryDate):"Entrega: —", ("$"+money(p.__authTotal)+" autoriz.")].filter(Boolean).join(" · ");
-    return `<div class="proj" data-id="${p.id}"><div class="dot ${dotClass}"></div><div style="min-width:0;"><b>${escapeHTML(p.name||"Sin nombre")}</b><div class="meta">${escapeHTML(sub)}</div></div></div>`;
-  }).join("") : `<div class="muted" style="padding:10px 2px;">Sin proyectos aquí.</div>`;
+    console.log("renderProjectsList: seg="+seg+" items="+items.length+" total="+db.projects.length);
 
-  box.querySelectorAll(".proj").forEach(el=>on(el,"click", ()=>{ selectedProjectId=el.dataset.id; mainTab="overview"; renderMain(); }));
+    box.innerHTML = items.length ? items.map(p=>{
+      const dotClass = p.__seg==="auth" ? "ok" : (p.__seg==="done" ? "done" : "no");
+      const sub=[p.client?("Cliente: "+p.client):null, p.deliveryDate?("Entrega: "+p.deliveryDate):"Entrega: —", ("$"+money(p.__authTotal)+" autoriz.")].filter(Boolean).join(" · ");
+      return `<div class="proj" data-id="${escapeAttr(p.id)}"><div class="dot ${dotClass}"></div><div style="min-width:0;"><b>${escapeHTML(p.name||"Sin nombre")}</b><div class="meta">${escapeHTML(sub)}</div></div></div>`;
+    }).join("") : `<div class="muted" style="padding:10px 2px;">Sin proyectos aquí.</div>`;
+
+    box.querySelectorAll(".proj").forEach(el=>on(el,"click", ()=>{ selectedProjectId=el.dataset.id; mainTab="overview"; renderMain(); }));
+  } catch(e) {
+    console.error("Error en renderProjectsList:", e);
+    const box=$("projectsList");
+    if(box) box.innerHTML = `<div style="color:red;padding:10px;">Error al mostrar proyectos: ${e.message}</div>`;
+  }
 }
 
 function renderMain(){
