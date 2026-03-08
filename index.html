@@ -330,9 +330,15 @@ function normalizeDB(){
   db.projects.forEach(p=>{ p.photos = p.photos||[]; });
   db.settings.materialDB.forEach(m=>{ m.cost = Number(m.cost||0); });
 }
+// In-memory fallback (for environments where localStorage is unavailable)
+const _memStore = {};
+function _storageGet(key){ try{ return localStorage.getItem(key); }catch(e){ return _memStore[key]||null; } }
+function _storageSet(key, val){ try{ localStorage.setItem(key, val); }catch(e){ _memStore[key]=val; } }
+function _storageRemove(key){ try{ localStorage.removeItem(key); }catch(e){ delete _memStore[key]; } }
+
 function load(){
   try{
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = _storageGet(STORAGE_KEY);
     db = raw ? JSON.parse(raw) : defaultDB();
   }catch(e){ db=defaultDB(); }
   normalizeDB();
@@ -341,12 +347,12 @@ function load(){
 //  GOOGLE SHEETS SYNC
 // ============================================================
 const GS_KEY = "esma_gs_url";
-let GS_URL = localStorage.getItem(GS_KEY) || "";
+let GS_URL = _storageGet(GS_KEY) || "";
 let _syncInProgress = false;
 let _lastSaveTime = 0;
 
 function save(){
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
+  _storageSet(STORAGE_KEY, JSON.stringify(db));
   _lastSaveTime = Date.now();
   if(GS_URL){ clearTimeout(save._t); save._t = setTimeout(gsPush, 300); }
 }
@@ -381,7 +387,7 @@ async function gsPullOnBoot(){
     if(data){
       db = data;
       normalizeDB();
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
+      _storageSet(STORAGE_KEY, JSON.stringify(db));
       renderProjectsList(); renderMain();
       syncStatusUpdate("↓ Sincronizado", "green");
     } else if(json.ok && !json.data){
@@ -838,7 +844,7 @@ function createProject(){
   const p={id:uid(), name:name.trim()||"Proyecto", createdAt:todayISO(), deliveryDate:"", client:"", notes:""};
   db.projects.unshift(p); save();
   selectedProjectId=p.id; mainTab="overview";
-  renderProjectsList(); renderMain();
+  setSeg("noauth");
 }
 function createQuote(projectId){
   const q={id:uid(), projectId, status:"draft", saleType:"manufactured", marginPct:25, createdAt:todayISO(), products:[], routes:[], extras:[]};
@@ -1794,7 +1800,7 @@ function downloadQuotePDF(){ alert('Función PDF no encontrada en esta versión.
     const val = (document.getElementById("gsUrlInput")?.value||"").trim();
     if(!val){ alert("Pega la URL de tu Apps Script"); return; }
     GS_URL = val;
-    localStorage.setItem(GS_KEY, GS_URL);
+    _storageSet(GS_KEY, GS_URL);
     const el = document.getElementById("syncStatus");
     if(el){ el.textContent = "✓ URL guardada"; el.style.color="green"; }
   });
@@ -1804,7 +1810,7 @@ function downloadQuotePDF(){ alert('Función PDF no encontrada en esta versión.
   document.getElementById("btnResetSync")?.addEventListener("click", async ()=>{
     if(!GS_URL){ alert("Primero guarda la URL de Apps Script"); return; }
     if(!confirm("¿Borrar datos locales y descargar todo desde Google Sheets?")) return;
-    localStorage.removeItem(STORAGE_KEY);
+    _storageRemove(STORAGE_KEY);
     db = defaultDB();
     syncStatusUpdate("Descargando...", "orange");
     await gsPullOnBoot();
