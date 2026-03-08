@@ -149,11 +149,10 @@
             <input id="gsUrlInput" placeholder="URL Apps Script..." style="flex:1;min-width:0;padding:7px 10px;border:1px solid var(--border);border-radius:10px;font-size:12px">
             <button class="btn small primary" id="btnSaveGsUrl">Guardar</button>
           </div>
-          <div style="display:flex;gap:6px">
+          <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
             <button class="btn small" id="btnGsPush">⬆ Subir</button>
             <button class="btn small" id="btnGsPull">⬇ Descargar</button>
-            <button class="btn small danger" id="btnResetSync" title="Borra datos locales y descarga desde Sheets">↺ Resetear</button>
-            <span id="syncStatus" style="font-size:11px;color:var(--muted);align-self:center"></span>
+            <span id="syncStatus" style="font-size:11px;color:var(--muted);"></span>
           </div>
           <div class="menuTitle">Datos</div>
           <button class="btn small" id="btnBackup">⬇ Respaldo local</button>
@@ -279,6 +278,8 @@
 
 <script>
 const STORAGE_KEY = "esma_app_b_v1";
+const GS_KEY = "esma_gs_url";
+let GS_URL = localStorage.getItem(GS_KEY) || "";
 const MONTHS = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
 const DOW = ["L","M","M","J","V","S","D"];
 const $ = (id)=>document.getElementById(id);
@@ -337,80 +338,55 @@ function load(){
   }catch(e){ db=defaultDB(); }
   normalizeDB();
 }
-// ============================================================
-//  GOOGLE SHEETS SYNC
-// ============================================================
-const GS_KEY = "esma_gs_url";
-let GS_URL = localStorage.getItem(GS_KEY) || "";
-let _syncInProgress = false;
-let _lastSaveTime = 0;
-
 function save(){
   localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
-  _lastSaveTime = Date.now();
-  if(GS_URL){ clearTimeout(save._t); save._t = setTimeout(gsPush, 500); }
+}
+
+async function gsPush(){
+  if(!GS_URL) return;
+  try {
+    const payload = JSON.stringify({action:"save", data:db});
+    await fetch(GS_URL, {method:"POST", mode:"no-cors", headers:{"Content-Type":"text/plain"}, body:payload});
+    syncStatusUpdate("✓ Guardado en Sheets", "green");
+  } catch(e) {
+    syncStatusUpdate("⚠ Sin conexión", "orange");
+  }
+}
+
+async function gsPull(){
+  if(!GS_URL) return;
+  syncStatusUpdate("Descargando...", "orange");
+  try {
+    const res = await fetch(GS_URL + "?action=load", {signal: AbortSignal.timeout(8000)});
+    const json = await res.json();
+    const data = (json.ok && json.data) ? json.data : null;
+    if(data && Array.isArray(data.projects)){
+      const localCount = db.projects ? db.projects.length : 0;
+      const remoteCount = data.projects.length;
+      if(remoteCount >= localCount){
+        db = data; normalizeDB();
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
+        renderProjectsList(); renderMain();
+        syncStatusUpdate("↓ Sincronizado (" + remoteCount + " proy.)", "green");
+      } else {
+        syncStatusUpdate("✓ Local más reciente", "green");
+        await gsPush();
+      }
+    } else if(json.ok && !json.data){
+      syncStatusUpdate("Sheets vacío, subiendo...", "orange");
+      await gsPush();
+    } else {
+      throw new Error("Respuesta inválida");
+    }
+  } catch(e) {
+    syncStatusUpdate("⚠ Error: " + e.message, "red");
+  }
 }
 
 function syncStatusUpdate(msg, color){
   const el = document.getElementById("syncStatus");
   if(el){ el.textContent = msg; el.style.color = color||"var(--muted)"; }
 }
-
-async function gsPush(){
-  if(!GS_URL || _syncInProgress) return;
-  _syncInProgress = true;
-  syncStatusUpdate("Sincronizando...", "orange");
-  try {
-    const payload = JSON.stringify({action:"save", data:db});
-    await fetch(GS_URL, {method:"POST", mode:"no-cors", headers:{"Content-Type":"text/plain"}, body:payload});
-    syncStatusUpdate("✓ Sync " + new Date().toLocaleTimeString("es-MX",{hour:"2-digit",minute:"2-digit"}), "green");
-  } catch(e) {
-    syncStatusUpdate("⚠ Sin conexión", "orange");
-  } finally {
-    _syncInProgress = false; // Always release, even on error
-  }
-}
-
-async function gsPullOnBoot(){
-  if(!GS_URL) return;
-  if(_syncInProgress) return;
-  _syncInProgress = true;
-  syncStatusUpdate("Descargando...", "orange");
-  try {
-    const res = await fetch(GS_URL + "?action=load", {signal: AbortSignal.timeout(8000)});
-    const json = await res.json();
-    const data = (json.ok && json.data) ? json.data : (!json.error && json.projects) ? json : null;
-    if(data && data.projects && Array.isArray(data.projects)){
-      // Only overwrite local if remote has MORE projects (avoid data loss)
-      const localCount = db.projects ? db.projects.length : 0;
-      const remoteCount = data.projects.length;
-      if(remoteCount >= localCount){
-        db = data;
-        normalizeDB();
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
-        renderProjectsList(); renderMain();
-        syncStatusUpdate("↓ Sincronizado (" + remoteCount + " proy.)", "green");
-      } else {
-        syncStatusUpdate("✓ Local más reciente", "green");
-        // Push local to sheets since it has more data
-        setTimeout(gsPush, 500);
-      }
-    } else if(json.ok && !json.data){
-      syncStatusUpdate("✓ Sheets vacío, subiendo local...", "green");
-      setTimeout(gsPush, 500);
-    } else {
-      throw new Error(json.error||"Respuesta inválida");
-    }
-  } catch(e) {
-    syncStatusUpdate("⚠ Sin conexión a Sheets", "orange");
-  } finally {
-    _syncInProgress = false;
-  }
-}
-
-// Auto-sync every 30s if no recent save
-// Auto-sync disabled to prevent data loss on failed requests
-// setInterval(()=>{ if(GS_URL && !_syncInProgress && (Date.now()-_lastSaveTime)>60000) gsPullOnBoot(); }, 30000);
 
 function currentUser(){
   const id = db.settings.session?.userId;
@@ -1737,8 +1713,7 @@ function seedDemo(){
 
 function boot(){
   load();
-  // Pull from Sheets on startup
-  gsPullOnBoot();
+  if(GS_URL) gsPull();
   const u=currentUser();
   $("whoami").textContent = u ? (u.name+" · "+u.role.toUpperCase()) : "No autenticado";
   $("btnLogout").style.display = u ? "" : "none";
@@ -1773,6 +1748,20 @@ function boot(){
   on($("drawerOverlay"),"click", (e)=>{ if(e.target && e.target.id==="drawerOverlay") closeDrawer(); });
   $("drawerOverlay").querySelectorAll(".chip").forEach(ch=>on(ch,"click", ()=>{ drawerMode=ch.dataset.chip; renderDrawer(); }));
 
+  // Google Sheets UI
+  const gsInput = $("gsUrlInput");
+  if(gsInput && GS_URL) gsInput.value = GS_URL;
+  on($("btnSaveGsUrl"), "click", ()=>{
+    const val = ($("gsUrlInput")?.value||"").trim();
+    if(!val){ alert("Pega la URL de tu Apps Script"); return; }
+    GS_URL = val;
+    localStorage.setItem(GS_KEY, GS_URL);
+    syncStatusUpdate("✓ URL guardada", "green");
+    gsPull();
+  });
+  on($("btnGsPush"), "click", gsPush);
+  on($("btnGsPull"), "click", gsPull);
+
   on($("btnBackup"),"click", exportJSON);
   on($("btnRestore"),"click", ()=>$("restoreFile").click());
   on($("restoreFile"),"change", ()=>{ const f=$("restoreFile").files?.[0]; if(f) restoreJSON(f); });
@@ -1800,30 +1789,7 @@ document.addEventListener("DOMContentLoaded", boot);
 
 function downloadQuotePDF(){ alert('Función PDF no encontrada en esta versión.'); }
 // Google Sheets sync UI
-(function initGsUI(){
-  const urlInput = document.getElementById("gsUrlInput");
-  if(urlInput && GS_URL) urlInput.value = GS_URL;
 
-  document.getElementById("btnSaveGsUrl")?.addEventListener("click", ()=>{
-    const val = (document.getElementById("gsUrlInput")?.value||"").trim();
-    if(!val){ alert("Pega la URL de tu Apps Script"); return; }
-    GS_URL = val;
-    localStorage.setItem(GS_KEY, GS_URL);
-    const el = document.getElementById("syncStatus");
-    if(el){ el.textContent = "✓ URL guardada"; el.style.color="green"; }
-  });
-
-  document.getElementById("btnGsPush")?.addEventListener("click", gsPush);
-  document.getElementById("btnGsPull")?.addEventListener("click", gsPullOnBoot);
-  document.getElementById("btnResetSync")?.addEventListener("click", async ()=>{
-    if(!GS_URL){ alert("Primero guarda la URL de Apps Script"); return; }
-    if(!confirm("¿Borrar datos locales y descargar todo desde Google Sheets?")) return;
-    localStorage.removeItem(STORAGE_KEY);
-    db = defaultDB();
-    syncStatusUpdate("Descargando...", "orange");
-    await gsPullOnBoot();
-  });
-})();
 
 </script>
 </body>
