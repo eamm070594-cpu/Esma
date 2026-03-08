@@ -378,7 +378,7 @@ async function gsPull(){
     if(remote && !remote.error && remote.projects){
       db = remote;
       localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
-      renderAll();
+      renderProjectsList(); renderMain();
       const el = document.getElementById("syncStatus");
       if(el){ el.textContent = "↓ Descargado " + new Date().toLocaleTimeString("es-MX",{hour:"2-digit",minute:"2-digit"}); el.style.color="green"; }
     }
