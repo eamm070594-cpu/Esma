@@ -325,7 +325,9 @@ function normalizeDB(){
   db.projects = Array.isArray(db.projects)? db.projects : [];
   db.quotes = Array.isArray(db.quotes)? db.quotes : [];
   if(!db.settings.empresa) db.settings.empresa = {nombre:"ESMA INDUSTRIAL", tel:"", email:"", web:"", redes:"", direccion:"", logoB64:"", titulo:"Propuesta de Servicios"};
-  else { db.settings.empresa.titulo = db.settings.empresa.titulo || "Propuesta de Servicios"; db.settings.empresa.logoB64 = db.settings.empresa.logoB64 || ""; }
+  else { db.settings.empresa.titulo = db.settings.empresa.titulo || "Propuesta de Servicios"; }
+  // Logo stored separately to survive Sheets sync
+  db.settings.empresa.logoB64 = localStorage.getItem("esma_logo_b64") || "";
   db.installs = Array.isArray(db.installs)? db.installs : [];
   db.purchases = Array.isArray(db.purchases)? db.purchases : [];
   db.tasks = Array.isArray(db.tasks)? db.tasks : [];
@@ -365,7 +367,9 @@ async function gsPush(){
   _syncInProgress = true;
   syncStatusUpdate("Sincronizando...", "orange");
   try {
-    const payload = JSON.stringify({action:"save", data:db});
+    const dbToSync = JSON.parse(JSON.stringify(db));
+  if(dbToSync.settings && dbToSync.settings.empresa) dbToSync.settings.empresa.logoB64 = "";
+  const payload = JSON.stringify({action:"save", data:dbToSync});
     await fetch(GS_URL, {method:"POST", mode:"no-cors", headers:{"Content-Type":"text/plain"}, body:payload});
     syncStatusUpdate("✓ Sync " + new Date().toLocaleTimeString("es-MX",{hour:"2-digit",minute:"2-digit"}), "green");
   } catch(e) {
@@ -604,7 +608,7 @@ function renderOverview(p){
         <div id="photosGrid" style="display:flex; flex-wrap:wrap; gap:8px;">
           ${(p.photos||[]).length === 0 ? '<div class="muted" style="font-size:12px;">Sin fotos aún.</div>' : (p.photos||[]).map((ph,i)=>`
             <div style="position:relative;">
-              <img src="${ph.data}" title="${escapeAttr(ph.name||'')}" style="width:100px;height:100px;object-fit:cover;border-radius:10px;border:1px solid var(--border);cursor:pointer;" data-photo-idx="${i}">
+              <img src="${ph.data}" title="${escapeAttr(ph.name||'')}" style="width:240px;height:240px;object-fit:cover;border-radius:12px;border:1px solid var(--border);cursor:pointer;" data-photo-idx="${i}" data-photo-src="${ph.data}">
               <button data-del-photo="${i}" style="position:absolute;top:3px;right:3px;background:rgba(0,0,0,.6);color:#fff;border:none;border-radius:50%;width:20px;height:20px;cursor:pointer;font-size:11px;display:flex;align-items:center;justify-content:center;">✕</button>
             </div>`).join('')}
         </div>
@@ -654,6 +658,56 @@ function renderOverview(p){
   on($("btnOpenSales"),"click", ()=>openDrawer("sales"));
   on($("btnOpenDB"),"click", ()=>openDrawer("db"));
   on($("btnOpenBE"),"click", ()=>openDrawer("breakeven"));
+
+  // Photo upload handler
+  const photoInput = $("photoInput");
+  if(photoInput){
+    on(photoInput, "change", (e)=>{
+      const files = [...e.target.files];
+      if(!files.length) return;
+      p.photos = p.photos || [];
+      let loaded = 0;
+      files.forEach(file=>{
+        // Resize to max 800px to keep localStorage manageable
+        const img = new Image();
+        const url = URL.createObjectURL(file);
+        img.onload = ()=>{
+          const MAX = 800;
+          const scale = Math.min(1, MAX/Math.max(img.width,img.height));
+          const canvas = document.createElement("canvas");
+          canvas.width = Math.round(img.width*scale);
+          canvas.height = Math.round(img.height*scale);
+          canvas.getContext("2d").drawImage(img,0,0,canvas.width,canvas.height);
+          URL.revokeObjectURL(url);
+          p.photos.push({name:file.name, data:canvas.toDataURL("image/jpeg",0.7)});
+          loaded++;
+          if(loaded===files.length){ save(); renderMain(); }
+        };
+        img.src = url;
+      });
+    });
+  }
+
+  // Delete photo handler
+  $("mainContent").querySelectorAll("button[data-del-photo]").forEach(btn=>{
+    on(btn,"click",()=>{
+      const idx = Number(btn.dataset.delPhoto);
+      p.photos = p.photos||[];
+      p.photos.splice(idx,1);
+      save(); renderMain();
+    });
+  });
+
+  // Lightbox - click photo to view full size
+  $("mainContent").querySelectorAll("img[data-photo-src]").forEach(img=>{
+    on(img,"click",()=>{
+      const lb = document.createElement("div");
+      lb.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:9999;display:flex;align-items:center;justify-content:center;cursor:zoom-out;";
+      lb.innerHTML=`<img src="${img.dataset.photoSrc}" style="max-width:95vw;max-height:95vh;border-radius:10px;object-fit:contain;">`;
+      lb.onclick=()=>lb.remove();
+      document.body.appendChild(lb);
+    });
+  });
 }
 
 function renderQuotes(p){
@@ -1196,10 +1250,10 @@ function renderEmpresaPanel(){
   on($("empLogoFile"),"change", (e)=>{
     const file = e.target.files[0]; if(!file) return;
     const reader = new FileReader();
-    reader.onload = ev => { db.settings.empresa.logoB64 = ev.target.result; save(); renderEmpresaPanel(); };
+    reader.onload = ev => { db.settings.empresa.logoB64 = ev.target.result; localStorage.setItem("esma_logo_b64", ev.target.result); save(); renderEmpresaPanel(); };
     reader.readAsDataURL(file);
   });
-  if($("empDelLogo")) on($("empDelLogo"),"click",()=>{ db.settings.empresa.logoB64=""; save(); renderEmpresaPanel(); });
+  if($("empDelLogo")) on($("empDelLogo"),"click",()=>{ db.settings.empresa.logoB64=""; localStorage.removeItem("esma_logo_b64"); save(); renderEmpresaPanel(); });
 
   on($("btnSaveEmp"),"click",()=>{
     db.settings.empresa = {
