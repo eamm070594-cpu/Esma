@@ -324,7 +324,8 @@ function normalizeDB(){
   db.settings.breakEven = db.settings.breakEven || defaultDB().settings.breakEven;
   db.projects = Array.isArray(db.projects)? db.projects : [];
   db.quotes = Array.isArray(db.quotes)? db.quotes : [];
-  db.settings.empresa = db.settings.empresa || {nombre:"ESMA INDUSTRIAL", tel:"", email:"", web:"", redes:"", direccion:"", logoB64:"", titulo:"Propuesta de Servicios"};
+  if(!db.settings.empresa) db.settings.empresa = {nombre:"ESMA INDUSTRIAL", tel:"", email:"", web:"", redes:"", direccion:"", logoB64:"", titulo:"Propuesta de Servicios"};
+  else { db.settings.empresa.titulo = db.settings.empresa.titulo || "Propuesta de Servicios"; db.settings.empresa.logoB64 = db.settings.empresa.logoB64 || ""; }
   db.installs = Array.isArray(db.installs)? db.installs : [];
   db.purchases = Array.isArray(db.purchases)? db.purchases : [];
   db.tasks = Array.isArray(db.tasks)? db.tasks : [];
@@ -482,7 +483,7 @@ function renderQuoteBreakdown(q){
 
 
 function projectAuthorizedTotal(pid){
-  return db.quotes.filter(q=>q.projectId===pid && q.status==="authorized").reduce((s,q)=>s+quoteTotal(q),0);
+  return db.quotes.filter(q=>q.projectId===pid && q.status==="authorized").reduce((s,q)=>s+quoteSellTotals(q).venta*(Number(q.qty)||1),0);
 }
 function projectHasAuthorized(pid){ return db.quotes.some(q=>q.projectId===pid && q.status==="authorized"); }
 function projectIsDone(pid){
@@ -596,7 +597,7 @@ function renderOverview(p){
     <div class="card" style="box-shadow:none;">
       <div class="pad">
         <div class="row" style="align-items:center; margin-bottom:10px;">
-          <b>📷 Fotos del lugar</b>
+          <b>📷 Foto de referencia</b>
           <div class="right"></div>
           <label class="btn small" style="cursor:pointer;">＋ Agregar foto <input type="file" id="photoInput" accept="image/*" multiple style="display:none"></label>
         </div>
@@ -751,24 +752,30 @@ function renderOps(p){
 
     <div style="height:12px;"></div>
 
-    <div class="row" style="align-items:flex-start;">
-      <div style="flex:1; min-width:260px;">
+    <div class="card" style="box-shadow:none;">
+      <div class="pad">
         <b style="font-size:13px;">Tareas</b>
         <div class="muted" style="font-size:12px;">Operación interna.</div>
         <div style="height:8px;"></div>
-        <table class="table"><thead><tr><th style="width:34px;"></th><th>Tarea</th><th style="width:90px;"></th></tr></thead><tbody id="tbTasks"></tbody></table>
+        <table class="table"><thead><tr><th style="width:34px;"></th><th>Tarea</th><th style="width:110px;"></th></tr></thead><tbody id="tbTasks"></tbody></table>
       </div>
-      <div style="flex:1; min-width:260px;">
+    </div>
+    <div style="height:10px;"></div>
+    <div class="card" style="box-shadow:none;">
+      <div class="pad">
         <b style="font-size:13px;">Instalaciones</b>
         <div class="muted" style="font-size:12px;">Eventos en calendario.</div>
         <div style="height:8px;"></div>
-        <table class="table"><thead><tr><th style="width:130px;">Fecha</th><th>Detalle</th><th style="width:90px;"></th></tr></thead><tbody id="tbInst"></tbody></table>
+        <table class="table"><thead><tr><th style="width:130px;">Fecha</th><th>Detalle</th><th style="width:110px;"></th></tr></thead><tbody id="tbInst"></tbody></table>
       </div>
-      <div style="flex:1; min-width:260px;">
+    </div>
+    <div style="height:10px;"></div>
+    <div class="card" style="box-shadow:none;">
+      <div class="pad">
         <b style="font-size:13px;">Compras</b>
         <div class="muted" style="font-size:12px;">Eventos en calendario.</div>
         <div style="height:8px;"></div>
-        <table class="table"><thead><tr><th style="width:130px;">Fecha</th><th>Detalle</th><th style="width:90px;"></th></tr></thead><tbody id="tbPurch"></tbody></table>
+        <table class="table"><thead><tr><th style="width:130px;">Fecha</th><th>Detalle</th><th style="width:110px;"></th></tr></thead><tbody id="tbPurch"></tbody></table>
       </div>
     </div>
   `;
@@ -1325,11 +1332,16 @@ function renderSalesPanel(){
   const y=salesCursor.getFullYear(), m=salesCursor.getMonth();
   const start=new Date(y,m,1), end=new Date(y,m+1,1);
   const rows=[]; let total=0;
+  let totalMP=0, totalRuta=0, totalUtil=0;
   db.projects.forEach(p=>{
     const d=parseISO(p.deliveryDate); if(!d) return;
     if(!(d>=start && d<end)) return;
-    const t=projectAuthorizedTotal(p.id); if(t<=0) return;
-    total+=t; rows.push({projectId:p.id, name:p.name, client:p.client, delivery:p.deliveryDate, total:t});
+    const authQuotes = db.quotes.filter(q=>q.projectId===p.id && q.status==="authorized");
+    if(!authQuotes.length) return;
+    let pTotal=0, pMP=0, pRuta=0, pUtil=0;
+    authQuotes.forEach(q=>{ const qty=Number(q.qty)||1; const t=quoteSellTotals(q); pTotal+=t.venta*qty; pMP+=t.mp*qty; pRuta+=t.ruta*qty; pUtil+=t.util*qty; });
+    total+=pTotal; totalMP+=pMP; totalRuta+=pRuta; totalUtil+=pUtil;
+    rows.push({projectId:p.id, name:p.name, client:p.client, delivery:p.deliveryDate, total:pTotal});
   });
   
 rows.sort((a,b)=>String(a.delivery||"").localeCompare(String(b.delivery||"")));
@@ -1361,6 +1373,19 @@ const wkCards = wkKeys.map((k,i)=>{
       <div class="right"></div><button class="btn small" id="salesToday">Hoy</button>
     </div>
     
+    <div style="height:10px;"></div>
+    <div class="card" style="box-shadow:none;">
+      <div class="pad">
+        <b>Resumen del mes</b>
+        <div style="height:10px;"></div>
+        <div class="kpi">
+          <div class="box"><div class="t">Venta total</div><div class="v">$${money(total)}</div></div>
+          <div class="box"><div class="t">Gasto MP</div><div class="v" style="color:var(--bad);">$${money(totalMP)}</div></div>
+          <div class="box"><div class="t">Gasto Ruta</div><div class="v" style="color:var(--warn);">$${money(totalRuta)}</div></div>
+          <div class="box"><div class="t">Utilidad acumulada</div><div class="v" style="color:var(--ok);">$${money(totalUtil)}</div></div>
+        </div>
+      </div>
+    </div>
     <div style="height:10px;"></div>
     <div class="card" style="box-shadow:none;">
       <div class="pad">
