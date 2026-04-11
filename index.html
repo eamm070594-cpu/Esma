@@ -64,6 +64,8 @@
   .dot{ width:10px; height:10px; border-radius:99px; margin-top:5px; }
   .dot.ok{ background:#22c55e; } .dot.no{ background:#f59e0b; } .dot.done{ background:#64748b; }
   .proj b{ font-size:13px; } .proj .meta{ font-size:12px; color:var(--muted); margin-top:2px; }
+  .projThumb{ width:46px; height:46px; border-radius:10px; object-fit:cover; border:1px solid var(--border); flex-shrink:0; }
+  .projThumbEmpty{ width:46px; height:46px; border-radius:10px; border:1.5px dashed var(--border); flex-shrink:0; display:grid; place-items:center; font-size:18px; color:var(--border); cursor:pointer; }
 
   .tabs{ display:flex; gap:8px; flex-wrap:wrap; }
   .tab{ padding:8px 10px; border-radius:999px; border:1px solid var(--border); background:#fff; cursor:pointer; font-weight:950; font-size:12px; color:var(--muted); }
@@ -291,6 +293,25 @@
 
 <script>
 const STORAGE_KEY = "esma_app_b_v1";
+const PHOTOS_KEY_PREFIX = "esma_photos_"; // fotos por proyecto, separadas del DB
+
+function savePhotos(projectId, photos){
+  try {
+    localStorage.setItem(PHOTOS_KEY_PREFIX + projectId, JSON.stringify(photos||[]));
+  } catch(e) {
+    console.warn("No se pudieron guardar fotos (espacio lleno):", e);
+    alert("No hay espacio suficiente para guardar la foto. Intenta con una imagen más pequeña o elimina fotos antiguas.");
+  }
+}
+function loadPhotos(projectId){
+  try {
+    const raw = localStorage.getItem(PHOTOS_KEY_PREFIX + projectId);
+    return raw ? JSON.parse(raw) : [];
+  } catch(e) { return []; }
+}
+function deleteProjectPhotos(projectId){
+  localStorage.removeItem(PHOTOS_KEY_PREFIX + projectId);
+}
 const MONTHS = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
 const DOW = ["L","M","M","J","V","S","D"];
 const $ = (id)=>document.getElementById(id);
@@ -343,7 +364,7 @@ function normalizeDB(){
   db.purchases = Array.isArray(db.purchases)? db.purchases : [];
   db.tasks = Array.isArray(db.tasks)? db.tasks : [];
   db.settings.routeDB.forEach(r=>{ r.costPerHour = Number(r.costPerHour||0); r.breakdown = r.breakdown || {renta:0, mod:0, moi:0, indirectos:0, luz:0, otros:0}; });
-  db.projects.forEach(p=>{ p.photos = p.photos||[]; });
+  db.projects.forEach(p=>{ p.photos = loadPhotos(p.id); });
   db.settings.materialDB.forEach(m=>{ m.cost = Number(m.cost||0); });
 }
 function load(){
@@ -363,7 +384,11 @@ let _syncInProgress = false;
 let _lastSaveTime = 0;
 
 function save(){
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
+  // Guardar fotos separado (no las metemos en el STORAGE_KEY principal)
+  db.projects.forEach(p=>{ if(p.photos && p.photos.length) savePhotos(p.id, p.photos); });
+  const dbSin = JSON.parse(JSON.stringify(db));
+  dbSin.projects.forEach(p=>{ p.photos = []; });
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(dbSin));
   _lastSaveTime = Date.now();
   if(GS_URL){ clearTimeout(save._t); save._t = setTimeout(gsPush, 300); }
 }
@@ -380,6 +405,8 @@ async function gsPush(){
   try {
     const dbToSync = JSON.parse(JSON.stringify(db));
   if(dbToSync.settings && dbToSync.settings.empresa) dbToSync.settings.empresa.logoB64 = "";
+  // No subir fotos a Sheets (se guardan solo en localStorage por proyecto)
+  if(dbToSync.projects) dbToSync.projects.forEach(p=>{ p.photos = []; });
   const payload = JSON.stringify({action:"save", data:dbToSync});
     await fetch(GS_URL, {method:"POST", mode:"no-cors", headers:{"Content-Type":"text/plain"}, body:payload});
     syncStatusUpdate("✓ Sync " + new Date().toLocaleTimeString("es-MX",{hour:"2-digit",minute:"2-digit"}), "green");
@@ -548,7 +575,11 @@ function renderProjectsList(){
   box.innerHTML = items.length ? items.map(p=>{
     const dotClass = p.__seg==="auth" ? "ok" : (p.__seg==="done" ? "done" : "no");
     const sub=[p.client?("Cliente: "+p.client):null, p.deliveryDate?("Entrega: "+p.deliveryDate):"Entrega: —", ("$"+money(p.__authTotal)+" autoriz.")].filter(Boolean).join(" · ");
-    return `<div class="proj" data-id="${p.id}"><div class="dot ${dotClass}"></div><div style="min-width:0;"><b>${escapeHTML(p.name||"Sin nombre")}</b><div class="meta">${escapeHTML(sub)}</div></div></div>`;
+    const photos = loadPhotos(p.id);
+    const thumb = photos.length
+      ? `<img class="projThumb" src="${photos[0].data}" alt="foto">`
+      : `<div class="projThumbEmpty" title="Sin foto">📷</div>`;
+    return `<div class="proj" data-id="${p.id}">${thumb}<div class="dot ${dotClass}" style="margin-top:5px;flex-shrink:0;"></div><div style="min-width:0;"><b>${escapeHTML(p.name||"Sin nombre")}</b><div class="meta">${escapeHTML(sub)}</div></div></div>`;
   }).join("") : `<div class="muted" style="padding:10px 2px;">Sin proyectos aquí.</div>`;
 
   box.querySelectorAll(".proj").forEach(el=>on(el,"click", ()=>{ selectedProjectId=el.dataset.id; mainTab="overview"; renderMain(); }));
@@ -650,6 +681,7 @@ function renderOverview(p){
 
   on($("btnDelP"),"click", ()=>{
     if(!confirm("¿Eliminar el proyecto? Se borrarán cotizaciones y tareas asociadas.")) return;
+    deleteProjectPhotos(p.id);
     db.projects=db.projects.filter(x=>x.id!==p.id);
     db.quotes=db.quotes.filter(x=>x.projectId!==p.id);
     db.tasks=db.tasks.filter(x=>x.projectId!==p.id);
@@ -694,7 +726,7 @@ function renderOverview(p){
           URL.revokeObjectURL(url);
           p.photos.push({name:file.name, data:canvas.toDataURL("image/jpeg",0.7)});
           loaded++;
-          if(loaded===files.length){ save(); renderMain(); }
+          if(loaded===files.length){ savePhotos(p.id, p.photos); save(); renderMain(); }
         };
         img.src = url;
       });
@@ -707,7 +739,7 @@ function renderOverview(p){
       const idx = Number(btn.dataset.delPhoto);
       p.photos = p.photos||[];
       p.photos.splice(idx,1);
-      save(); renderMain();
+      savePhotos(p.id, p.photos); save(); renderMain();
     });
   });
 
