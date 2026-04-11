@@ -557,31 +557,6 @@ async function gsPullOnBoot(){
     const remoteData = (json.ok && json.data) ? json.data : (!json.error && json.projects) ? json : null;
 
     if(remoteData && remoteData.projects){
-      const localProjects = db.projects ? db.projects.length : 0;
-      const remoteProjects = remoteData.projects ? remoteData.projects.length : 0;
-
-      // Si Sheets tiene MÁS proyectos → descargar sin preguntar
-      if(remoteProjects > localProjects){
-        applyRemoteData(remoteData);
-        syncStatusUpdate("↓ Sincronizado " + new Date().toLocaleTimeString("es-MX",{hour:"2-digit",minute:"2-digit"}), "green");
-        return;
-      }
-
-      // Si local tiene MÁS proyectos que remoto → preguntar antes de sobreescribir
-      if(localProjects > remoteProjects && localProjects > 0){
-        _syncInProgress = false;
-        syncStatusUpdate("⚠ Conflicto", "orange");
-        const msg = `Local tiene ${localProjects} proyectos y Sheets tiene ${remoteProjects}.\n\n¿Qué quieres hacer?\n\nOK = Usar datos de Sheets\nCancelar = Mantener local y subir a Sheets`;
-        if(confirm(msg)){
-          applyRemoteData(remoteData);
-        } else {
-          syncStatusUpdate("Subiendo datos locales...", "orange");
-          await gsPush();
-        }
-        return;
-      }
-
-      // Igual número — aplicar Sheets (puede tener datos más recientes)
       applyRemoteData(remoteData);
       syncStatusUpdate("↓ Sincronizado " + new Date().toLocaleTimeString("es-MX",{hour:"2-digit",minute:"2-digit"}), "green");
 
