@@ -2712,7 +2712,7 @@ function downloadQuotePDF(){ alert('Función PDF no encontrada en esta versión.
   document.getElementById("btnGsPush")?.addEventListener("click", gsPush);
   // Inicializar input folio
   const folioInput = document.getElementById("folioCounterInput");
-  if(folioInput) folioInput.value = Number(db.settings.folioCounter||0);
+  if(folioInput) folioInput.value = Number(db?.settings?.folioCounter||0);
   document.getElementById("btnSaveFolio")?.addEventListener("click", ()=>{
     const val = Number(document.getElementById("folioCounterInput").value||0);
     db.settings.folioCounter = val;
