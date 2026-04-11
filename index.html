@@ -2713,9 +2713,6 @@ function downloadQuotePDF(){ alert('Función PDF no encontrada en esta versión.
     alert("✅ El próximo folio será: " + String(val+1).padStart(4,"0"));
   });
   document.getElementById("btnGsPull")?.addEventListener("click", async ()=>{
-    if(db.projects && db.projects.length > 0){
-      if(!confirm("⚠️ Esto descargará los datos de Google Sheets y reemplazará los datos locales.\n\n¿Continuar?")) return;
-    }
     await gsPullOnBoot();
   });
   document.getElementById("btnResetSync")?.addEventListener("click", async ()=>{
