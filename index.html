@@ -127,17 +127,127 @@
     min-width: 280px;
   }
 
+
+  /* ---- Pantalla de inicio ---- */
+  #homeScreen{ display:none; position:fixed; inset:0; background:var(--bg); flex-direction:column; align-items:center; justify-content:center; padding:32px 16px; overflow-y:auto; z-index:100; }
+  #homeScreen .home-logo{ width:120px; height:120px; border-radius:28px; background:var(--brand); display:grid; place-items:center; color:#fff; font-size:48px; font-weight:900; margin-bottom:18px; overflow:hidden; cursor:pointer; position:relative; }
+  #homeScreen .home-logo img{ width:100%; height:100%; object-fit:contain; }
+  #homeScreen .home-logo .logo-hint{ position:absolute; inset:0; background:rgba(0,0,0,.45); display:none; align-items:center; justify-content:center; font-size:12px; color:#fff; border-radius:28px; }
+  #homeScreen .home-logo:hover .logo-hint{ display:flex; }
+  #homeScreen h1{ font-size:26px; font-weight:950; color:var(--text); margin:0 0 4px; text-align:center; }
+  #homeScreen .home-sub{ font-size:14px; color:var(--muted); margin-bottom:40px; text-align:center; }
+  .home-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:16px; max-width:780px; width:100%; }
+  @media(max-width:600px){ .home-grid{ grid-template-columns:1fr 1fr; } }
+  .home-btn{ background:#fff; border:1px solid var(--border); border-radius:22px; padding:28px 16px; display:flex; flex-direction:column; align-items:center; gap:12px; cursor:pointer; transition:box-shadow .15s,transform .15s; text-align:center; }
+  .home-btn:hover{ box-shadow:0 12px 36px rgba(2,6,23,.12); transform:translateY(-2px); }
+  .home-btn .hico{ font-size:36px; line-height:1; }
+  .home-btn .hlabel{ font-size:15px; font-weight:950; color:var(--text); }
+  .home-btn .hdesc{ font-size:12px; color:var(--muted); }
+  .home-btn.primary-btn{ background:var(--brand); border-color:transparent; }
+  .home-btn.primary-btn .hlabel, .home-btn.primary-btn .hdesc{ color:#fff; }
+  .home-footer{ margin-top:32px; font-size:12px; color:var(--muted); display:flex; gap:16px; align-items:center; }
+
+  /* ---- Vistas de sección global ---- */
+  #sectionScreen{ display:none; position:fixed; inset:0; background:var(--bg); flex-direction:column; overflow-y:auto; z-index:100; }
+  .sec-topbar{ background:#fff; border-bottom:1px solid var(--border); padding:12px 20px; display:flex; align-items:center; gap:12px; position:sticky; top:0; z-index:20; }
+  .sec-topbar h2{ margin:0; font-size:17px; font-weight:950; }
+  .sec-topbar .sec-sub{ font-size:12px; color:var(--muted); margin-top:1px; }
+  .sec-body{ max-width:1100px; margin:0 auto; padding:20px 16px; width:100%; }
+  .sec-item{ background:#fff; border:1px solid var(--border); border-radius:14px; padding:12px 14px; display:flex; gap:12px; align-items:flex-start; margin-bottom:8px; }
+  .sec-item:hover{ box-shadow:0 4px 14px rgba(2,6,23,.07); }
+  .sec-item .si-ico{ font-size:22px; flex-shrink:0; margin-top:1px; }
+  .sec-item .si-body{ flex:1; min-width:0; }
+  .sec-item .si-title{ font-size:13px; font-weight:800; }
+  .sec-item .si-meta{ font-size:12px; color:var(--muted); margin-top:2px; }
+  .sec-item .si-right{ flex-shrink:0; display:flex; flex-direction:column; align-items:flex-end; gap:6px; }
+  .sec-filters{ display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px; align-items:center; }
+  .sec-empty{ padding:40px; text-align:center; color:var(--muted); font-size:14px; }
+  .status-dot{ width:8px; height:8px; border-radius:99px; display:inline-block; margin-right:4px; }
+  .status-dot.pending{ background:#f59e0b; }
+  .status-dot.done{ background:#22c55e; }
+  .status-dot.auth{ background:#3b82f6; }
+
 </style>
 </head>
 <body>
 
+<!-- ============ VISTAS DE SECCIÓN ============ -->
+<div id="sectionScreen">
+  <div class="sec-topbar">
+    <button class="iconBtn" id="secBtnBack" title="Volver al inicio">←</button>
+    <div>
+      <h2 id="secTitle">Compras</h2>
+      <div class="sec-sub" id="secSub">Todos los proyectos</div>
+    </div>
+    <div style="margin-left:auto; display:flex; gap:8px;">
+      <button class="btn small primary" id="secBtnAdd" style="display:none;">＋ Agregar</button>
+    </div>
+  </div>
+  <div class="sec-body">
+    <div class="sec-filters" id="secFilters"></div>
+    <div id="secContent"></div>
+  </div>
+</div>
+<!-- ========== FIN VISTAS SECCIÓN ========== -->
+
+<!-- ============ PANTALLA DE INICIO ============ -->
+<div id="homeScreen">
+  <div class="home-logo" id="homeLogoBox" title="Click para cambiar logo">
+    <span id="homeLogoText">E</span>
+    <img id="homeLogoImg" src="" style="display:none;">
+    <div class="logo-hint">📷 Cambiar</div>
+    <input type="file" id="homeLogoFile" accept="image/*" style="display:none;">
+  </div>
+  <h1 id="homeTitle">ESMA INDUSTRIAL</h1>
+  <div class="home-sub" id="homeSub">Sistema de proyectos</div>
+
+  <div class="home-grid">
+    <div class="home-btn primary-btn" id="hbtnProyectos">
+      <div class="hico">📁</div>
+      <div class="hlabel">Proyectos</div>
+      <div class="hdesc">Ver y gestionar proyectos</div>
+    </div>
+    <div class="home-btn" id="hbtnCotizador">
+      <div class="hico">🧾</div>
+      <div class="hlabel">Cotizador</div>
+      <div class="hdesc">Crear y revisar cotizaciones</div>
+    </div>
+    <div class="home-btn" id="hbtnInstalaciones">
+      <div class="hico">🛠️</div>
+      <div class="hlabel">Instalaciones</div>
+      <div class="hdesc">Calendario de instalaciones</div>
+    </div>
+    <div class="home-btn" id="hbtnCompras">
+      <div class="hico">🛒</div>
+      <div class="hlabel">Compras</div>
+      <div class="hdesc">Órdenes y seguimiento</div>
+    </div>
+    <div class="home-btn" id="hbtnCalendario">
+      <div class="hico">📅</div>
+      <div class="hlabel">Calendario</div>
+      <div class="hdesc">Vista general de eventos</div>
+    </div>
+    <div class="home-btn" id="hbtnVentas">
+      <div class="hico">📈</div>
+      <div class="hlabel">Ventas</div>
+      <div class="hdesc">Resumen y métricas</div>
+    </div>
+  </div>
+
+  <div class="home-footer">
+    <span id="homeWhoami">—</span>
+    <button class="btn small" id="homeBtnLogout" style="display:none;">Salir</button>
+  </div>
+</div>
+<!-- ========== FIN PANTALLA INICIO ========== -->
+
 <div class="topbar">
   <div class="topin">
-    <div class="brand">
-      <div class="logo">E</div>
+    <div class="brand" style="cursor:pointer;" id="brandHome" title="Ir al inicio">
+      <div class="logo" id="topbarLogo" style="overflow:hidden;">E</div>
       <div style="min-width:0;">
-        <b>Proyectos ESMA INDUSTRIAL</b>
-        <span>Proyectos · Compras · Instalaciones · Cotizador</span>
+        <b id="topbarTitle">ESMA INDUSTRIAL</b>
+        <span id="topbarSub">Proyectos · Compras · Instalaciones</span>
       </div>
     </div>
 
@@ -168,7 +278,13 @@
             <button class="btn small danger" id="btnResetSync" title="Borra datos locales y descarga desde Sheets">↺ Resetear</button>
             <span id="syncStatus" style="font-size:11px;color:var(--muted);align-self:center"></span>
           </div>
-          <div class="menuTitle">Datos</div>
+          <div class="menuTitle">Folio de cotizaciones</div>
+      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+        <span style="font-size:12px;color:var(--muted);">Siguiente folio:</span>
+        <input id="folioCounterInput" type="number" min="0" style="width:80px;padding:6px 8px;border:1px solid var(--border);border-radius:8px;font-size:13px;">
+        <button class="btn small primary" id="btnSaveFolio">Guardar</button>
+      </div>
+      <div class="menuTitle">Datos</div>
           <button class="btn small" id="btnBackup">⬇ Respaldo local</button>
           <button class="btn small" id="btnRestore">⬆ Restaurar local</button>
           <input type="file" id="restoreFile" accept="application/json" style="display:none">
@@ -330,6 +446,7 @@ function defaultDB(){
       routeDB:[{id:"rt_lm", name:"Ruta LM", type:"LM", costPerHour:350}],
       materialDB:[{id:"m_mel19", desc:"Melamina 19mm", cost:980, vendor:"Proveedor", uom:"pza"}],
       adminPercent: 12,
+      folioCounter: 0,
       breakEven: {
         month: (new Date().toISOString().slice(0,7)),
         // Variables/Fijos manuales
@@ -353,6 +470,7 @@ function normalizeDB(){
   db.settings.routeDB = Array.isArray(db.settings.routeDB)? db.settings.routeDB : [];
   db.settings.materialDB = Array.isArray(db.settings.materialDB)? db.settings.materialDB : [];
   db.settings.adminPercent = Number(db.settings.adminPercent ?? 12);
+  db.settings.folioCounter = Number(db.settings.folioCounter ?? 0);
   db.settings.breakEven = db.settings.breakEven || defaultDB().settings.breakEven;
   db.projects = Array.isArray(db.projects)? db.projects : [];
   db.quotes = Array.isArray(db.quotes)? db.quotes : [];
@@ -954,8 +1072,9 @@ function createProject(){
   setSeg("noauth");
 }
 function createQuote(projectId){
-  const num = db.quotes.filter(x=>x.projectId===projectId).length + 1;
-  const q={id:uid(), projectId, name:"Cotización "+num, qty:1, status:"draft", saleType:"manufactured", marginPct:25, createdAt:todayISO(), products:[], routes:[], extras:[]};
+  db.settings.folioCounter = (Number(db.settings.folioCounter)||0) + 1;
+  const folio = String(db.settings.folioCounter).padStart(4,"0");
+  const q={id:uid(), projectId, code: folio, name:"Cotización "+folio, qty:1, status:"draft", saleType:"manufactured", marginPct:25, createdAt:todayISO(), products:[], routes:[], extras:[]};
   db.quotes.unshift(q); save(); return q;
 }
 function routeByName(name){ return (db.settings.routeDB||[]).find(r=>r.name===name)||null; }
@@ -2008,7 +2127,7 @@ function buildQuotePDFHTML(p, q, extraQuotes, includeIVA){
     position: fixed; top: 50%; left: 50%;
     transform: translate(-50%, -50%) rotate(-35deg);
     width: 60%;
-    opacity: 0.04;
+    opacity: 0.12;
     z-index: 0;
     pointer-events: none;
   }
@@ -2073,7 +2192,7 @@ function buildQuotePDFHTML(p, q, extraQuotes, includeIVA){
     <!-- TITLE -->
     <div class="doc-title">
       ${escapeHTML(emp.titulo||"Propuesta de Servicios")}
-      <div class="folio">Folio: ${escapeHTML(q.id.slice(0,8).toUpperCase())} &nbsp;·&nbsp; Fecha: ${escapeHTML(dt)}</div>
+      <div class="folio">Folio: ${escapeHTML((q.code||q.id.slice(0,8)).toUpperCase())} &nbsp;·&nbsp; Fecha: ${escapeHTML(dt)}</div>
     </div>
 
     <!-- META -->
@@ -2128,7 +2247,7 @@ function buildQuotePDFHTML(p, q, extraQuotes, includeIVA){
     <!-- FOOTER -->
     <div class="footer">
       <span>${escapeHTML(emp.nombre||"ESMA INDUSTRIAL")} &nbsp;·&nbsp; Propuesta generada digitalmente</span>
-      <span class="accent">Folio: ${escapeHTML(q.id.slice(0,8).toUpperCase())}</span>
+      <span class="accent">Folio: ${escapeHTML((q.code||q.id.slice(0,8)).toUpperCase())}</span>
     </div>
   </div>
 </body>
@@ -2179,6 +2298,270 @@ function seedDemo(){
   save(); location.reload();
 }
 
+// ---- PANTALLA DE INICIO ----
+let currentScreen = "home"; // "home" | "app"
+
+function showHome(){
+  currentScreen = "home";
+  hideAllScreens();
+  document.getElementById("homeScreen").style.display = "flex";
+  // Sync nombre empresa
+  const emp = db.settings.empresa || {};
+  const nombre = emp.nombre || "ESMA INDUSTRIAL";
+  document.getElementById("homeTitle").textContent = nombre;
+  document.getElementById("topbarTitle").textContent = nombre;
+  // Sync logo
+  const logo = emp.logoB64 || localStorage.getItem("esma_logo_b64") || "";
+  refreshHomeLogo(logo);
+  // Sync usuario
+  const u = currentUser();
+  document.getElementById("homeWhoami").textContent = u ? (u.name + " · " + u.role.toUpperCase()) : "—";
+  document.getElementById("homeBtnLogout").style.display = u ? "" : "none";
+}
+
+// ---- VISTAS DE SECCIÓN GLOBAL ----
+let currentSection = ""; // compras | instalaciones | cotizaciones | tareas
+
+function hideAllScreens(){
+  document.getElementById("homeScreen").style.display = "none";
+  document.getElementById("sectionScreen").style.display = "none";
+}
+
+function showSection(section){
+  hideAllScreens();
+  currentSection = section;
+  document.getElementById("sectionScreen").style.display = "flex";
+  renderSection(section);
+}
+
+function renderSection(section){
+  const titles = {
+    compras:       { title:"🛒 Compras",        sub:"Todos los proyectos", ico:"🛒" },
+    instalaciones: { title:"🛠️ Instalaciones",  sub:"Todos los proyectos", ico:"🛠️" },
+    tareas:        { title:"✅ Tareas",          sub:"Todos los proyectos", ico:"✅" },
+    cotizaciones:  { title:"🧾 Cotizaciones",   sub:"Todos los proyectos", ico:"🧾" },
+  };
+  const t = titles[section] || { title: section, sub:"", ico:"📋" };
+  document.getElementById("secTitle").textContent = t.title;
+  document.getElementById("secSub").textContent = t.sub;
+
+  const filters = document.getElementById("secFilters");
+  const content = document.getElementById("secContent");
+  const addBtn  = document.getElementById("secBtnAdd");
+  addBtn.style.display = "none";
+  filters.innerHTML = "";
+
+  if(section === "compras")       renderSecCompras(filters, content, addBtn);
+  if(section === "instalaciones") renderSecInstalaciones(filters, content, addBtn);
+  if(section === "tareas")        renderSecTareas(filters, content, addBtn);
+  if(section === "cotizaciones")  renderSecCotizaciones(filters, content, addBtn);
+}
+
+function projectName(pid){
+  const p = db.projects.find(x=>x.id===pid);
+  return p ? (p.name||"Sin nombre") : "—";
+}
+
+function goToProject(pid, tab){
+  showApp();
+  selectedProjectId = pid;
+  mainTab = tab || "overview";
+  renderProjectsList();
+  renderMain();
+}
+
+function renderSecCompras(filtersEl, contentEl, addBtn){
+  const items = [...db.purchases].sort((a,b)=>String(b.date||"").localeCompare(String(a.date||"")));
+  if(!items.length){ contentEl.innerHTML=`<div class="sec-empty">Sin compras registradas.</div>`; return; }
+  contentEl.innerHTML = items.map(item=>{
+    const pname = projectName(item.projectId);
+    return `<div class="sec-item">
+      <div class="si-ico">🛒</div>
+      <div class="si-body">
+        <div class="si-title">${escapeHTML(item.title||"Sin título")}</div>
+        <div class="si-meta">📁 ${escapeHTML(pname)} ${item.date ? "· 📅 "+item.date : ""}</div>
+      </div>
+      <div class="si-right">
+        <button class="btn small" data-pid="${item.projectId}" data-goto="ops">Ver proyecto</button>
+      </div>
+    </div>`;
+  }).join("");
+  contentEl.querySelectorAll("button[data-goto]").forEach(b=>
+    b.addEventListener("click",()=>goToProject(b.dataset.pid, b.dataset.goto))
+  );
+}
+
+function renderSecInstalaciones(filtersEl, contentEl, addBtn){
+  const items = [...db.installs].sort((a,b)=>String(b.date||"").localeCompare(String(a.date||"")));
+  if(!items.length){ contentEl.innerHTML=`<div class="sec-empty">Sin instalaciones registradas.</div>`; return; }
+  contentEl.innerHTML = items.map(item=>{
+    const pname = projectName(item.projectId);
+    return `<div class="sec-item">
+      <div class="si-ico">🛠️</div>
+      <div class="si-body">
+        <div class="si-title">${escapeHTML(item.title||"Sin título")}</div>
+        <div class="si-meta">📁 ${escapeHTML(pname)} ${item.date ? "· 📅 "+item.date : ""}</div>
+      </div>
+      <div class="si-right">
+        <button class="btn small" data-pid="${item.projectId}" data-goto="ops">Ver proyecto</button>
+      </div>
+    </div>`;
+  }).join("");
+  contentEl.querySelectorAll("button[data-goto]").forEach(b=>
+    b.addEventListener("click",()=>goToProject(b.dataset.pid, b.dataset.goto))
+  );
+}
+
+function renderSecTareas(filtersEl, contentEl, addBtn){
+  // Filter buttons
+  filtersEl.innerHTML = `
+    <button class="tab active" data-tf="all">Todas</button>
+    <button class="tab" data-tf="pending">Pendientes</button>
+    <button class="tab" data-tf="done">Completadas</button>`;
+  let filter = "all";
+  function renderList(){
+    let items = [...db.tasks].sort((a,b)=>String(b.date||"").localeCompare(String(a.date||"")));
+    if(filter==="pending") items = items.filter(x=>!x.done);
+    if(filter==="done")    items = items.filter(x=>!!x.done);
+    if(!items.length){ contentEl.innerHTML=`<div class="sec-empty">Sin tareas${filter!=="all"?" en esta categoría":""}.</div>`; return; }
+    contentEl.innerHTML = items.map(item=>{
+      const pname = projectName(item.projectId);
+      const dotCls = item.done ? "done" : "pending";
+      return `<div class="sec-item">
+        <div class="si-ico">${item.done?"✅":"🔲"}</div>
+        <div class="si-body">
+          <div class="si-title"><span class="status-dot ${dotCls}"></span>${escapeHTML(item.title||"Sin título")}</div>
+          <div class="si-meta">📁 ${escapeHTML(pname)} ${item.date ? "· 📅 "+item.date : ""}</div>
+        </div>
+        <div class="si-right">
+          <button class="btn small" data-pid="${item.projectId}" data-goto="ops">Ver proyecto</button>
+        </div>
+      </div>`;
+    }).join("");
+    contentEl.querySelectorAll("button[data-goto]").forEach(b=>
+      b.addEventListener("click",()=>goToProject(b.dataset.pid, b.dataset.goto))
+    );
+  }
+  filtersEl.querySelectorAll("button[data-tf]").forEach(btn=>{
+    btn.addEventListener("click",()=>{
+      filter = btn.dataset.tf;
+      filtersEl.querySelectorAll("button[data-tf]").forEach(b=>b.classList.toggle("active", b===btn));
+      renderList();
+    });
+  });
+  renderList();
+}
+
+function renderSecCotizaciones(filtersEl, contentEl, addBtn){
+  filtersEl.innerHTML = `
+    <button class="tab active" data-qf="all">Todas</button>
+    <button class="tab" data-qf="authorized">Autorizadas</button>
+    <button class="tab" data-qf="draft">Borradores</button>`;
+  let filter = "all";
+  function renderList(){
+    let items = [...db.quotes].sort((a,b)=>String(b.createdAt||"").localeCompare(String(a.createdAt||"")));
+    if(filter==="authorized") items = items.filter(x=>x.status==="authorized");
+    if(filter==="draft")      items = items.filter(x=>x.status!=="authorized");
+    if(!items.length){ contentEl.innerHTML=`<div class="sec-empty">Sin cotizaciones${filter!=="all"?" en esta categoría":""}.</div>`; return; }
+    contentEl.innerHTML = items.map(q=>{
+      const pname = projectName(q.projectId);
+      const t = quoteSellTotals(q);
+      const isAuth = q.status==="authorized";
+      return `<div class="sec-item">
+        <div class="si-ico">🧾</div>
+        <div class="si-body">
+          <div class="si-title"><span class="status-dot ${isAuth?"auth":"pending"}"></span>${escapeHTML(q.name||"Cotización")}</div>
+          <div class="si-meta">📁 ${escapeHTML(pname)} · ${isAuth?"<b style='color:#14532d;'>Autorizada</b>":"Borrador"} · 📅 ${q.createdAt||"—"}</div>
+        </div>
+        <div class="si-right">
+          <b style="font-size:14px;">$${money(t.venta)}</b>
+          <button class="btn small" data-qid="${q.id}" data-pid="${q.projectId}">Abrir</button>
+        </div>
+      </div>`;
+    }).join("");
+    contentEl.querySelectorAll("button[data-qid]").forEach(b=>{
+      b.addEventListener("click",()=>{
+        const q = db.quotes.find(x=>x.id===b.dataset.qid); if(!q) return;
+        showApp();
+        selectedProjectId = b.dataset.pid;
+        mainTab = "quotes";
+        renderProjectsList();
+        renderMain();
+        setTimeout(()=>openQuoteEditor(q), 50);
+      });
+    });
+  }
+  filtersEl.querySelectorAll("button[data-qf]").forEach(btn=>{
+    btn.addEventListener("click",()=>{
+      filter = btn.dataset.qf;
+      filtersEl.querySelectorAll("button[data-qf]").forEach(b=>b.classList.toggle("active", b===btn));
+      renderList();
+    });
+  });
+  renderList();
+}
+
+function showApp(){
+  currentScreen = "app";
+  hideAllScreens();
+  renderProjectsList();
+  renderMain();
+}
+
+function refreshHomeLogo(logoB64){
+  const box = document.getElementById("homeLogoBox");
+  const img = document.getElementById("homeLogoImg");
+  const txt = document.getElementById("homeLogoText");
+  const topLogo = document.getElementById("topbarLogo");
+  if(logoB64){
+    img.src = logoB64;
+    img.style.display = "";
+    txt.style.display = "none";
+    // Also update topbar logo
+    topLogo.innerHTML = `<img src="${logoB64}" style="width:100%;height:100%;object-fit:contain;border-radius:12px;">`;
+  } else {
+    img.style.display = "none";
+    txt.style.display = "";
+    topLogo.innerHTML = "E";
+  }
+}
+
+function bootHomeScreen(){
+  // Logo click to change
+  const logoBox = document.getElementById("homeLogoBox");
+  const fileInput = document.getElementById("homeLogoFile");
+  logoBox.addEventListener("click", ()=> fileInput.click());
+  fileInput.addEventListener("change", (e)=>{
+    const file = e.target.files[0]; if(!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const b64 = ev.target.result;
+      db.settings.empresa = db.settings.empresa || {};
+      db.settings.empresa.logoB64 = b64;
+      localStorage.setItem("esma_logo_b64", b64);
+      save();
+      refreshHomeLogo(b64);
+    };
+    reader.readAsDataURL(file);
+  });
+
+  // Nav buttons
+  document.getElementById("hbtnProyectos").addEventListener("click", ()=> showApp());
+  document.getElementById("hbtnCotizador").addEventListener("click", ()=> showSection("cotizaciones"));
+  document.getElementById("hbtnInstalaciones").addEventListener("click", ()=> showSection("instalaciones"));
+  document.getElementById("hbtnCompras").addEventListener("click", ()=> showSection("compras"));
+  document.getElementById("hbtnCalendario").addEventListener("click", ()=>{ showApp(); openDrawer("calendar"); });
+  document.getElementById("hbtnVentas").addEventListener("click", ()=>{ showApp(); openDrawer("sales"); });
+
+  document.getElementById("homeBtnLogout").addEventListener("click", logout);
+
+  // Botón volver en sección
+  document.getElementById("secBtnBack").addEventListener("click", ()=> showHome());
+
+  // Topbar brand click → ir al inicio
+  document.getElementById("brandHome").addEventListener("click", ()=> showHome());
+}
+
 function boot(){
   load();
   // Pull from Sheets on startup
@@ -2195,7 +2578,7 @@ function boot(){
     $("loginMsg").textContent=""; $("loginModal").style.display="none";
     $("whoami").textContent=u.name+" · "+u.role.toUpperCase();
     $("btnLogout").style.display="";
-    renderProjectsList(); renderMain();
+    showHome();
   });
   on($("btnSeedDemo"),"click", seedDemo);
   on($("btnLogout"),"click", logout);
@@ -2236,8 +2619,9 @@ function boot(){
   });
   on($("btnEmails"),"click", openEmails);
 
-  renderProjectsList();
-  renderMain();
+  // Mostrar pantalla inicio al cargar
+  bootHomeScreen();
+  showHome();
 }
 document.addEventListener("DOMContentLoaded", boot);
 
@@ -2257,6 +2641,15 @@ function downloadQuotePDF(){ alert('Función PDF no encontrada en esta versión.
   });
 
   document.getElementById("btnGsPush")?.addEventListener("click", gsPush);
+  // Inicializar input folio
+  const folioInput = document.getElementById("folioCounterInput");
+  if(folioInput) folioInput.value = Number(db.settings.folioCounter||0);
+  document.getElementById("btnSaveFolio")?.addEventListener("click", ()=>{
+    const val = Number(document.getElementById("folioCounterInput").value||0);
+    db.settings.folioCounter = val;
+    save();
+    alert("✅ El próximo folio será: " + String(val+1).padStart(4,"0"));
+  });
   document.getElementById("btnGsPull")?.addEventListener("click", gsPullOnBoot);
   document.getElementById("btnResetSync")?.addEventListener("click", async ()=>{
     if(!GS_URL){ alert("Primero guarda la URL de Apps Script"); return; }
