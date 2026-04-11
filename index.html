@@ -2255,12 +2255,38 @@ function buildQuotePDFHTML(p, q, extraQuotes, includeIVA){
 }
 
 function exportJSON(){
-  const blob=new Blob([JSON.stringify(db,null,2)],{type:"application/json"});
-  const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="ESMA_respaldo.json"; a.click(); URL.revokeObjectURL(a.href);
+  // Incluir fotos de todos los proyectos en el respaldo
+  const backup = JSON.parse(JSON.stringify(db));
+  backup._photos = {};
+  db.projects.forEach(p=>{
+    const photos = loadPhotos(p.id);
+    if(photos.length) backup._photos[p.id] = photos;
+  });
+  // También incluir logo
+  backup._logoB64 = localStorage.getItem("esma_logo_b64") || "";
+  const blob=new Blob([JSON.stringify(backup,null,2)],{type:"application/json"});
+  const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="ESMA_respaldo_completo.json"; a.click(); URL.revokeObjectURL(a.href);
 }
 function restoreJSON(file){
   const reader=new FileReader();
-  reader.onload=()=>{ try{ db=JSON.parse(reader.result); normalizeDB(); save(); location.reload(); }catch(e){ alert("Archivo inválido."); } };
+  reader.onload=()=>{
+    try{
+      const data=JSON.parse(reader.result);
+      // Restaurar fotos por proyecto si vienen en el respaldo
+      if(data._photos){
+        Object.entries(data._photos).forEach(([pid, photos])=>{
+          savePhotos(pid, photos);
+        });
+        delete data._photos;
+      }
+      // Restaurar logo si viene
+      if(data._logoB64){
+        localStorage.setItem("esma_logo_b64", data._logoB64);
+        delete data._logoB64;
+      }
+      db=data; normalizeDB(); save(); location.reload();
+    }catch(e){ alert("Archivo inválido."); }
+  };
   reader.readAsText(file);
 }
 function downloadCSV(filename, rows){
