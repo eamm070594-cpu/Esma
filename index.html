@@ -495,7 +495,16 @@ function normalizeDB(){
   db.purchases = Array.isArray(db.purchases)? db.purchases : [];
   db.tasks = Array.isArray(db.tasks)? db.tasks : [];
   db.settings.routeDB.forEach(r=>{ r.costPerHour = Number(r.costPerHour||0); r.breakdown = r.breakdown || {renta:0, mod:0, moi:0, indirectos:0, luz:0, otros:0}; });
-  db.projects.forEach(p=>{ p.photos = loadPhotos(p.id); });
+  db.projects.forEach(p=>{
+    const local = loadPhotos(p.id); // fotos guardadas localmente (pueden ser base64 o url)
+    const remote = (p.photos||[]).filter(ph=>ph.url); // urls de imgbb que vinieron de Sheets
+    // Combinar: primero las remotas (url), luego las locales que no estén ya
+    const remoteUrls = new Set(remote.map(ph=>ph.url));
+    const localExtra = local.filter(ph=>!ph.url || !remoteUrls.has(ph.url));
+    p.photos = [...remote, ...localExtra];
+    // Guardar el resultado completo en localStorage
+    if(p.photos.length) savePhotos(p.id, p.photos);
+  });
   db.settings.materialDB.forEach(m=>{ m.cost = Number(m.cost||0); });
 }
 function load(){
@@ -515,10 +524,13 @@ let _syncInProgress = false;
 let _lastSaveTime = 0;
 
 function save(){
-  // Guardar fotos separado (no las metemos en el STORAGE_KEY principal)
+  // Guardar fotos separado en localStorage
   db.projects.forEach(p=>{ if(p.photos && p.photos.length) savePhotos(p.id, p.photos); });
+  // En el DB principal guardar solo fotos con URL (imgbb) — no base64
   const dbSin = JSON.parse(JSON.stringify(db));
-  dbSin.projects.forEach(p=>{ p.photos = []; });
+  dbSin.projects.forEach(p=>{
+    p.photos = (p.photos||[]).filter(ph=>ph.url && !ph.data);
+  });
   localStorage.setItem(STORAGE_KEY, JSON.stringify(dbSin));
   _lastSaveTime = Date.now();
   if(GS_URL){ clearTimeout(save._t); save._t = setTimeout(gsPush, 300); }
@@ -535,10 +547,12 @@ async function gsPush(){
   syncStatusUpdate("Sincronizando...", "orange");
   try {
     const dbToSync = JSON.parse(JSON.stringify(db));
-    // Incluir logo pero NO fotos (las fotos van por URL con imgbb)
     if(dbToSync.settings && dbToSync.settings.empresa)
       dbToSync.settings.empresa.logoB64 = localStorage.getItem("esma_logo_b64") || "";
-    dbToSync.projects.forEach(p=>{ p.photos = []; });
+    // Subir fotos con URL (imgbb) pero NO base64
+    dbToSync.projects.forEach(p=>{
+      p.photos = (p.photos||[]).filter(ph=>ph.url && !ph.data);
+    });
     const payload = JSON.stringify({action:"save", data:dbToSync});
     await fetch(GS_URL, {method:"POST", mode:"no-cors", headers:{"Content-Type":"text/plain"}, body:payload});
     syncStatusUpdate("✓ Sync " + new Date().toLocaleTimeString("es-MX",{hour:"2-digit",minute:"2-digit"}), "green");
