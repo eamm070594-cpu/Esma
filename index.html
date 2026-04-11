@@ -522,10 +522,11 @@ async function gsPush(){
   syncStatusUpdate("Sincronizando...", "orange");
   try {
     const dbToSync = JSON.parse(JSON.stringify(db));
-  if(dbToSync.settings && dbToSync.settings.empresa) dbToSync.settings.empresa.logoB64 = "";
-  // No subir fotos a Sheets (se guardan solo en localStorage por proyecto)
-  if(dbToSync.projects) dbToSync.projects.forEach(p=>{ p.photos = []; });
-  const payload = JSON.stringify({action:"save", data:dbToSync});
+    // Incluir logo pero NO fotos (las fotos van por URL con imgbb)
+    if(dbToSync.settings && dbToSync.settings.empresa)
+      dbToSync.settings.empresa.logoB64 = localStorage.getItem("esma_logo_b64") || "";
+    dbToSync.projects.forEach(p=>{ p.photos = []; });
+    const payload = JSON.stringify({action:"save", data:dbToSync});
     await fetch(GS_URL, {method:"POST", mode:"no-cors", headers:{"Content-Type":"text/plain"}, body:payload});
     syncStatusUpdate("✓ Sync " + new Date().toLocaleTimeString("es-MX",{hour:"2-digit",minute:"2-digit"}), "green");
   } catch(e) {
@@ -540,16 +541,39 @@ async function gsPullOnBoot(){
   try {
     const res = await fetch(GS_URL + "?action=load");
     const json = await res.json();
-    // Accept both {ok:true, data:{...}} and direct DB object
-    const data = (json.ok && json.data) ? json.data : (!json.error && json.projects) ? json : null;
-    if(data && data.projects){
-      db = data;
-      normalizeDB();
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
-      setSeg(seg); renderMain();
-      syncStatusUpdate("↓ Sincronizado", "green");
+    const remoteData = (json.ok && json.data) ? json.data : (!json.error && json.projects) ? json : null;
+
+    if(remoteData && remoteData.projects){
+      const localProjects = db.projects ? db.projects.length : 0;
+      const remoteProjects = remoteData.projects ? remoteData.projects.length : 0;
+
+      // Si local tiene MÁS proyectos que remoto, NO sobreescribir — preguntar
+      if(localProjects > remoteProjects && localProjects > 0){
+        _syncInProgress = false;
+        syncStatusUpdate("⚠ Conflicto", "orange");
+        const msg = `Local tiene ${localProjects} proyectos y Sheets tiene ${remoteProjects}.
+
+¿Qué quieres hacer?
+
+OK = Usar datos de Sheets (descarga)
+Cancelar = Mantener datos locales y subir a Sheets`;
+        if(confirm(msg)){
+          // Usuario eligió Sheets
+          applyRemoteData(remoteData);
+        } else {
+          // Usuario eligió local — subir local a Sheets
+          syncStatusUpdate("Subiendo datos locales...", "orange");
+          await gsPush();
+        }
+        return;
+      }
+
+      // Remoto tiene igual o más proyectos — aplicar normalmente
+      applyRemoteData(remoteData);
+      syncStatusUpdate("↓ Sincronizado " + new Date().toLocaleTimeString("es-MX",{hour:"2-digit",minute:"2-digit"}), "green");
+
     } else if(json.ok && !json.data){
-      // Sheets is empty, push local data up
+      // Sheets vacío — subir local
       syncStatusUpdate("Sheets vacío, subiendo...", "orange");
       _syncInProgress = false;
       await gsPush();
@@ -558,6 +582,18 @@ async function gsPullOnBoot(){
   } catch(e) {
     syncStatusUpdate("⚠ Error al descargar", "orange");
   } finally { _syncInProgress = false; }
+}
+
+function applyRemoteData(data){
+  if(data.settings && data.settings.empresa && data.settings.empresa.logoB64){
+    localStorage.setItem("esma_logo_b64", data.settings.empresa.logoB64);
+  }
+  db = data;
+  normalizeDB();
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
+  setSeg(seg);
+  renderProjectsList();
+  renderMain();
 }
 
 // Auto-sync disabled
@@ -831,18 +867,18 @@ function renderOverview(p){
       p.photos = p.photos || [];
       let loaded = 0;
       files.forEach(file=>{
-        // Resize to max 800px to keep localStorage manageable
+        // Resize a max 400px y calidad 40% para que quepan en sync
         const img = new Image();
         const url = URL.createObjectURL(file);
         img.onload = ()=>{
-          const MAX = 800;
+          const MAX = 400;
           const scale = Math.min(1, MAX/Math.max(img.width,img.height));
           const canvas = document.createElement("canvas");
           canvas.width = Math.round(img.width*scale);
           canvas.height = Math.round(img.height*scale);
           canvas.getContext("2d").drawImage(img,0,0,canvas.width,canvas.height);
           URL.revokeObjectURL(url);
-          p.photos.push({name:file.name, data:canvas.toDataURL("image/jpeg",0.7)});
+          p.photos.push({name:file.name, data:canvas.toDataURL("image/jpeg",0.40)});
           loaded++;
           if(loaded===files.length){ savePhotos(p.id, p.photos); save(); renderMain(); }
         };
@@ -2676,7 +2712,12 @@ function downloadQuotePDF(){ alert('Función PDF no encontrada en esta versión.
     save();
     alert("✅ El próximo folio será: " + String(val+1).padStart(4,"0"));
   });
-  document.getElementById("btnGsPull")?.addEventListener("click", gsPullOnBoot);
+  document.getElementById("btnGsPull")?.addEventListener("click", async ()=>{
+    if(db.projects && db.projects.length > 0){
+      if(!confirm("⚠️ Esto descargará los datos de Google Sheets y reemplazará los datos locales.\n\n¿Continuar?")) return;
+    }
+    await gsPullOnBoot();
+  });
   document.getElementById("btnResetSync")?.addEventListener("click", async ()=>{
     if(!GS_URL){ alert("Primero guarda la URL de Apps Script"); return; }
     if(!confirm("¿Borrar datos locales y descargar todo desde Google Sheets?")) return;
