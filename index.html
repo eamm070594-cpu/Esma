@@ -109,6 +109,17 @@
   .drawer.full .drawerBody{ padding:16px 18px; }
   .drawer.full .drawerHead{ padding:14px 18px; }
   .drawer.full .drawerBody .card{ max-width:1200px; margin:0 auto; }
+  /* Buscador de materiales */
+  .matPicker{ position:relative; display:block; }
+  .matPickerInput{ width:100%; border:1px solid var(--border); border-radius:10px; padding:7px 10px; font-size:13px; font-weight:700; background:#fff; cursor:text; box-sizing:border-box; }
+  .matPickerDropdown{ position:absolute; top:calc(100% + 2px); left:0; min-width:240px; background:#fff; border:1px solid var(--border); border-radius:12px; box-shadow:0 8px 28px rgba(2,6,23,.15); z-index:9999; display:none; flex-direction:column; }
+  .matPickerDropdown.open{ display:flex; }
+  .matPickerSearch{ border:0; border-bottom:1px solid var(--border); padding:8px 12px; font-size:13px; outline:0; width:100%; box-sizing:border-box; border-radius:12px 12px 0 0; }
+  .matPickerList{ overflow-y:auto; max-height:180px; }
+  .matPickerOption{ padding:8px 12px; font-size:13px; cursor:pointer; }
+  .matPickerOption:hover{ background:#f1f5f9; }
+  .matPickerEmpty{ padding:8px 12px; font-size:12px; color:var(--muted); }
+  .matPickerFooter{ border-top:1px solid var(--border); padding:6px 8px; }
   /* Mejor legibilidad en Operación */
   #tbTasks textarea[data-f="title"], #tbInst textarea[data-f="title"], #tbPurch textarea[data-f="title"]{
     min-width: 280px;
@@ -404,9 +415,7 @@ async function gsPullOnBoot(){
   } finally { _syncInProgress = false; }
 }
 
-// Auto-sync every 30s if no recent save
 // Auto-sync disabled
-setInterval(()=>{ if(GS_URL && !_syncInProgress && (Date.now()-(_lastSaveTime||0))>60000) gsPullOnBoot(); }, 30000);
 
 function currentUser(){
   const id = db.settings.session?.userId;
@@ -462,25 +471,29 @@ function quoteBreakdown(q){
 function quoteSellTotals(q){
   const b=quoteBreakdown(q);
   const adminPct=Number(db.settings.adminPercent ?? 12);
-  const admin = b.total * (adminPct/100);
-  const costoConAdmin = b.total + admin;
+  // Admin% y utilidad solo sobre MP+Ruta. Extras se suman directo.
+  const baseCalc = b.mp + b.ruta;
+  const admin = baseCalc * (adminPct/100);
+  const costoConAdmin = baseCalc + admin;
   const pct=Number(q.marginPct ?? 25);
   const util = costoConAdmin * (pct/100);
-  const venta = costoConAdmin + util;
+  const ventaSinExtras = costoConAdmin + util;
+  const venta = ventaSinExtras + b.extra;
   const retorno = venta - b.ruta - b.extra;
-  return {costo:b.total, mp:b.mp, ruta:b.ruta, extra:b.extra, admin, adminPct, costoConAdmin, pct, util, venta, retorno};
+  return {costo:b.total, mp:b.mp, ruta:b.ruta, extra:b.extra, admin, adminPct, costoConAdmin, pct, util, ventaSinExtras, venta, retorno};
 }
 function renderQuoteBreakdown(q){
   if(!$("qMarginPct")) return;
   $("qMarginPct").value = Number(q.marginPct ?? 25);
   const t = quoteSellTotals(q);
-  $("bdCosto").textContent = "$"+money(t.costo);
+  $("bdCosto").textContent = "$"+money(t.mp + t.ruta);
   $("bdMP").textContent = "$"+money(t.mp);
   $("bdRuta").textContent = "$"+money(t.ruta);
-  $("bdExtra").textContent = "$"+money(t.extra);
   $("bdAdmin").textContent = "$"+money(t.admin)+" ("+t.adminPct+"%)";
   $("bdCostoAdmin").textContent = "$"+money(t.costoConAdmin);
   $("bdUtil").textContent = "$"+money(t.util);
+  $("bdSinExtras").textContent = "$"+money(t.ventaSinExtras);
+  $("bdExtra").textContent = "$"+money(t.extra);
   $("bdVenta").textContent = "$"+money(t.venta);
   $("bdRetorno").textContent = "$"+money(t.retorno);
 }
@@ -882,7 +895,7 @@ function bindInlineTable(tbodyId, arr){
   const tb=$(tbodyId);
   tb.querySelectorAll("tr").forEach(tr=>{
     const id=tr.dataset.id;
-    tr.querySelectorAll("input").forEach(inp=>{
+    tr.querySelectorAll("input, textarea").forEach(inp=>{
       on(inp,"input", ()=>{
         const obj=arr.find(x=>x.id===id); if(!obj) return;
         const f=inp.dataset.f;
@@ -916,11 +929,126 @@ function createQuote(projectId){
 function routeByName(name){ return (db.settings.routeDB||[]).find(r=>r.name===name)||null; }
 function materialByDesc(desc){ return (db.settings.materialDB||[]).find(m=>(m.desc||"")===desc)||null; }
 
+
+function showAddMaterialModal(prefillDesc, onSaved){
+  const old=document.getElementById("_addMatModal"); if(old) old.remove();
+  const overlay=document.createElement("div");
+  overlay.id="_addMatModal";
+  overlay.style.cssText="position:fixed;inset:0;background:rgba(2,6,23,.55);display:flex;align-items:center;justify-content:center;z-index:9999;";
+  overlay.innerHTML=`
+    <div style="background:#fff;border-radius:18px;padding:20px;width:420px;max-width:92vw;box-shadow:0 20px 50px rgba(0,0,0,.2);">
+      <b style="font-size:15px;">+ Agregar material a BD</b>
+      <div style="height:14px;"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div style="grid-column:1/-1;">
+          <label style="font-size:11px;color:var(--muted);font-weight:700;display:block;margin-bottom:4px;">DESCRIPCION *</label>
+          <input id="_amDesc" value="${escapeAttr(prefillDesc||"")}" placeholder="Nombre del material" style="width:100%;border:1px solid var(--border);border-radius:10px;padding:8px 10px;font-size:13px;box-sizing:border-box;">
+        </div>
+        <div>
+          <label style="font-size:11px;color:var(--muted);font-weight:700;display:block;margin-bottom:4px;">COSTO UNITARIO</label>
+          <input id="_amCost" type="number" step="0.01" value="0" style="width:100%;border:1px solid var(--border);border-radius:10px;padding:8px 10px;font-size:13px;box-sizing:border-box;">
+        </div>
+        <div>
+          <label style="font-size:11px;color:var(--muted);font-weight:700;display:block;margin-bottom:4px;">UNIDAD</label>
+          <input id="_amUom" placeholder="pza, m2, ml..." style="width:100%;border:1px solid var(--border);border-radius:10px;padding:8px 10px;font-size:13px;box-sizing:border-box;">
+        </div>
+        <div style="grid-column:1/-1;">
+          <label style="font-size:11px;color:var(--muted);font-weight:700;display:block;margin-bottom:4px;">PROVEEDOR</label>
+          <input id="_amVendor" placeholder="Opcional" style="width:100%;border:1px solid var(--border);border-radius:10px;padding:8px 10px;font-size:13px;box-sizing:border-box;">
+        </div>
+      </div>
+      <div style="height:16px;"></div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;">
+        <button id="_amCancel" class="btn">Cancelar</button>
+        <button id="_amSave" class="btn primary">Guardar y usar</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  setTimeout(()=>{ const d=document.getElementById("_amDesc"); if(d) d.focus(); }, 50);
+  document.getElementById("_amCancel").onclick=()=>overlay.remove();
+  document.getElementById("_amSave").onclick=()=>{
+    const desc=document.getElementById("_amDesc").value.trim();
+    if(!desc){ alert("Escribe una descripcion."); return; }
+    const newMat={id:uid(), desc, cost:Number(document.getElementById("_amCost").value||0), uom:document.getElementById("_amUom").value.trim(), vendor:document.getElementById("_amVendor").value.trim()};
+    db.settings.materialDB=db.settings.materialDB||[];
+    db.settings.materialDB.push(newMat);
+    save();
+    overlay.remove();
+    if(onSaved) onSaved(newMat);
+  };
+}
+
+function createMatPicker(currentValue, onChange){
+  const wrapper=document.createElement("div");
+  wrapper.className="matPicker";
+  const input=document.createElement("input");
+  input.className="matPickerInput";
+  input.placeholder="-- seleccionar --";
+  input.value=currentValue||"";
+  const dropdown=document.createElement("div");
+  dropdown.className="matPickerDropdown";
+  const searchEl=document.createElement("input");
+  searchEl.className="matPickerSearch";
+  searchEl.placeholder="Buscar...";
+  const listEl=document.createElement("div");
+  listEl.className="matPickerList";
+  const footer=document.createElement("div");
+  footer.className="matPickerFooter";
+  const addBtn=document.createElement("button");
+  addBtn.className="btn small";
+  addBtn.style.cssText="width:100%;font-size:11px;";
+  addBtn.textContent="+ Agregar nuevo material a BD";
+  addBtn.type="button";
+  footer.appendChild(addBtn);
+  dropdown.appendChild(searchEl);
+  dropdown.appendChild(listEl);
+  dropdown.appendChild(footer);
+  wrapper.appendChild(input);
+  wrapper.appendChild(dropdown);
+
+  function renderList(filter){
+    const mats=db.settings.materialDB||[];
+    const filtered=filter?mats.filter(m=>(m.desc||"").toLowerCase().includes(filter.toLowerCase())):mats;
+    if(!filtered.length){
+      listEl.innerHTML=`<div class="matPickerEmpty">${filter?"Sin resultados":"Sin materiales en BD"}</div>`;
+    } else {
+      listEl.innerHTML=filtered.map(m=>`<div class="matPickerOption" data-val="${escapeAttr(m.desc)}">${escapeHTML(m.desc)}${m.uom?" · "+escapeHTML(m.uom):""} · $${money(m.cost||0)}</div>`).join("");
+      listEl.querySelectorAll(".matPickerOption").forEach(opt=>{
+        opt.addEventListener("mousedown",(e)=>{ e.preventDefault(); selectVal(opt.dataset.val); });
+      });
+    }
+  }
+  function selectVal(val){
+    input.value=val;
+    dropdown.classList.remove("open");
+    onChange(val);
+  }
+  function openDrop(){
+    dropdown.classList.add("open");
+    searchEl.value="";
+    renderList("");
+    setTimeout(()=>searchEl.focus(),30);
+  }
+  input.addEventListener("click", openDrop);
+  input.addEventListener("focus", openDrop);
+  searchEl.addEventListener("input",()=>renderList(searchEl.value));
+  searchEl.addEventListener("keydown",(e)=>{ if(e.key==="Escape"){ dropdown.classList.remove("open"); } });
+  addBtn.addEventListener("click",(e)=>{
+    e.preventDefault(); e.stopPropagation();
+    const prefill=searchEl.value.trim()||input.value.trim();
+    dropdown.classList.remove("open");
+    showAddMaterialModal(prefill,(newMat)=>selectVal(newMat.desc));
+  });
+  document.addEventListener("mousedown",(e)=>{
+    if(!wrapper.contains(e.target)) dropdown.classList.remove("open");
+  },{capture:true});
+  return wrapper;
+}
+
 function openQuoteEditor(q){
   const p=db.projects.find(x=>x.id===q.projectId); if(!p) return;
   mainTab="quotes";
   const routeOpts=(db.settings.routeDB||[]).map(r=>`<option value="${escapeAttr(r.name)}">${escapeHTML(r.name)} · ${escapeHTML(r.type||"")} · $${money(r.costPerHour||0)}/h</option>`).join("");
-  const matOpts=(db.settings.materialDB||[]).map(m=>`<option value="${escapeAttr(m.desc)}">${escapeHTML(m.desc)}${m.uom?(" · "+escapeHTML(m.uom)):""}</option>`).join("");
 
   $("mainContent").innerHTML=`
     <div class="row" style="flex-wrap:wrap; gap:8px;">
@@ -986,16 +1114,17 @@ function openQuoteEditor(q){
         <div style="height:8px;"></div>
         <table class="table" id="quoteBreakdown">
           <tbody>
-            <tr><td><b>Costo directo</b></td><td style="text-align:right;"><b id="bdCosto">$0.00</b></td></tr>
+            <tr><td><b>Costo directo (MP + Ruta)</b></td><td style="text-align:right;"><b id="bdCosto">$0.00</b></td></tr>
             <tr><td style="padding-left:16px; color:var(--muted)">MP</td><td style="text-align:right;" id="bdMP">$0.00</td></tr>
             <tr><td style="padding-left:16px; color:var(--muted)">Ruta</td><td style="text-align:right;" id="bdRuta">$0.00</td></tr>
-            <tr><td style="padding-left:16px; color:var(--muted)">Extras</td><td style="text-align:right;" id="bdExtra">$0.00</td></tr>
             <tr>
               <td>Gastos admin <input id="adminPctInput" type="number" step="0.1" style="width:60px; margin-left:6px;" title="% sobre costo directo"> %</td>
               <td style="text-align:right;" id="bdAdmin">$0.00</td>
             </tr>
             <tr><td><b>Costo total</b></td><td style="text-align:right;"><b id="bdCostoAdmin">$0.00</b></td></tr>
             <tr><td>Utilidad %</td><td style="text-align:right;" id="bdUtil">$0.00</td></tr>
+            <tr><td>Subtotal sin extras</td><td style="text-align:right;" id="bdSinExtras">$0.00</td></tr>
+            <tr><td style="color:var(--muted)">+ Extras (suma directa)</td><td style="text-align:right;" id="bdExtra">$0.00</td></tr>
             <tr><td><b>Precio de venta</b></td><td style="text-align:right; color:var(--ok);"><b id="bdVenta">$0.00</b></td></tr>
             <tr><td style="color:var(--muted)">Retorno neto</td><td style="text-align:right;" id="bdRetorno">$0.00</td></tr>
           </tbody>
@@ -1008,16 +1137,37 @@ function openQuoteEditor(q){
 
   function renderLines(){
     const prod=q.products||[];
-    $("tbProd").innerHTML = prod.length ? prod.map(r=>`
-      <tr data-id="${r.id}">
-        <td><select data-f="matPick"><option value="">—</option>${matOpts}</select></td>
-        <td><input data-f="desc" value="${escapeAttr(r.desc||"")}" placeholder="Descripción..."></td>
-        <td><input data-f="qty" type="number" step="0.01" value="${Number(r.qty||0)}"></td>
-        <td><input data-f="unitPrice" type="number" step="0.01" value="${Number(r.unitPrice||0)}"></td>
-        <td style="text-align:right;"><b>$${money(Number(r.qty||0)*Number(r.unitPrice||0))}</b></td>
-        <td style="text-align:right;"><button class="btn small danger" data-act="delProd">X</button></td>
-      </tr>`).join("") : `<tr><td colspan="6" class="muted" style="padding:14px;">Agrega productos.</td></tr>`;
-    $("tbProd").querySelectorAll("tr").forEach(tr=>{ const r=prod.find(x=>x.id===tr.dataset.id); const sel=tr.querySelector('select[data-f="matPick"]'); if(sel) sel.value=r.matPick||""; });
+    if(!prod.length){
+      $("tbProd").innerHTML=`<tr><td colspan="6" class="muted" style="padding:14px;">Agrega productos.</td></tr>`;
+    } else {
+      $("tbProd").innerHTML=prod.map(r=>`
+        <tr data-id="${r.id}">
+          <td class="mpCell" style="min-width:190px;max-width:220px;"></td>
+          <td><input data-f="desc" value="${escapeAttr(r.desc||"")}" placeholder="Descripción..."></td>
+          <td><input data-f="qty" type="number" step="0.01" value="${Number(r.qty||0)}"></td>
+          <td><input data-f="unitPrice" type="number" step="0.01" value="${Number(r.unitPrice||0)}"></td>
+          <td style="text-align:right;" class="tdImp"><b>$${money(Number(r.qty||0)*Number(r.unitPrice||0))}</b></td>
+          <td style="text-align:right;"><button class="btn small danger" data-act="delProd">X</button></td>
+        </tr>`).join("");
+      $("tbProd").querySelectorAll("tr[data-id]").forEach(tr=>{
+        const r=prod.find(x=>x.id===tr.dataset.id); if(!r) return;
+        const cell=tr.querySelector(".mpCell");
+        if(!cell) return;
+        const picker=createMatPicker(r.matPick||"",(val)=>{
+          r.matPick=val;
+          const mm=materialByDesc(val);
+          if(mm){
+            r.unitPrice=Number(mm.cost||0);
+            if(!r.desc) r.desc=mm.desc;
+            const upi=tr.querySelector('input[data-f="unitPrice"]'); if(upi) upi.value=r.unitPrice;
+            const di=tr.querySelector('input[data-f="desc"]'); if(di&&!di.value) di.value=r.desc;
+          }
+          const imp=tr.querySelector(".tdImp"); if(imp) imp.innerHTML=`<b>$${money(Number(r.qty||0)*Number(r.unitPrice||0))}</b>`;
+          save(); $("qTotal").textContent="$"+money(quoteTotal(q)); renderQuoteBreakdown(q); renderProjectsList();
+        });
+        cell.appendChild(picker);
+      });
+    }
 
     const routes=q.routes||[];
     $("tbRoutes").innerHTML = routes.length ? routes.map(r=>`
@@ -1047,50 +1197,34 @@ function openQuoteEditor(q){
 
   function bindQuoteTable(tbodyId, kind){
     const tb=$(tbodyId);
-    // Guardamos sin re-render en cada tecla (evita perder foco)
-    tb.querySelectorAll("tr").forEach(tr=>{
+    tb.querySelectorAll("tr[data-id]").forEach(tr=>{
       const id=tr.dataset.id;
-
       tr.querySelectorAll("input, select").forEach(el=>{
+        // Ignorar inputs del matPicker widget
+        if(el.classList.contains("matPickerInput")||el.classList.contains("matPickerSearch")) return;
+        if(el.closest&&el.closest(".matPickerDropdown")) return;
         const commit = ()=>{
-          const f=el.dataset.f;
-          const arr = (kind==="prod")? q.products : (kind==="routes")? q.routes : q.extras;
-          const row = arr.find(x=>x.id===id); if(!row) return;
-
+          const f=el.dataset.f; if(!f) return;
+          const arr=(kind==="prod")?q.products:(kind==="routes")?q.routes:q.extras;
+          const row=arr.find(x=>x.id===id); if(!row) return;
           if(kind==="prod"){
-            if(f==="matPick"){
-              row.matPick=el.value;
-              const mm=materialByDesc(row.matPick);
-              if(mm){ row.unitPrice=Number(mm.cost||0); if(!row.desc) row.desc=mm.desc; }
-            }else if(el.type==="number"){ row[f]=Number(el.value||0); }
-            else{ row[f]=el.value; }
-          }else if(kind==="routes"){
-            if(f==="routeName"){
-              row.routeName=el.value;
-              const rm=routeByName(row.routeName);
-              if(rm) row.rate=Number(rm.costPerHour||0);
-            }else if(el.type==="number"){ row[f]=Number(el.value||0); }
-            else{ row[f]=el.value; }
-          }else{
-            if(el.type==="number") row[f]=Number(el.value||0);
-            else row[f]=el.value;
+            if(el.type==="number") row[f]=Number(el.value||0); else row[f]=el.value;
+            // Actualizar importe sin re-render (preserva picker)
+            const imp=tr.querySelector(".tdImp"); if(imp) imp.innerHTML=`<b>$${money(Number(row.qty||0)*Number(row.unitPrice||0))}</b>`;
+            save(); $("qTotal").textContent="$"+money(quoteTotal(q)); renderQuoteBreakdown(q); renderProjectsList();
+          } else if(kind==="routes"){
+            if(f==="routeName"){ row.routeName=el.value; const rm=routeByName(row.routeName); if(rm) row.rate=Number(rm.costPerHour||0); }
+            else if(el.type==="number") row[f]=Number(el.value||0); else row[f]=el.value;
+            save(); renderLines(); renderQuoteBreakdown(q); renderProjectsList();
+          } else {
+            if(el.type==="number") row[f]=Number(el.value||0); else row[f]=el.value;
+            save(); renderLines(); renderQuoteBreakdown(q); renderProjectsList();
           }
-          save();
-          // Re-render solo al salir/cambiar el campo
-          renderLines();
-  renderQuoteBreakdown(q);
-          renderProjectsList();
         };
-
-        if(el.tagName==="SELECT"){
-          on(el,"change", commit);
-        }else{
-          on(el,"blur", commit);
-          on(el,"keydown", (e)=>{ if(e.key==="Enter"){ e.preventDefault(); el.blur(); }});
-        }
+        if(el.tagName==="SELECT"){ on(el,"change",commit); }
+        else { on(el,"blur",commit); on(el,"keydown",(e)=>{ if(e.key==="Enter"){e.preventDefault();el.blur();} }); }
       });
-
-      tr.querySelectorAll("button[data-act]").forEach(btn=>on(btn,"click", ()=>{
+      tr.querySelectorAll("button[data-act]").forEach(btn=>on(btn,"click",()=>{
         if(btn.dataset.act==="delProd") q.products=q.products.filter(x=>x.id!==id);
         if(btn.dataset.act==="delRoute") q.routes=q.routes.filter(x=>x.id!==id);
         if(btn.dataset.act==="delExtra") q.extras=q.extras.filter(x=>x.id!==id);
@@ -1346,9 +1480,10 @@ function renderCalendarPanel(){
         ${dayList.length ? dayList.map(e=>{
           const tag=e.type==="delivery"?"📦 Entrega":e.type==="install"?"🛠️ Instalación":e.type==="purchase"?"🛒 Compra":"✅ Tarea";
           const extra=(e.type==="task")?(e.done?" · (OK)":" · (pend.)"):"";
+          const targetTab=(e.type==="task"||e.type==="install"||e.type==="purchase")?"ops":"overview";
           return `<div class="row" style="justify-content:space-between; border:1px solid var(--border); border-radius:14px; padding:10px; margin-bottom:8px; background:#fff;">
             <div style="min-width:0;"><b style="font-size:13px;">${tag}</b><div class="muted" style="font-size:12px;">${escapeHTML(e.title)}${escapeHTML(extra)}</div></div>
-            <button class="btn small" data-open="${e.projectId}">Abrir</button>
+            <button class="btn small" data-open="${e.projectId}" data-tab="${targetTab}">Abrir</button>
           </div>`;
         }).join("") : `<div class="muted">Sin eventos.</div>`}
       </div>
@@ -1379,7 +1514,7 @@ function renderCalendarPanel(){
     }
   }
 
-$("drawerContent").querySelectorAll("button[data-open]").forEach(b=>on(b,"click", ()=>{ selectedProjectId=b.dataset.open; mainTab="overview"; closeDrawer(); renderProjectsList(); renderMain(); }));
+$("drawerContent").querySelectorAll("button[data-open]").forEach(b=>on(b,"click", ()=>{ selectedProjectId=b.dataset.open; mainTab=b.dataset.tab||"overview"; closeDrawer(); renderProjectsList(); renderMain(); }));
 }
 
 function renderSalesPanel(){
