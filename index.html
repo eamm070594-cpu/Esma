@@ -522,17 +522,10 @@ async function gsPush(){
   syncStatusUpdate("Sincronizando...", "orange");
   try {
     const dbToSync = JSON.parse(JSON.stringify(db));
-    // Incluir logo
-    if(dbToSync.settings && dbToSync.settings.empresa)
-      dbToSync.settings.empresa.logoB64 = localStorage.getItem("esma_logo_b64") || "";
-    // Incluir fotos de todos los proyectos
-    dbToSync._photos = {};
-    db.projects.forEach(p=>{
-      const photos = loadPhotos(p.id);
-      if(photos.length) dbToSync._photos[p.id] = photos;
-    });
-    dbToSync.projects.forEach(p=>{ p.photos = []; }); // no duplicar en el objeto proyecto
-    const payload = JSON.stringify({action:"save", data:dbToSync});
+  if(dbToSync.settings && dbToSync.settings.empresa) dbToSync.settings.empresa.logoB64 = "";
+  // No subir fotos a Sheets (se guardan solo en localStorage por proyecto)
+  if(dbToSync.projects) dbToSync.projects.forEach(p=>{ p.photos = []; });
+  const payload = JSON.stringify({action:"save", data:dbToSync});
     await fetch(GS_URL, {method:"POST", mode:"no-cors", headers:{"Content-Type":"text/plain"}, body:payload});
     syncStatusUpdate("✓ Sync " + new Date().toLocaleTimeString("es-MX",{hour:"2-digit",minute:"2-digit"}), "green");
   } catch(e) {
@@ -550,17 +543,6 @@ async function gsPullOnBoot(){
     // Accept both {ok:true, data:{...}} and direct DB object
     const data = (json.ok && json.data) ? json.data : (!json.error && json.projects) ? json : null;
     if(data && data.projects){
-      // Restaurar fotos si vienen en el payload
-      if(data._photos){
-        Object.entries(data._photos).forEach(([pid, photos])=>{
-          if(photos && photos.length) savePhotos(pid, photos);
-        });
-        delete data._photos;
-      }
-      // Restaurar logo si viene
-      if(data.settings && data.settings.empresa && data.settings.empresa.logoB64){
-        localStorage.setItem("esma_logo_b64", data.settings.empresa.logoB64);
-      }
       db = data;
       normalizeDB();
       localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
