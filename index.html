@@ -12,22 +12,22 @@
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap');
 
 :root{
-  --bg:#0f172a;
-  --bg2:#1e293b;
-  --bg3:#334155;
-  --card:#1e293b;
-  --card2:#263348;
-  --border:#334155;
-  --text:#f1f5f9;
-  --muted:#94a3b8;
-  --accent:#3b82f6;
-  --accent2:#60a5fa;
-  --green:#22c55e;
-  --amber:#f59e0b;
+  --bg:#f1f5f9;
+  --bg2:#ffffff;
+  --bg3:#e2e8f0;
+  --card:#ffffff;
+  --card2:#f8fafc;
+  --border:#e2e8f0;
+  --text:#0f172a;
+  --muted:#64748b;
+  --accent:#1d4ed8;
+  --accent2:#2563eb;
+  --green:#16a34a;
+  --amber:#d97706;
   --red:#ef4444;
   --radius:16px;
   --radius2:12px;
-  --shadow:0 4px 24px rgba(0,0,0,.4);
+  --shadow:0 2px 12px rgba(0,0,0,.08);
   --nav-h:68px;
   --font:'Plus Jakarta Sans',system-ui,sans-serif;
 }
@@ -43,7 +43,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);overscroll-b
 /* ── TOPBAR ── */
 .topbar{
   position:sticky;top:0;z-index:50;
-  background:rgba(15,23,42,.92);
+  background:rgba(255,255,255,.95);
   backdrop-filter:blur(16px);
   -webkit-backdrop-filter:blur(16px);
   border-bottom:1px solid var(--border);
@@ -71,7 +71,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);overscroll-b
 .bottomnav{
   position:fixed;bottom:0;left:0;right:0;
   height:var(--nav-h);
-  background:rgba(15,23,42,.95);
+  background:rgba(255,255,255,.97);
   backdrop-filter:blur(16px);
   -webkit-backdrop-filter:blur(16px);
   border-top:1px solid var(--border);
@@ -214,7 +214,7 @@ table{width:100%;border-collapse:collapse;font-size:13px;}
 thead th{background:var(--bg3);padding:10px 12px;text-align:left;font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;border-bottom:1px solid var(--border);}
 tbody td{padding:11px 12px;border-bottom:1px solid rgba(51,65,85,.5);vertical-align:middle;}
 tbody tr:last-child td{border-bottom:none;}
-tbody tr:hover td{background:rgba(255,255,255,.02);}
+tbody tr:hover td{background:rgba(0,0,0,.02);}
 
 /* ── KPI GRID ── */
 .kpi-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;}
@@ -225,7 +225,7 @@ tbody tr:hover td{background:rgba(255,255,255,.02);}
 
 /* ── MODAL / DRAWER ── */
 .overlay{
-  position:fixed;inset:0;background:rgba(0,0,0,.6);
+  position:fixed;inset:0;background:rgba(15,23,42,.4);
   display:none;align-items:flex-end;justify-content:center;
   z-index:100;
 }
@@ -266,7 +266,7 @@ tbody tr:hover td{background:rgba(255,255,255,.02);}
   display:grid;place-items:center;
   font-size:42px;font-weight:900;color:#fff;
   margin-bottom:20px;cursor:pointer;position:relative;
-  box-shadow:0 8px 32px rgba(59,130,246,.35);
+  box-shadow:0 4px 20px rgba(29,78,216,.25);
 }
 .home-logo img{width:100%;height:100%;object-fit:contain;}
 .home-logo .hint{position:absolute;inset:0;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center;font-size:12px;border-radius:24px;}
@@ -291,7 +291,7 @@ tbody tr:hover td{background:rgba(255,255,255,.02);}
 /* ── LOGIN ── */
 #loginModal{
   position:fixed;inset:0;z-index:300;
-  background:rgba(0,0,0,.7);
+  background:rgba(100,116,139,.3);
   display:none;align-items:center;justify-content:center;
   padding:20px;
 }
@@ -320,12 +320,12 @@ tbody tr:hover td{background:rgba(255,255,255,.02);}
 /* ── SEARCHABLE SELECT ── */
 .matPicker{position:relative;display:block;}
 .matPickerInput{width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:9px 12px;font-size:13px;font-weight:600;color:var(--text);font-family:var(--font);}
-.matPickerDropdown{position:absolute;top:calc(100% + 4px);left:0;right:0;min-width:260px;background:var(--bg2);border:1px solid var(--border);border-radius:14px;box-shadow:0 8px 32px rgba(0,0,0,.4);z-index:9999;display:none;flex-direction:column;overflow:hidden;}
+.matPickerDropdown{position:absolute;top:calc(100% + 4px);left:0;right:0;min-width:260px;background:var(--bg2);border:1px solid var(--border);border-radius:14px;box-shadow:0 4px 16px rgba(0,0,0,.12);z-index:9999;display:none;flex-direction:column;overflow:hidden;}
 .matPickerDropdown.open{display:flex;}
 .matPickerSearch{border:0;border-bottom:1px solid var(--border);padding:10px 14px;font-size:13px;background:transparent;color:var(--text);font-family:var(--font);outline:0;}
 .matPickerList{overflow-y:auto;max-height:200px;}
 .matPickerOption{padding:10px 14px;font-size:13px;cursor:pointer;color:var(--text);}
-.matPickerOption:hover{background:rgba(255,255,255,.05);}
+.matPickerOption:hover{background:rgba(0,0,0,.05);}
 .matPickerEmpty{padding:10px 14px;font-size:12px;color:var(--muted);}
 .matPickerFooter{border-top:1px solid var(--border);padding:8px 10px;}
 
@@ -337,7 +337,7 @@ tbody tr:hover td{background:rgba(255,255,255,.02);}
 }
 #sectionScreen.show{display:flex;}
 .sec-topbar{
-  background:rgba(15,23,42,.92);
+  background:rgba(255,255,255,.95);
   backdrop-filter:blur(16px);
   border-bottom:1px solid var(--border);
   padding:12px 16px;
@@ -361,7 +361,7 @@ tbody tr:hover td{background:rgba(255,255,255,.02);}
 .photo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px;margin-top:10px;}
 .photo-item{position:relative;aspect-ratio:1;border-radius:12px;overflow:hidden;border:1px solid var(--border);}
 .photo-item img{width:100%;height:100%;object-fit:cover;cursor:pointer;}
-.photo-item .del-btn{position:absolute;top:4px;right:4px;background:rgba(0,0,0,.7);border:none;color:#fff;width:22px;height:22px;border-radius:6px;cursor:pointer;font-size:12px;display:grid;place-items:center;}
+.photo-item .del-btn{position:absolute;top:4px;right:4px;background:rgba(100,116,139,.3);border:none;color:#fff;width:22px;height:22px;border-radius:6px;cursor:pointer;font-size:12px;display:grid;place-items:center;}
 
 /* ── TOOLS MENU ── */
 .tools-overlay{position:fixed;inset:0;z-index:80;display:none;}
@@ -375,7 +375,7 @@ tbody tr:hover td{background:rgba(255,255,255,.02);}
 }
 .tools-menu.open{display:block;}
 .tools-item{padding:10px 12px;border-radius:10px;cursor:pointer;display:flex;align-items:center;gap:10px;font-size:13px;font-weight:600;color:var(--text);}
-.tools-item:hover{background:rgba(255,255,255,.05);}
+.tools-item:hover{background:rgba(0,0,0,.05);}
 .tools-item .ti-ico{font-size:17px;width:24px;text-align:center;}
 .tools-divider{height:1px;background:var(--border);margin:4px 0;}
 .tools-label{font-size:10px;color:var(--muted);font-weight:700;letter-spacing:.5px;text-transform:uppercase;padding:6px 12px 2px;}
@@ -999,7 +999,7 @@ function renderOverview(p){
             const src = ph.url || ph.data || "";
             return `<div style="position:relative;">
               <img src="${escapeAttr(src)}" title="${escapeAttr(ph.name||'')}" style="width:240px;height:240px;object-fit:cover;border-radius:12px;border:1px solid var(--border);cursor:pointer;" data-photo-idx="${i}" data-photo-src="${escapeAttr(src)}">
-              <button data-del-photo="${i}" style="position:absolute;top:3px;right:3px;background:rgba(0,0,0,.6);color:#fff;border:none;border-radius:50%;width:20px;height:20px;cursor:pointer;font-size:11px;display:flex;align-items:center;justify-content:center;">✕</button>
+              <button data-del-photo="${i}" style="position:absolute;top:3px;right:3px;background:rgba(15,23,42,.4);color:#fff;border:none;border-radius:50%;width:20px;height:20px;cursor:pointer;font-size:11px;display:flex;align-items:center;justify-content:center;">✕</button>
             </div>`;
           }).join('')}
         </div>
@@ -3472,7 +3472,7 @@ function renderSalesPage(){
       <span style="flex:1;text-align:center;font-size:17px;font-weight:800;">${MONTHS_ES[m]} ${y}</span>
       <button class="btn icon" id="salesNext">\u2192</button>
     </div>
-    <div class="card" style="margin-bottom:14px;background:linear-gradient(135deg,rgba(59,130,246,.2),rgba(59,130,246,.05));border-color:rgba(59,130,246,.3);">
+    <div class="card" style="margin-bottom:14px;background:linear-gradient(135deg,rgba(29,78,216,.1),rgba(29,78,216,.02));border-color:rgba(29,78,216,.2);">
       <div style="font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.5px;">Total del mes</div>
       <div style="font-size:32px;font-weight:900;color:var(--accent2);margin-top:4px;">$${money(total)}</div>
       <div style="font-size:12px;color:var(--muted);margin-top:4px;">${rows.length} proyecto${rows.length!==1?"s":""} con entrega en el mes</div>
@@ -3594,9 +3594,10 @@ function buildTopbar(){
   topbar.innerHTML=`
     <div class="logo" id="topbarLogoEl" onclick="showHome()" style="cursor:pointer;">${logo?'<img src="'+escapeAttr(logo)+'" style="width:100%;height:100%;object-fit:contain;">':'E'}</div>
     <div class="title"><h1 id="topbarTitleEl">${escapeHTML(emp.nombre||"ESMA INDUSTRIAL")}</h1><span id="syncStatusBar" style="font-size:11px;color:var(--muted);">---</span></div>
-    <div class="actions"><div class="sync-dot" id="syncDot"></div><button class="btn icon" id="btnTools">\u22EE</button></div>
+    <div class="actions"><div class="sync-dot" id="syncDot"></div><button class="btn small" id="btnGoHome" title="Inicio" style="font-size:18px;padding:6px 10px;">&#127968;</button><button class="btn icon" id="btnTools">\u22EE</button></div>
   `;
   document.getElementById("btnTools").addEventListener("click",(e)=>{ e.stopPropagation(); openToolsMenu(); });
+  const ghb=document.getElementById("btnGoHome"); if(ghb) ghb.addEventListener("click",showHome);
 }
 
 function openToolsMenu(){
