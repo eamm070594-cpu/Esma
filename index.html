@@ -2,412 +2,600 @@
 <html lang="es">
 <head>
 <meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>ESMA Industrial · Proyectos</title>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="theme-color" content="#0f172a"/>
+<title>ESMA Industrial</title>
+<link rel="manifest" href="data:application/json,{%22name%22:%22ESMA%20Industrial%22,%22short_name%22:%22ESMA%22,%22display%22:%22standalone%22,%22background_color%22:%22%230f172a%22,%22theme_color%22:%22%230f172a%22}">
 <style>
-  :root{
-    --bg:#f5f7fb; --card:#ffffff; --text:#0f172a; --muted:#64748b;
-    --border:#e5e7eb; --brand:#0b1220; --primary:#0f172a;
-    --shadow:0 10px 30px rgba(2,6,23,.10);
-    --radius:18px;
-    --btn:#0f172a; --btnText:#fff;
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap');
+
+:root{
+  --bg:#0f172a;
+  --bg2:#1e293b;
+  --bg3:#334155;
+  --card:#1e293b;
+  --card2:#263348;
+  --border:#334155;
+  --text:#f1f5f9;
+  --muted:#94a3b8;
+  --accent:#3b82f6;
+  --accent2:#60a5fa;
+  --green:#22c55e;
+  --amber:#f59e0b;
+  --red:#ef4444;
+  --radius:16px;
+  --radius2:12px;
+  --shadow:0 4px 24px rgba(0,0,0,.4);
+  --nav-h:68px;
+  --font:'Plus Jakarta Sans',system-ui,sans-serif;
+}
+
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+html,body{height:100%;overflow:hidden;}
+body{font-family:var(--font);background:var(--bg);color:var(--text);overscroll-behavior:none;}
+
+/* ── LAYOUT ── */
+#app{display:flex;flex-direction:column;height:100vh;height:100dvh;}
+#screen{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;padding-bottom:calc(var(--nav-h) + 16px);}
+
+/* ── TOPBAR ── */
+.topbar{
+  position:sticky;top:0;z-index:50;
+  background:rgba(15,23,42,.92);
+  backdrop-filter:blur(16px);
+  -webkit-backdrop-filter:blur(16px);
+  border-bottom:1px solid var(--border);
+  padding:12px 16px 10px;
+  display:flex;align-items:center;gap:10px;
+}
+.topbar .logo{
+  width:36px;height:36px;border-radius:10px;
+  overflow:hidden;background:var(--accent);
+  display:grid;place-items:center;
+  font-weight:900;font-size:15px;color:#fff;flex-shrink:0;
+  cursor:pointer;
+}
+.topbar .logo img{width:100%;height:100%;object-fit:contain;}
+.topbar .title{flex:1;min-width:0;}
+.topbar .title h1{font-size:16px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.topbar .title span{font-size:11px;color:var(--muted);}
+.topbar .actions{display:flex;gap:8px;align-items:center;}
+.topbar .sync-dot{width:8px;height:8px;border-radius:50%;background:var(--green);flex-shrink:0;}
+.topbar .sync-dot.syncing{background:var(--amber);animation:pulse 1s infinite;}
+.topbar .sync-dot.error{background:var(--red);}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:.4;}}
+
+/* ── BOTTOM NAV ── */
+.bottomnav{
+  position:fixed;bottom:0;left:0;right:0;
+  height:var(--nav-h);
+  background:rgba(15,23,42,.95);
+  backdrop-filter:blur(16px);
+  -webkit-backdrop-filter:blur(16px);
+  border-top:1px solid var(--border);
+  display:flex;align-items:stretch;
+  padding-bottom:env(safe-area-inset-bottom);
+  z-index:50;
+}
+.nav-item{
+  flex:1;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:3px;
+  cursor:pointer;border:none;background:transparent;
+  color:var(--muted);font-family:var(--font);
+  transition:color .15s;padding:8px 4px;
+  position:relative;
+}
+.nav-item.active{color:var(--accent);}
+.nav-item .nav-ico{font-size:22px;line-height:1;}
+.nav-item .nav-lbl{font-size:10px;font-weight:700;letter-spacing:.3px;}
+.nav-item .nav-badge{
+  position:absolute;top:6px;right:calc(50% - 14px);
+  background:var(--red);color:#fff;
+  font-size:9px;font-weight:800;
+  min-width:16px;height:16px;border-radius:8px;
+  display:grid;place-items:center;padding:0 3px;
+}
+
+/* ── PAGES ── */
+.page{display:none;padding:16px;}
+.page.active{display:block;}
+
+/* ── CARDS ── */
+.card{
+  background:var(--card);border:1px solid var(--border);
+  border-radius:var(--radius);padding:16px;
+  box-shadow:var(--shadow);
+}
+.card+.card{margin-top:10px;}
+.card-header{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:12px;}
+.card-title{font-size:15px;font-weight:800;}
+.card-sub{font-size:12px;color:var(--muted);margin-top:2px;}
+
+/* ── SECTION HEADER ── */
+.sec-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;gap:10px;}
+.sec-head h2{font-size:20px;font-weight:900;}
+.sec-head .sub{font-size:12px;color:var(--muted);margin-top:2px;}
+
+/* ── BUTTONS ── */
+.btn{
+  border:1px solid var(--border);background:var(--card2);
+  color:var(--text);padding:10px 14px;border-radius:var(--radius2);
+  cursor:pointer;font-weight:700;font-size:13px;
+  display:inline-flex;align-items:center;gap:7px;
+  font-family:var(--font);transition:all .15s;white-space:nowrap;
+}
+.btn:active{transform:scale(.97);}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff;}
+.btn.green{background:var(--green);border-color:var(--green);color:#fff;}
+.btn.danger{background:rgba(239,68,68,.15);border-color:rgba(239,68,68,.3);color:var(--red);}
+.btn.small{padding:7px 10px;font-size:12px;border-radius:10px;}
+.btn.icon{width:36px;height:36px;padding:0;justify-content:center;border-radius:10px;}
+.btn-fab{
+  position:fixed;bottom:calc(var(--nav-h) + 16px);right:16px;
+  width:52px;height:52px;border-radius:16px;
+  background:var(--accent);border:none;color:#fff;
+  font-size:24px;cursor:pointer;
+  box-shadow:0 4px 20px rgba(59,130,246,.4);
+  display:grid;place-items:center;z-index:40;
+  font-family:var(--font);transition:transform .15s;
+}
+.btn-fab:active{transform:scale(.93);}
+
+/* ── INPUTS ── */
+.field{
+  background:var(--bg3);border:1px solid var(--border);
+  border-radius:var(--radius2);padding:11px 12px;
+  display:flex;align-items:center;gap:8px;
+  transition:border-color .15s;
+}
+.field:focus-within{border-color:var(--accent);}
+.field input,.field select,.field textarea{
+  border:0;outline:0;background:transparent;
+  color:var(--text);font-family:var(--font);font-size:14px;
+  width:100%;
+}
+.field textarea{resize:vertical;min-height:70px;}
+.field .ico{color:var(--muted);font-size:16px;flex-shrink:0;}
+.field+.field{margin-top:8px;}
+.field-label{font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;margin-bottom:6px;margin-top:14px;}
+
+/* ── PROJECT CARD ── */
+.proj-card{
+  background:var(--card);border:1px solid var(--border);
+  border-radius:var(--radius);padding:14px;
+  display:flex;gap:12px;align-items:flex-start;
+  cursor:pointer;transition:all .15s;margin-bottom:10px;
+}
+.proj-card:active{transform:scale(.99);}
+.proj-card .thumb{
+  width:52px;height:52px;border-radius:12px;
+  flex-shrink:0;overflow:hidden;
+  background:var(--bg3);border:1px solid var(--border);
+  display:grid;place-items:center;font-size:22px;
+}
+.proj-card .thumb img{width:100%;height:100%;object-fit:cover;}
+.proj-card .info{flex:1;min-width:0;}
+.proj-card .name{font-size:15px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.proj-card .meta{font-size:12px;color:var(--muted);margin-top:3px;}
+.proj-card .right{display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0;}
+
+/* ── BADGES ── */
+.badge{
+  display:inline-flex;align-items:center;gap:5px;
+  padding:4px 8px;border-radius:999px;font-size:11px;font-weight:700;
+}
+.badge.green{background:rgba(34,197,94,.15);color:var(--green);border:1px solid rgba(34,197,94,.2);}
+.badge.amber{background:rgba(245,158,11,.15);color:var(--amber);border:1px solid rgba(245,158,11,.2);}
+.badge.red{background:rgba(239,68,68,.15);color:var(--red);border:1px solid rgba(239,68,68,.2);}
+.badge.blue{background:rgba(59,130,246,.15);color:var(--accent2);border:1px solid rgba(59,130,246,.2);}
+.badge.gray{background:var(--bg3);color:var(--muted);border:1px solid var(--border);}
+.dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+.dot.green{background:var(--green);}
+.dot.amber{background:var(--amber);}
+.dot.gray{background:var(--muted);}
+
+/* ── TABS ── */
+.tabs{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;margin-bottom:14px;scrollbar-width:none;}
+.tabs::-webkit-scrollbar{display:none;}
+.tab{
+  padding:8px 14px;border-radius:999px;
+  border:1px solid var(--border);background:var(--card);
+  color:var(--muted);font-size:13px;font-weight:700;
+  cursor:pointer;white-space:nowrap;flex-shrink:0;
+  font-family:var(--font);transition:all .15s;
+}
+.tab.active{background:var(--accent);border-color:var(--accent);color:#fff;}
+
+/* ── TABLE ── */
+.table-wrap{overflow-x:auto;border-radius:var(--radius2);border:1px solid var(--border);}
+table{width:100%;border-collapse:collapse;font-size:13px;}
+thead th{background:var(--bg3);padding:10px 12px;text-align:left;font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;border-bottom:1px solid var(--border);}
+tbody td{padding:11px 12px;border-bottom:1px solid rgba(51,65,85,.5);vertical-align:middle;}
+tbody tr:last-child td{border-bottom:none;}
+tbody tr:hover td{background:rgba(255,255,255,.02);}
+
+/* ── KPI GRID ── */
+.kpi-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;}
+.kpi-box{background:var(--card);border:1px solid var(--border);border-radius:var(--radius2);padding:14px;}
+.kpi-box .kv{font-size:26px;font-weight:900;margin:4px 0 2px;}
+.kpi-box .kl{font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.5px;}
+.kpi-box .ks{font-size:11px;color:var(--muted);}
+
+/* ── MODAL / DRAWER ── */
+.overlay{
+  position:fixed;inset:0;background:rgba(0,0,0,.6);
+  display:none;align-items:flex-end;justify-content:center;
+  z-index:100;
+}
+.overlay.open{display:flex;}
+.sheet{
+  background:var(--bg2);border-radius:20px 20px 0 0;
+  border:1px solid var(--border);border-bottom:none;
+  width:100%;max-width:600px;
+  max-height:92vh;display:flex;flex-direction:column;
+  overflow:hidden;
+  padding-bottom:env(safe-area-inset-bottom);
+}
+.sheet-handle{width:36px;height:4px;border-radius:2px;background:var(--border);margin:10px auto 0;}
+.sheet-head{padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;}
+.sheet-head h3{flex:1;font-size:17px;font-weight:800;}
+.sheet-body{flex:1;overflow-y:auto;padding:16px;}
+.sheet-footer{padding:12px 16px;border-top:1px solid var(--border);display:flex;gap:8px;}
+.sheet-footer .btn{flex:1;justify-content:center;}
+
+/* ── EMPTY STATE ── */
+.empty{text-align:center;padding:48px 20px;color:var(--muted);}
+.empty .ico{font-size:48px;margin-bottom:12px;}
+.empty h3{font-size:17px;font-weight:800;color:var(--text);margin-bottom:6px;}
+.empty p{font-size:13px;line-height:1.5;}
+
+/* ── HOME SCREEN ── */
+#homeScreen{
+  position:fixed;inset:0;z-index:200;
+  background:var(--bg);
+  display:none;flex-direction:column;
+  align-items:center;justify-content:center;
+  padding:32px 20px;overflow-y:auto;
+}
+#homeScreen.show{display:flex;}
+.home-logo{
+  width:100px;height:100px;border-radius:24px;
+  background:var(--accent);overflow:hidden;
+  display:grid;place-items:center;
+  font-size:42px;font-weight:900;color:#fff;
+  margin-bottom:20px;cursor:pointer;position:relative;
+  box-shadow:0 8px 32px rgba(59,130,246,.35);
+}
+.home-logo img{width:100%;height:100%;object-fit:contain;}
+.home-logo .hint{position:absolute;inset:0;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center;font-size:12px;border-radius:24px;}
+.home-logo:hover .hint{display:flex;}
+.home-title{font-size:28px;font-weight:900;margin-bottom:4px;text-align:center;}
+.home-sub{font-size:14px;color:var(--muted);margin-bottom:40px;text-align:center;}
+.home-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;width:100%;max-width:400px;}
+.home-btn{
+  background:var(--card);border:1px solid var(--border);
+  border-radius:var(--radius);padding:20px 14px;
+  display:flex;flex-direction:column;align-items:center;gap:8px;
+  cursor:pointer;transition:all .15s;text-align:center;
+}
+.home-btn:active{transform:scale(.97);}
+.home-btn.accent{background:var(--accent);border-color:var(--accent);}
+.home-btn .hico{font-size:32px;line-height:1;}
+.home-btn .hlabel{font-size:14px;font-weight:800;}
+.home-btn .hdesc{font-size:11px;color:var(--muted);}
+.home-btn.accent .hdesc{color:rgba(255,255,255,.7);}
+.home-footer{margin-top:28px;display:flex;gap:12px;align-items:center;font-size:12px;color:var(--muted);}
+
+/* ── LOGIN ── */
+#loginModal{
+  position:fixed;inset:0;z-index:300;
+  background:rgba(0,0,0,.7);
+  display:none;align-items:center;justify-content:center;
+  padding:20px;
+}
+#loginModal.show{display:flex;}
+.login-box{
+  background:var(--bg2);border:1px solid var(--border);
+  border-radius:24px;padding:28px;width:100%;max-width:380px;
+  box-shadow:var(--shadow);
+}
+.login-box h2{font-size:22px;font-weight:900;margin-bottom:4px;}
+.login-box p{font-size:13px;color:var(--muted);margin-bottom:20px;}
+
+/* ── QUOTE EDITOR ── */
+.quote-editor{background:var(--bg2);}
+.qe-section{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:10px;}
+.qe-section-title{font-size:13px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;}
+
+/* ── BREAKDOWN ── */
+.breakdown{background:var(--bg3);border-radius:var(--radius2);padding:14px;}
+.breakdown-row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;font-size:13px;}
+.breakdown-row+.breakdown-row{border-top:1px solid rgba(255,255,255,.05);}
+.breakdown-row.total{font-size:17px;font-weight:900;padding-top:10px;margin-top:4px;border-top:1px solid var(--border)!important;}
+.breakdown-row .label{color:var(--muted);}
+.breakdown-row.total .label{color:var(--text);}
+
+/* ── SEARCHABLE SELECT ── */
+.matPicker{position:relative;display:block;}
+.matPickerInput{width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:9px 12px;font-size:13px;font-weight:600;color:var(--text);font-family:var(--font);}
+.matPickerDropdown{position:absolute;top:calc(100% + 4px);left:0;right:0;min-width:260px;background:var(--bg2);border:1px solid var(--border);border-radius:14px;box-shadow:0 8px 32px rgba(0,0,0,.4);z-index:9999;display:none;flex-direction:column;overflow:hidden;}
+.matPickerDropdown.open{display:flex;}
+.matPickerSearch{border:0;border-bottom:1px solid var(--border);padding:10px 14px;font-size:13px;background:transparent;color:var(--text);font-family:var(--font);outline:0;}
+.matPickerList{overflow-y:auto;max-height:200px;}
+.matPickerOption{padding:10px 14px;font-size:13px;cursor:pointer;color:var(--text);}
+.matPickerOption:hover{background:rgba(255,255,255,.05);}
+.matPickerEmpty{padding:10px 14px;font-size:12px;color:var(--muted);}
+.matPickerFooter{border-top:1px solid var(--border);padding:8px 10px;}
+
+/* ── SECTION SCREENS ── */
+#sectionScreen{
+  position:fixed;inset:0;z-index:150;
+  background:var(--bg);
+  display:none;flex-direction:column;
+}
+#sectionScreen.show{display:flex;}
+.sec-topbar{
+  background:rgba(15,23,42,.92);
+  backdrop-filter:blur(16px);
+  border-bottom:1px solid var(--border);
+  padding:12px 16px;
+  display:flex;align-items:center;gap:10px;
+  flex-shrink:0;
+}
+.sec-topbar h2{font-size:17px;font-weight:800;flex:1;}
+.sec-content{flex:1;overflow-y:auto;padding:16px;padding-bottom:32px;}
+.sec-item{
+  background:var(--card);border:1px solid var(--border);
+  border-radius:var(--radius2);padding:14px;
+  display:flex;gap:12px;align-items:flex-start;margin-bottom:8px;
+}
+.sec-item .si-ico{font-size:20px;flex-shrink:0;margin-top:1px;}
+.sec-item .si-body{flex:1;min-width:0;}
+.sec-item .si-title{font-size:13px;font-weight:800;}
+.sec-item .si-meta{font-size:12px;color:var(--muted);margin-top:3px;}
+.sec-item .si-right{flex-shrink:0;}
+
+/* ── PHOTO GRID ── */
+.photo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px;margin-top:10px;}
+.photo-item{position:relative;aspect-ratio:1;border-radius:12px;overflow:hidden;border:1px solid var(--border);}
+.photo-item img{width:100%;height:100%;object-fit:cover;cursor:pointer;}
+.photo-item .del-btn{position:absolute;top:4px;right:4px;background:rgba(0,0,0,.7);border:none;color:#fff;width:22px;height:22px;border-radius:6px;cursor:pointer;font-size:12px;display:grid;place-items:center;}
+
+/* ── TOOLS MENU ── */
+.tools-overlay{position:fixed;inset:0;z-index:80;display:none;}
+.tools-overlay.open{display:block;}
+.tools-menu{
+  position:fixed;top:60px;right:12px;
+  background:var(--bg2);border:1px solid var(--border);
+  border-radius:16px;box-shadow:var(--shadow);
+  padding:8px;min-width:240px;z-index:81;
+  display:none;
+}
+.tools-menu.open{display:block;}
+.tools-item{padding:10px 12px;border-radius:10px;cursor:pointer;display:flex;align-items:center;gap:10px;font-size:13px;font-weight:600;color:var(--text);}
+.tools-item:hover{background:rgba(255,255,255,.05);}
+.tools-item .ti-ico{font-size:17px;width:24px;text-align:center;}
+.tools-divider{height:1px;background:var(--border);margin:4px 0;}
+.tools-label{font-size:10px;color:var(--muted);font-weight:700;letter-spacing:.5px;text-transform:uppercase;padding:6px 12px 2px;}
+
+/* ── RESPONSIVE ── */
+@media(min-width:640px){
+  .home-grid{grid-template-columns:repeat(3,1fr);}
+  .kpi-grid{grid-template-columns:repeat(4,1fr);}
+  .photo-grid{grid-template-columns:repeat(auto-fill,minmax(150px,1fr));}
+}
+@media(min-width:1024px){
+  #app{flex-direction:row;}
+  #screen{padding-bottom:16px;}
+  .bottomnav{
+    position:static;width:72px;height:auto;
+    flex-direction:column;border-top:none;border-right:1px solid var(--border);
+    padding:16px 0;justify-content:flex-start;gap:4px;
   }
-  *{ box-sizing:border-box; }
-  body{ margin:0; font-family: ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial; background:var(--bg); color:var(--text); }
-  a{ color:inherit; text-decoration:none; }
-
-  .topbar{ position:sticky; top:0; z-index:30; background:rgba(255,255,255,.78); backdrop-filter: blur(10px); border-bottom:1px solid var(--border); }
-  .topin{ max-width:1560px; margin:0 auto; padding:12px 16px; display:flex; gap:12px; align-items:center; justify-content:space-between; flex-wrap:wrap; }
-  .brand{ display:flex; gap:10px; align-items:center; min-width:260px; }
-  .brand .logo{ width:38px; height:38px; border-radius:12px; background:var(--brand); display:grid; place-items:center; color:#fff; font-weight:900; letter-spacing:.5px; }
-  .brand b{ display:block; font-size:14px; }
-  .brand span{ display:block; font-size:12px; color:var(--muted); margin-top:1px; }
-  .nav{ display:flex; gap:8px; flex-wrap:wrap; justify-content:center; }
-  .rightbar{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; justify-content:flex-end; }
-  .pill{ display:inline-flex; align-items:center; gap:8px; padding:7px 10px; border:1px solid var(--border); background:#fff; border-radius:999px; font-size:12px; color:var(--muted); }
-
-  .btn{ border:1px solid var(--border); background:#fff; color:var(--text); padding:9px 12px; border-radius:12px; cursor:pointer; font-weight:800; font-size:13px; display:inline-flex; align-items:center; gap:8px; }
-  .btn:hover{ box-shadow:0 6px 18px rgba(2,6,23,.08); }
-  .btn.primary{ background:var(--btn); color:var(--btnText); border-color:transparent; }
-  .btn.small{ padding:7px 10px; font-size:12px; border-radius:11px; }
-  .btn.danger{ background:#fff; border-color:#fecaca; color:#991b1b; }
-  .iconBtn{ width:34px; height:34px; border-radius:12px; border:1px solid var(--border); background:#fff; cursor:pointer; display:grid; place-items:center; font-weight:900; }
-  .iconBtn:hover{ box-shadow:0 6px 18px rgba(2,6,23,.08); }
-  .menu{ position:relative; }
-  details.menu > summary{ list-style:none; }
-  details.menu > summary::-webkit-details-marker{ display:none; }
-  .menuDrop{ position:absolute; right:0; top:44px; width:290px; background:#fff; border:1px solid var(--border); border-radius:14px; box-shadow:var(--shadow); padding:10px; display:flex; flex-direction:column; gap:8px; z-index:40; }
-  .menuTitle{ font-size:12px; color:var(--muted); font-weight:950; margin:2px 2px 4px; }
-
-  .wrap{ max-width:1560px; margin:0 auto; padding:14px 16px 26px; }
-  .grid{ display:grid; grid-template-columns: 360px 1fr; gap:14px; align-items:start; }
-  @media (max-width: 1100px){ .grid{ grid-template-columns: 1fr; } }
-
-  .card{ background:var(--card); border:1px solid var(--border); border-radius:var(--radius); box-shadow: var(--shadow); }
-  .head{ padding:14px 16px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:flex-start; gap:10px; }
-  .head b{ font-size:16px; }
-  .head .sub{ font-size:12px; color:var(--muted); margin-top:2px; }
-  .pad{ padding:14px 16px; }
-  .muted{ color:var(--muted); }
-  .row{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
-  .right{ margin-left:auto; }
-
-  .segbox{ display:grid; grid-template-columns: 1fr 1fr 1fr; gap:8px; background:#f8fafc; border:1px solid var(--border); padding:8px; border-radius:16px; }
-  .seg{ text-align:center; padding:10px 8px; border-radius:12px; border:1px solid transparent; font-weight:950; font-size:12px; cursor:pointer; color:var(--muted); background:transparent; }
-  .seg.active{ background:#fff; border-color:var(--border); color:var(--text); box-shadow:0 6px 18px rgba(2,6,23,.06); }
-  .field{ display:flex; align-items:center; gap:8px; border:1px solid var(--border); border-radius:14px; padding:9px 10px; background:#fff; }
-  .field input, .field select{ border:0; outline:0; width:100%; font-size:13px; background:transparent; }
-  select{ border:1px solid var(--border); border-radius:12px; padding:9px 10px; font-weight:800; }
-  .list{ display:flex; flex-direction:column; gap:8px; margin-top:12px; }
-  .proj{ border:1px solid var(--border); border-radius:14px; padding:10px 10px; display:flex; gap:10px; cursor:pointer; background:#fff; }
-  .proj:hover{ box-shadow:0 6px 18px rgba(2,6,23,.08); }
-  .dot{ width:10px; height:10px; border-radius:99px; margin-top:5px; }
-  .dot.ok{ background:#22c55e; } .dot.no{ background:#f59e0b; } .dot.done{ background:#64748b; }
-  .proj b{ font-size:13px; } .proj .meta{ font-size:12px; color:var(--muted); margin-top:2px; }
-  .projThumb{ width:46px; height:46px; border-radius:10px; object-fit:cover; border:1px solid var(--border); flex-shrink:0; }
-  .projThumbEmpty{ width:46px; height:46px; border-radius:10px; border:1.5px dashed var(--border); flex-shrink:0; display:grid; place-items:center; font-size:18px; color:var(--border); cursor:pointer; }
-
-  .tabs{ display:flex; gap:8px; flex-wrap:wrap; }
-  .tab{ padding:8px 10px; border-radius:999px; border:1px solid var(--border); background:#fff; cursor:pointer; font-weight:950; font-size:12px; color:var(--muted); }
-  .tab.active{ background:#0f172a; color:#fff; border-color:transparent; }
-  .table{ width:100%; border-collapse:collapse; font-size:13px; }
-  .table th,.table td{ border-bottom:1px solid var(--border); padding:10px 8px; vertical-align:top; }
-  .table th{ text-align:left; font-size:12px; color:var(--muted); letter-spacing:.02em; text-transform:uppercase; }
-  .table input,.table select,.table textarea{ width:100%; border:1px solid var(--border); border-radius:12px; padding:8px 10px; font-weight:750; font-size:13px; background:#fff; }
-  .table textarea{ resize:vertical; min-height:38px; }
-  .kpi{ display:grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap:10px; }
-  @media (max-width: 900px){ .kpi{ grid-template-columns: repeat(2, minmax(0,1fr)); } }
-  .kpi .box{ border:1px solid var(--border); border-radius:16px; padding:12px; background:#fff; }
-  .kpi .box .t{ font-size:12px; color:var(--muted); font-weight:900; }
-  .kpi .box .v{ font-size:18px; font-weight:950; margin-top:4px; }
-
-  .drawerOverlay{ position:fixed; inset:0; background:rgba(2,6,23,.35); display:none; align-items:stretch; justify-content:flex-end; z-index:50; }
-  .drawer{ width:520px; max-width:92vw; height:100vh; background:#fff; border-left:1px solid var(--border); box-shadow:-18px 0 45px rgba(2,6,23,.22); display:flex; flex-direction:column; }
-  .drawerHead{ padding:14px 14px; border-bottom:1px solid var(--border); display:flex; align-items:flex-start; gap:10px; }
-  .drawerHead b{ font-size:15px; display:block; } .drawerHead .sub{ font-size:12px; color:var(--muted); margin-top:2px; }
-  .drawerBody{ padding:14px; overflow:auto; height:calc(100vh - 64px); }
-  .chips{ display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px; }
-  .chip{ padding:8px 10px; border-radius:999px; border:1px solid var(--border); background:#fff; cursor:pointer; font-weight:950; font-size:12px; color:var(--muted); }
-  .chip.active{ background:#0f172a; color:#fff; border-color:transparent; }
-
-  .calTop{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:10px; }
-  .calGrid{ display:grid; grid-template-columns: repeat(7, minmax(0,1fr)); gap:8px; }
-  .calCell{ border:1px solid var(--border); border-radius:14px; padding:10px; background:#fff; min-height:78px; cursor:pointer; }
-  .calCell:hover{ box-shadow:0 6px 18px rgba(2,6,23,.08); }
-  .calCell .d{ font-weight:950; font-size:12px; color:var(--muted); }
-  .badge{ display:inline-flex; align-items:center; gap:6px; padding:4px 7px; border-radius:999px; border:1px solid var(--border); background:#fff; font-weight:900; font-size:11px; color:var(--muted); margin-top:6px; }
-  .badge.ok{ border-color:#bbf7d0; color:#14532d; background:#f0fdf4; }
-  .badge.warn{ border-color:#fed7aa; color:#7c2d12; background:#fff7ed; }
-  .badge.gray{ border-color:#e5e7eb; color:#334155; background:#f8fafc; }
-
-  .modal{ position:fixed; inset:0; background:rgba(2,6,23,.55); display:none; align-items:center; justify-content:center; z-index:60; }
-  .modal .box{ width:520px; max-width:92vw; background:#fff; border:1px solid var(--border); border-radius:22px; box-shadow:var(--shadow); padding:14px; }
-  .modal .box h2{ margin:6px 0 2px; font-size:18px; }
-  .modal .box p{ margin:0 0 12px; color:var(--muted); font-size:13px; }
-  .grid2{ display:grid; grid-template-columns: 1fr 1fr; gap:10px; }
-  @media (max-width: 560px){ .grid2{ grid-template-columns:1fr; } }
-
-  .drawer.full{ width:100vw; max-width:100vw; }
-  .drawer.full .drawerBody{ padding:16px 18px; }
-  .drawer.full .drawerHead{ padding:14px 18px; }
-  .drawer.full .drawerBody .card{ max-width:1200px; margin:0 auto; }
-  /* Buscador de materiales */
-  .matPicker{ position:relative; display:block; }
-  .matPickerInput{ width:100%; border:1px solid var(--border); border-radius:10px; padding:7px 10px; font-size:13px; font-weight:700; background:#fff; cursor:text; box-sizing:border-box; }
-  .matPickerDropdown{ position:absolute; top:calc(100% + 2px); left:0; min-width:240px; background:#fff; border:1px solid var(--border); border-radius:12px; box-shadow:0 8px 28px rgba(2,6,23,.15); z-index:9999; display:none; flex-direction:column; }
-  .matPickerDropdown.open{ display:flex; }
-  .matPickerSearch{ border:0; border-bottom:1px solid var(--border); padding:8px 12px; font-size:13px; outline:0; width:100%; box-sizing:border-box; border-radius:12px 12px 0 0; }
-  .matPickerList{ overflow-y:auto; max-height:180px; }
-  .matPickerOption{ padding:8px 12px; font-size:13px; cursor:pointer; }
-  .matPickerOption:hover{ background:#f1f5f9; }
-  .matPickerEmpty{ padding:8px 12px; font-size:12px; color:var(--muted); }
-  .matPickerFooter{ border-top:1px solid var(--border); padding:6px 8px; }
-  /* Mejor legibilidad en Operación */
-  #tbTasks textarea[data-f="title"], #tbInst textarea[data-f="title"], #tbPurch textarea[data-f="title"]{
-    min-width: 280px;
-  }
-
-
-  /* ---- Pantalla de inicio ---- */
-  #homeScreen{ display:none; position:fixed; inset:0; background:var(--bg); flex-direction:column; align-items:center; justify-content:center; padding:32px 16px; overflow-y:auto; z-index:100; }
-  #homeScreen .home-logo{ width:120px; height:120px; border-radius:28px; background:var(--brand); display:grid; place-items:center; color:#fff; font-size:48px; font-weight:900; margin-bottom:18px; overflow:hidden; cursor:pointer; position:relative; }
-  #homeScreen .home-logo img{ width:100%; height:100%; object-fit:contain; }
-  #homeScreen .home-logo .logo-hint{ position:absolute; inset:0; background:rgba(0,0,0,.45); display:none; align-items:center; justify-content:center; font-size:12px; color:#fff; border-radius:28px; }
-  #homeScreen .home-logo:hover .logo-hint{ display:flex; }
-  #homeScreen h1{ font-size:26px; font-weight:950; color:var(--text); margin:0 0 4px; text-align:center; }
-  #homeScreen .home-sub{ font-size:14px; color:var(--muted); margin-bottom:40px; text-align:center; }
-  .home-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:16px; max-width:780px; width:100%; }
-  @media(max-width:600px){ .home-grid{ grid-template-columns:1fr 1fr; } }
-  .home-btn{ background:#fff; border:1px solid var(--border); border-radius:22px; padding:28px 16px; display:flex; flex-direction:column; align-items:center; gap:12px; cursor:pointer; transition:box-shadow .15s,transform .15s; text-align:center; }
-  .home-btn:hover{ box-shadow:0 12px 36px rgba(2,6,23,.12); transform:translateY(-2px); }
-  .home-btn .hico{ font-size:36px; line-height:1; }
-  .home-btn .hlabel{ font-size:15px; font-weight:950; color:var(--text); }
-  .home-btn .hdesc{ font-size:12px; color:var(--muted); }
-  .home-btn.primary-btn{ background:var(--brand); border-color:transparent; }
-  .home-btn.primary-btn .hlabel, .home-btn.primary-btn .hdesc{ color:#fff; }
-  .home-footer{ margin-top:32px; font-size:12px; color:var(--muted); display:flex; gap:16px; align-items:center; }
-
-  /* ---- Vistas de sección global ---- */
-  #sectionScreen{ display:none; position:fixed; inset:0; background:var(--bg); flex-direction:column; overflow-y:auto; z-index:100; }
-  .sec-topbar{ background:#fff; border-bottom:1px solid var(--border); padding:12px 20px; display:flex; align-items:center; gap:12px; position:sticky; top:0; z-index:20; }
-  .sec-topbar h2{ margin:0; font-size:17px; font-weight:950; }
-  .sec-topbar .sec-sub{ font-size:12px; color:var(--muted); margin-top:1px; }
-  .sec-body{ max-width:1100px; margin:0 auto; padding:20px 16px; width:100%; }
-  .sec-item{ background:#fff; border:1px solid var(--border); border-radius:14px; padding:12px 14px; display:flex; gap:12px; align-items:flex-start; margin-bottom:8px; }
-  .sec-item:hover{ box-shadow:0 4px 14px rgba(2,6,23,.07); }
-  .sec-item .si-ico{ font-size:22px; flex-shrink:0; margin-top:1px; }
-  .sec-item .si-body{ flex:1; min-width:0; }
-  .sec-item .si-title{ font-size:13px; font-weight:800; }
-  .sec-item .si-meta{ font-size:12px; color:var(--muted); margin-top:2px; }
-  .sec-item .si-right{ flex-shrink:0; display:flex; flex-direction:column; align-items:flex-end; gap:6px; }
-  .sec-filters{ display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px; align-items:center; }
-  .sec-empty{ padding:40px; text-align:center; color:var(--muted); font-size:14px; }
-  .status-dot{ width:8px; height:8px; border-radius:99px; display:inline-block; margin-right:4px; }
-  .status-dot.pending{ background:#f59e0b; }
-  .status-dot.done{ background:#22c55e; }
-  .status-dot.auth{ background:#3b82f6; }
-
+  .nav-item{flex:0;padding:12px 8px;border-radius:12px;width:56px;}
+  .nav-item .nav-lbl{font-size:9px;}
+  .btn-fab{bottom:24px;}
+}
 </style>
 </head>
 <body>
 
-<!-- ============ VISTAS DE SECCIÓN ============ -->
-<div id="sectionScreen">
-  <div class="sec-topbar">
-    <button class="iconBtn" id="secBtnBack" title="Volver al inicio">←</button>
-    <div>
-      <h2 id="secTitle">Compras</h2>
-      <div class="sec-sub" id="secSub">Todos los proyectos</div>
-    </div>
-    <div style="margin-left:auto; display:flex; gap:8px;">
-      <button class="btn small primary" id="secBtnAdd" style="display:none;">＋ Agregar</button>
-    </div>
-  </div>
-  <div class="sec-body">
-    <div class="sec-filters" id="secFilters"></div>
-    <div id="secContent"></div>
-  </div>
-</div>
-<!-- ========== FIN VISTAS SECCIÓN ========== -->
-
-<!-- ============ PANTALLA DE INICIO ============ -->
-<div id="homeScreen">
-  <div class="home-logo" id="homeLogoBox" title="Click para cambiar logo">
+<!-- HOME SCREEN -->
+<div id="homeScreen" class="show">
+  <div class="home-logo" id="homeLogoBox">
     <span id="homeLogoText">E</span>
-    <img id="homeLogoImg" src="" style="display:none;">
-    <div class="logo-hint">📷 Cambiar</div>
-    <input type="file" id="homeLogoFile" accept="image/*" style="display:none;">
+    <img id="homeLogoImg" src="" style="display:none">
+    <div class="hint">📷</div>
+    <input type="file" id="homeLogoFile" accept="image/*" style="display:none">
   </div>
-  <h1 id="homeTitle">ESMA INDUSTRIAL</h1>
-  <div class="home-sub" id="homeSub">Sistema de proyectos</div>
-
+  <div class="home-title" id="homeTitle">ESMA INDUSTRIAL</div>
+  <div class="home-sub">Sistema de proyectos</div>
   <div class="home-grid">
-    <div class="home-btn primary-btn" id="hbtnProyectos">
+    <div class="home-btn accent" id="hbtnProyectos">
       <div class="hico">📁</div>
       <div class="hlabel">Proyectos</div>
-      <div class="hdesc">Ver y gestionar proyectos</div>
+      <div class="hdesc">Ver y gestionar</div>
     </div>
-    <div class="home-btn" id="hbtnCotizador">
+    <div class="home-btn" id="hbtnCotizaciones">
       <div class="hico">🧾</div>
-      <div class="hlabel">Cotizador</div>
-      <div class="hdesc">Crear y revisar cotizaciones</div>
+      <div class="hlabel">Cotizaciones</div>
+      <div class="hdesc">Todas las cotizaciones</div>
     </div>
     <div class="home-btn" id="hbtnInstalaciones">
       <div class="hico">🛠️</div>
       <div class="hlabel">Instalaciones</div>
-      <div class="hdesc">Calendario de instalaciones</div>
+      <div class="hdesc">Agenda de trabajo</div>
     </div>
     <div class="home-btn" id="hbtnCompras">
       <div class="hico">🛒</div>
       <div class="hlabel">Compras</div>
-      <div class="hdesc">Órdenes y seguimiento</div>
+      <div class="hdesc">Órdenes y pedidos</div>
     </div>
     <div class="home-btn" id="hbtnCalendario">
       <div class="hico">📅</div>
       <div class="hlabel">Calendario</div>
-      <div class="hdesc">Vista general de eventos</div>
+      <div class="hdesc">Vista de eventos</div>
     </div>
     <div class="home-btn" id="hbtnVentas">
       <div class="hico">📈</div>
       <div class="hlabel">Ventas</div>
-      <div class="hdesc">Resumen y métricas</div>
+      <div class="hdesc">Resumen mensual</div>
     </div>
   </div>
-
   <div class="home-footer">
     <span id="homeWhoami">—</span>
-    <button class="btn small" id="homeBtnLogout" style="display:none;">Salir</button>
-  </div>
-</div>
-<!-- ========== FIN PANTALLA INICIO ========== -->
-
-<div class="topbar">
-  <div class="topin">
-    <div class="brand" style="cursor:pointer;" id="brandHome" title="Ir al inicio">
-      <div class="logo" id="topbarLogo" style="overflow:hidden;">E</div>
-      <div style="min-width:0;">
-        <b id="topbarTitle">ESMA INDUSTRIAL</b>
-        <span id="topbarSub">Proyectos · Compras · Instalaciones</span>
-      </div>
-    </div>
-
-    <div class="nav">
-      <button class="btn small primary" id="navProjects">📁 Proyectos</button>
-      <button class="btn small" id="navOpenDrawer">🧩 Panel</button>
-    </div>
-
-    <div class="rightbar">
-      <span class="pill" id="whoami">—</span>
-      <button class="btn small" id="btnLogout">Salir</button>
-
-      <details class="menu" id="toolsMenu">
-        <summary class="btn small">☰ Herramientas</summary>
-        <div class="menuDrop">
-          <div class="menuTitle">Acciones</div>
-          <button class="btn small" id="btnEmails">✉ Correos</button>
-          <button class="btn small" id="btnReports">📊 Reportes</button>
-          <button class="btn small" id="btnExportQuote">🧾 Exportar cotización</button>
-          <div class="menuTitle">Sincronización Google Sheets</div>
-          <div style="display:flex;gap:6px;flex-wrap:wrap">
-            <input id="gsUrlInput" placeholder="URL Apps Script..." style="flex:1;min-width:0;padding:7px 10px;border:1px solid var(--border);border-radius:10px;font-size:12px">
-            <button class="btn small primary" id="btnSaveGsUrl">Guardar</button>
-          </div>
-          <div style="display:flex;gap:6px">
-            <button class="btn small" id="btnGsPush">⬆ Subir</button>
-            <button class="btn small" id="btnGsPull">⬇ Descargar</button>
-            <button class="btn small danger" id="btnResetSync" title="Borra datos locales y descarga desde Sheets">↺ Resetear</button>
-            <span id="syncStatus" style="font-size:11px;color:var(--muted);align-self:center"></span>
-          </div>
-          <div class="menuTitle">Folio de cotizaciones</div>
-      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
-        <span style="font-size:12px;color:var(--muted);">Siguiente folio:</span>
-        <input id="folioCounterInput" type="number" min="0" style="width:80px;padding:6px 8px;border:1px solid var(--border);border-radius:8px;font-size:13px;">
-        <button class="btn small primary" id="btnSaveFolio">Guardar</button>
-      </div>
-      <div class="menuTitle">Datos</div>
-          <button class="btn small" id="btnBackup">⬇ Respaldo local</button>
-          <button class="btn small" id="btnRestore">⬆ Restaurar local</button>
-          <input type="file" id="restoreFile" accept="application/json" style="display:none">
-        </div>
-      </details>
-    </div>
+    <button class="btn small danger" id="homeBtnLogout" style="display:none">Salir</button>
   </div>
 </div>
 
-<div class="wrap">
-  <div class="grid">
-    <div class="card">
-      <div class="head">
-        <div>
-          <b>Proyectos</b>
-          <div class="sub">Filtra y selecciona.</div>
-        </div>
-      </div>
-      <div class="pad">
-        <div class="segbox">
-          <div class="seg" id="segAuth">Autorizados</div>
-          <div class="seg active" id="segNoAuth">No autorizados</div>
-          <div class="seg" id="segDone">Terminados</div>
-        </div>
-
-        <div style="height:10px;"></div>
-        <div class="row">
-          <select id="sortProjects" style="flex:1; min-width:200px;">
-            <option value="delivery">Orden: Entrega</option>
-            <option value="created">Orden: Creación</option>
-            <option value="name">Orden: Nombre</option>
-            <option value="cost">Orden: Total autorizado</option>
-          </select>
-          <button class="btn small" id="btnClearFilters">Limpiar</button>
-        </div>
-
-        <div style="height:10px;"></div>
-        <div class="field">
-          <span class="muted">🔎</span>
-          
-        </div>
-
-        <div style="height:10px;"></div>
-        <button class="btn primary" style="width:100%;" id="btnNewProject">＋ Nuevo proyecto</button>
-
-        <div class="list" id="projectsList"></div>
-        <div class="muted" style="font-size:12px; margin-top:10px;">
-          Regla: “Autorizado” = tiene al menos una cotización autorizada.
-        </div>
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="head">
-        <div>
-          <b id="mainTitle">Selecciona un proyecto</b>
-          <div class="sub" id="mainSub">Elige a la izquierda.</div>
-        </div>
-        <div class="row">
-          <button class="btn small" id="btnOpenDrawer">🧩 Panel</button>
-          <button class="btn small primary" id="btnNewQuote" style="display:none;">＋ Cotización</button>
-        </div>
-      </div>
-
-      <div class="pad">
-        <div class="tabs" id="mainTabs" style="display:none;">
-          <div class="tab active" data-tab="overview">Resumen</div>
-          <div class="tab" data-tab="quotes">Cotizador</div>
-          <div class="tab" data-tab="ops">Operación</div>
-        </div>
-        <div style="height:12px;"></div>
-
-        <div id="mainContent"></div>
-      </div>
-    </div>
+<!-- SECTION SCREEN -->
+<div id="sectionScreen">
+  <div class="sec-topbar">
+    <button class="btn icon" id="secBack">←</button>
+    <h2 id="secTitle">—</h2>
+    <div id="secActions"></div>
   </div>
+  <div class="sec-filters" style="padding:10px 16px 0;display:flex;gap:6px;overflow-x:auto;" id="secFilters"></div>
+  <div class="sec-content" id="secContent"></div>
 </div>
 
-<div class="drawerOverlay" id="drawerOverlay">
-  <div class="drawer" role="dialog" aria-modal="true">
-    <div class="drawerHead">
-      <div style="min-width:0;">
-        <b id="drawerTitle">Panel</b>
-        <div class="sub" id="drawerSub">Calendario · Ventas · Base de datos</div>
-      </div>
-      <div class="right"></div>
-      <button class="iconBtn" id="drawerClose" title="Cerrar">✕</button>
-    </div>
-    <div class="drawerBody">
-      <div class="chips">
-        <div class="chip active" data-chip="calendar">📅 Calendario</div>
-        <div class="chip" data-chip="sales">📈 Ventas</div>
-        <div class="chip" data-chip="db">🗄 Base de datos</div>
-        <div class="chip" data-chip="breakeven">⚖️ Punto de equilibrio</div>
-        <div class="chip" data-chip="empresa">🏢 Mi empresa</div>
-      </div>
-      <div id="drawerContent"></div>
-    </div>
-  </div>
-</div>
-
-<div class="modal" id="loginModal">
-  <div class="box">
+<!-- LOGIN -->
+<div id="loginModal" class="show">
+  <div class="login-box">
     <h2>Iniciar sesión</h2>
-    <p>Acceso por cuenta. Admin puede gestionar usuarios y bases.</p>
-    <div class="grid2">
-      <div class="field"><span class="muted">📧</span><input id="loginEmail" placeholder="correo@empresa.com"></div>
-      <div class="field"><span class="muted">🔒</span><input id="loginPass" placeholder="contraseña" type="password"></div>
+    <p>ESMA Industrial · Proyectos</p>
+    <div class="field-label">Correo</div>
+    <div class="field"><span class="ico">📧</span><input id="loginEmail" type="email" placeholder="correo@empresa.com"></div>
+    <div class="field-label">Contraseña</div>
+    <div class="field"><span class="ico">🔒</span><input id="loginPass" type="password" placeholder="contraseña"></div>
+    <div style="height:14px"></div>
+    <div style="display:flex;gap:8px;">
+      <button class="btn primary" id="btnLogin" style="flex:1;justify-content:center;">Entrar</button>
+      <button class="btn" id="btnSeedDemo">Demo</button>
     </div>
-    <div style="height:10px;"></div>
-    <div class="row">
-      <button class="btn primary" id="btnLogin">Entrar</button>
-      <span class="muted" id="loginMsg"></span>
-      <div class="right"></div>
-      <button class="btn" id="btnSeedDemo">Cargar demo</button>
-    </div>
-    <div class="muted" style="font-size:12px; margin-top:10px;">
-      Demo: <b>admin@esma</b> / <b>1234</b>
-    </div>
+    <div style="font-size:12px;color:var(--muted);margin-top:10px;">Demo: admin@esma / 1234</div>
+    <div style="font-size:12px;color:var(--red);margin-top:6px;display:none" id="loginMsg"></div>
   </div>
 </div>
+
+<!-- MAIN APP -->
+<div id="app" style="display:none;">
+  <div id="screen">
+
+    <!-- PAGE: PROYECTOS -->
+    <div class="page active" id="page-projects">
+      <div style="padding:16px 0 10px;">
+        <div class="sec-head">
+          <div><h2>Proyectos</h2><div class="sub" id="projCount">—</div></div>
+          <button class="btn primary small" id="btnNewProject">＋ Nuevo</button>
+        </div>
+        <div class="tabs" id="projTabs">
+          <div class="tab active" data-seg="noauth">En curso</div>
+          <div class="tab" data-seg="auth">Autorizados</div>
+          <div class="tab" data-seg="done">Terminados</div>
+        </div>
+        <div class="field" style="margin-bottom:12px;">
+          <span class="ico">🔎</span>
+          <input id="searchProjects" placeholder="Buscar proyecto o cliente...">
+        </div>
+        <div id="projectsList"></div>
+      </div>
+    </div>
+
+    <!-- PAGE: DETALLE PROYECTO -->
+    <div class="page" id="page-project-detail">
+      <div style="padding:16px 0 10px;">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
+          <button class="btn icon" id="btnBackProjects">←</button>
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:18px;font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" id="detailProjectName">—</div>
+            <div style="font-size:12px;color:var(--muted);" id="detailProjectMeta">—</div>
+          </div>
+          <button class="btn small primary" id="btnNewQuoteDetail">＋ Cotización</button>
+        </div>
+        <div class="tabs" id="detailTabs">
+          <div class="tab active" data-dtab="overview">Resumen</div>
+          <div class="tab" data-dtab="quotes">Cotizaciones</div>
+          <div class="tab" data-dtab="ops">Operación</div>
+        </div>
+        <div id="detailContent"></div>
+      </div>
+    </div>
+
+    <!-- PAGE: COTIZADOR (editor) -->
+    <div class="page" id="page-quote-editor">
+      <div id="quoteEditorContent"></div>
+    </div>
+
+    <!-- PAGE: CALENDARIO -->
+    <div class="page" id="page-calendar">
+      <div style="padding:16px 0 10px;">
+        <div class="sec-head"><div><h2>Calendario</h2></div></div>
+        <div id="calendarContent"></div>
+      </div>
+    </div>
+
+    <!-- PAGE: VENTAS -->
+    <div class="page" id="page-sales">
+      <div style="padding:16px 0 10px;">
+        <div class="sec-head"><div><h2>Ventas</h2></div></div>
+        <div id="salesContent"></div>
+      </div>
+    </div>
+
+    <!-- PAGE: AJUSTES -->
+    <div class="page" id="page-settings">
+      <div style="padding:16px 0 10px;">
+        <div class="sec-head"><div><h2>Ajustes</h2></div></div>
+        <div id="settingsContent"></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- BOTTOM NAV -->
+  <nav class="bottomnav">
+    <button class="nav-item active" data-nav="projects">
+      <span class="nav-ico">📁</span>
+      <span class="nav-lbl">Proyectos</span>
+    </button>
+    <button class="nav-item" data-nav="calendar">
+      <span class="nav-ico">📅</span>
+      <span class="nav-lbl">Calendario</span>
+    </button>
+    <button class="nav-item" data-nav="sales">
+      <span class="nav-ico">📈</span>
+      <span class="nav-lbl">Ventas</span>
+    </button>
+    <button class="nav-item" data-nav="settings">
+      <span class="nav-ico">⚙️</span>
+      <span class="nav-lbl">Ajustes</span>
+    </button>
+  </nav>
+</div>
+
+<!-- TOOLS OVERLAY -->
+<div class="tools-overlay" id="toolsOverlay"></div>
+<div class="tools-menu" id="toolsMenu"></div>
+
+<!-- BOTTOM SHEET (modal) -->
+<div class="overlay" id="sheetOverlay">
+  <div class="sheet" id="sheetEl">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head">
+      <h3 id="sheetTitle">—</h3>
+      <button class="btn icon" id="sheetClose">✕</button>
+    </div>
+    <div class="sheet-body" id="sheetBody"></div>
+    <div class="sheet-footer" id="sheetFooter"></div>
+  </div>
+</div>
+
 
 <script>
+
 const STORAGE_KEY = "esma_app_b_v1";
 const IMGBB_API_KEY = "91c48536cbf1b271a1b7e7eedeea773e";
 
@@ -2745,6 +2933,785 @@ function downloadQuotePDF(){ alert('Función PDF no encontrada en esta versión.
     await gsPullOnBoot();
   });
 })();
+
+
+
+
+
+// ========================================================
+//  NEW UI LAYER — Navigation, Pages, Components
+// ========================================================
+
+let currentPage = "projects";
+let _calSelectedDay = "";
+let _calFilter = {delivery:true, install:true, purchase:true, task:true};
+let _calCursor = new Date(); _calCursor.setDate(1);
+let _salesCursor = new Date(); _salesCursor.setDate(1);
+let currentProjectId = "";
+let currentDetailTab = "overview";
+let projSeg = "noauth";
+let projSearch = "";
+
+const MONTHS_ES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
+
+// ---- Navigation ----
+function showPage(name){
+  currentPage = name;
+  document.querySelectorAll(".page").forEach(p=>p.classList.remove("active"));
+  const pg = document.getElementById("page-"+name);
+  if(pg) pg.classList.add("active");
+  document.querySelectorAll(".nav-item").forEach(n=>n.classList.toggle("active", n.dataset.nav===name));
+  const scr = document.getElementById("screen");
+  if(scr) scr.scrollTop = 0;
+  if(name==="projects") renderProjectsPage();
+  if(name==="calendar") renderCalendarPage();
+  if(name==="sales") renderSalesPage();
+  if(name==="settings") renderSettingsPage();
+}
+
+function showHome(){
+  document.getElementById("homeScreen").classList.add("show");
+  document.getElementById("app").style.display = "none";
+  const emp = (db&&db.settings&&db.settings.empresa)||{};
+  const ht = document.getElementById("homeTitle"); if(ht) ht.textContent = emp.nombre||"ESMA INDUSTRIAL";
+  const logo = emp.logoB64||localStorage.getItem("esma_logo_b64")||"";
+  refreshLogo(logo);
+  const u = currentUser();
+  const hw = document.getElementById("homeWhoami"); if(hw) hw.textContent = u?(u.name+" \u00b7 "+u.role.toUpperCase()):"---";
+  const hl = document.getElementById("homeBtnLogout"); if(hl) hl.style.display = u?"":"none";
+}
+
+function showApp(){
+  document.getElementById("homeScreen").classList.remove("show");
+  document.getElementById("sectionScreen").classList.remove("show");
+  document.getElementById("app").style.display = "";
+  renderProjectsPage();
+}
+
+function refreshLogo(b64){
+  const img = document.getElementById("homeLogoImg");
+  const txt = document.getElementById("homeLogoText");
+  const topLogo = document.getElementById("topbarLogoEl");
+  if(b64){
+    if(img){ img.src=b64; img.style.display=""; }
+    if(txt) txt.style.display="none";
+    if(topLogo) topLogo.innerHTML='<img src="'+b64+'" style="width:100%;height:100%;object-fit:contain;border-radius:10px;">';
+  } else {
+    if(img) img.style.display="none";
+    if(txt) txt.style.display="";
+    if(topLogo) topLogo.textContent="E";
+  }
+}
+
+// ---- Section screens ----
+function showSection(section){
+  document.getElementById("homeScreen").classList.remove("show");
+  document.getElementById("app").style.display = "";
+  document.getElementById("sectionScreen").classList.add("show");
+  currentSection = section;
+  _renderSection(section);
+}
+
+function _renderSection(section){
+  const titles = {compras:"\u{1F6D2} Compras", instalaciones:"\u{1F6E0}\uFE0F Instalaciones", cotizaciones:"\u{1F9FE} Cotizaciones", tareas:"\u2705 Tareas"};
+  const st = document.getElementById("secTitle"); if(st) st.textContent = titles[section]||section;
+  const filtersEl = document.getElementById("secFilters");
+  const contentEl = document.getElementById("secContent");
+  if(filtersEl) filtersEl.innerHTML="";
+  if(contentEl) contentEl.innerHTML="";
+  if(section==="compras") _renderSecCompras(filtersEl, contentEl);
+  else if(section==="instalaciones") _renderSecInstalaciones(filtersEl, contentEl);
+  else if(section==="cotizaciones") _renderSecCotizaciones(filtersEl, contentEl);
+  else if(section==="tareas") _renderSecTareas(filtersEl, contentEl);
+}
+
+function _goToProject(pid, tab){
+  showApp();
+  openProjectDetail(pid, tab||"overview");
+}
+
+function _renderSecCompras(filtersEl, contentEl){
+  const items=[...db.purchases].sort((a,b)=>String(b.date||"").localeCompare(String(a.date||"")));
+  if(!items.length){ contentEl.innerHTML='<div class="empty"><div class="ico">\u{1F6D2}</div><h3>Sin compras</h3><p>Agrega compras desde los proyectos.</p></div>'; return; }
+  contentEl.innerHTML=items.map(item=>`<div class="sec-item"><div class="si-ico">\u{1F6D2}</div><div class="si-body"><div class="si-title">${escapeHTML(item.title||"Sin titulo")}</div><div class="si-meta">\u{1F4C1} ${escapeHTML(projectName(item.projectId))}${item.date?" \u00b7 \u{1F4C5} "+item.date:""}</div></div><div class="si-right"><button class="btn small" data-pid="${item.projectId}">Ver</button></div></div>`).join("");
+  contentEl.querySelectorAll("button[data-pid]").forEach(b=>b.addEventListener("click",()=>_goToProject(b.dataset.pid,"ops")));
+}
+
+function _renderSecInstalaciones(filtersEl, contentEl){
+  const items=[...db.installs].sort((a,b)=>String(b.date||"").localeCompare(String(a.date||"")));
+  if(!items.length){ contentEl.innerHTML='<div class="empty"><div class="ico">\u{1F6E0}\uFE0F</div><h3>Sin instalaciones</h3></div>'; return; }
+  contentEl.innerHTML=items.map(item=>`<div class="sec-item"><div class="si-ico">\u{1F6E0}\uFE0F</div><div class="si-body"><div class="si-title">${escapeHTML(item.title||"Sin titulo")}</div><div class="si-meta">\u{1F4C1} ${escapeHTML(projectName(item.projectId))}${item.date?" \u00b7 \u{1F4C5} "+item.date:""}</div></div><div class="si-right"><button class="btn small" data-pid="${item.projectId}">Ver</button></div></div>`).join("");
+  contentEl.querySelectorAll("button[data-pid]").forEach(b=>b.addEventListener("click",()=>_goToProject(b.dataset.pid,"ops")));
+}
+
+function _renderSecCotizaciones(filtersEl, contentEl){
+  if(filtersEl) filtersEl.innerHTML='<button class="tab active" data-qf="all">Todas</button><button class="tab" data-qf="authorized">Autorizadas</button><button class="tab" data-qf="draft">Borradores</button>';
+  let filter="all";
+  function renderList(){
+    let items=[...db.quotes].sort((a,b)=>String(b.createdAt||"").localeCompare(String(a.createdAt||"")));
+    if(filter==="authorized") items=items.filter(x=>x.status==="authorized");
+    if(filter==="draft") items=items.filter(x=>x.status!=="authorized");
+    if(!items.length){ contentEl.innerHTML='<div class="empty"><div class="ico">\u{1F9FE}</div><h3>Sin cotizaciones</h3></div>'; return; }
+    contentEl.innerHTML=items.map(q=>{
+      const t=quoteSellTotals(q); const isAuth=q.status==="authorized";
+      return `<div class="sec-item"><div class="si-ico">\u{1F9FE}</div><div class="si-body"><div class="si-title">${escapeHTML(q.name||"Cotizacion")}</div><div class="si-meta">\u{1F4C1} ${escapeHTML(projectName(q.projectId))} \u00b7 ${isAuth?'<span style="color:var(--green)">Autorizada</span>':"Borrador"}</div></div><div class="si-right" style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;"><span style="font-size:14px;font-weight:900;">$${money(t.venta)}</span><button class="btn small" data-qid="${q.id}" data-pid="${q.projectId}">Abrir</button></div></div>`;
+    }).join("");
+    contentEl.querySelectorAll("button[data-qid]").forEach(b=>{
+      b.addEventListener("click",()=>{
+        const q=db.quotes.find(x=>x.id===b.dataset.qid); if(!q) return;
+        showApp(); openProjectDetail(b.dataset.pid,"quotes");
+        setTimeout(()=>openQuoteEditorPage(q),100);
+      });
+    });
+  }
+  if(filtersEl) filtersEl.querySelectorAll(".tab").forEach(btn=>btn.addEventListener("click",()=>{
+    filter=btn.dataset.qf;
+    filtersEl.querySelectorAll(".tab").forEach(b=>b.classList.toggle("active",b===btn));
+    renderList();
+  }));
+  renderList();
+}
+
+function _renderSecTareas(filtersEl, contentEl){
+  if(filtersEl) filtersEl.innerHTML='<button class="tab active" data-tf="all">Todas</button><button class="tab" data-tf="pending">Pendientes</button><button class="tab" data-tf="done">Completadas</button>';
+  let filter="all";
+  function renderList(){
+    let items=[...db.tasks].sort((a,b)=>String(b.date||"").localeCompare(String(a.date||"")));
+    if(filter==="pending") items=items.filter(x=>!x.done);
+    if(filter==="done") items=items.filter(x=>!!x.done);
+    if(!items.length){ contentEl.innerHTML='<div class="empty"><div class="ico">\u2705</div><h3>Sin tareas</h3></div>'; return; }
+    contentEl.innerHTML=items.map(item=>`<div class="sec-item"><div class="si-ico">${item.done?"\u2705":"\u{1F532}"}</div><div class="si-body"><div class="si-title">${escapeHTML(item.title||"Sin titulo")}</div><div class="si-meta">\u{1F4C1} ${escapeHTML(projectName(item.projectId))}${item.date?" \u00b7 \u{1F4C5} "+item.date:""}</div></div><div class="si-right"><button class="btn small" data-pid="${item.projectId}">Ver</button></div></div>`).join("");
+    contentEl.querySelectorAll("button[data-pid]").forEach(b=>b.addEventListener("click",()=>_goToProject(b.dataset.pid,"ops")));
+  }
+  if(filtersEl) filtersEl.querySelectorAll(".tab").forEach(btn=>btn.addEventListener("click",()=>{
+    filter=btn.dataset.tf;
+    filtersEl.querySelectorAll(".tab").forEach(b=>b.classList.toggle("active",b===btn));
+    renderList();
+  }));
+  renderList();
+}
+
+// ---- Projects page ----
+function renderProjectsPage(){
+  const box=document.getElementById("projectsList"); if(!box) return;
+  const term=projSearch.trim().toLowerCase();
+  let items=db.projects.map(p=>{
+    const auth=projectHasAuthorized(p.id); const done=projectIsDone(p.id);
+    const pseg=done?"done":(auth?"auth":"noauth");
+    return {...p,__seg:pseg,__authTotal:projectAuthorizedTotal(p.id)};
+  }).filter(p=>{
+    if(projSeg==="auth"&&p.__seg!=="auth") return false;
+    if(projSeg==="noauth"&&p.__seg!=="noauth") return false;
+    if(projSeg==="done"&&p.__seg!=="done") return false;
+    if(term&&!(String(p.name||"").toLowerCase().includes(term)||String(p.client||"").toLowerCase().includes(term))) return false;
+    return true;
+  }).sort((a,b)=>String(a.deliveryDate||"9999-12-31").localeCompare(String(b.deliveryDate||"9999-12-31")));
+
+  const cnt=document.getElementById("projCount"); if(cnt) cnt.textContent=items.length+" proyecto"+(items.length!==1?"s":"");
+
+  if(!items.length){ box.innerHTML='<div class="empty"><div class="ico">\u{1F4C1}</div><h3>Sin proyectos</h3><p>Crea tu primer proyecto.</p></div>'; return; }
+
+  box.innerHTML=items.map(p=>{
+    const photos=loadPhotos(p.id);
+    const thumbSrc=photos.length?(photos[0].url||photos[0].data||""):"";
+    const thumb=thumbSrc?`<img src="${escapeAttr(thumbSrc)}" alt="">`:'<span style="font-size:24px;">\u{1F4C1}</span>';
+    const sub=[p.client?("\u{1F464} "+p.client):null,p.deliveryDate?("\u{1F4C5} "+p.deliveryDate):null].filter(Boolean).join(" \u00b7 ");
+    const badgeCls=p.__seg==="auth"?"green":p.__seg==="done"?"gray":"amber";
+    const badgeTxt=p.__seg==="auth"?"Autorizado":p.__seg==="done"?"Terminado":"En curso";
+    return `<div class="proj-card" data-id="${p.id}"><div class="thumb">${thumb}</div><div class="info"><div class="name">${escapeHTML(p.name||"Sin nombre")}</div><div class="meta">${escapeHTML(sub||"Sin datos")}</div></div><div class="right"><span class="badge ${badgeCls}">${badgeTxt}</span><span style="font-size:13px;font-weight:800;color:var(--accent2);">$${money(p.__authTotal)}</span></div></div>`;
+  }).join("");
+
+  box.querySelectorAll(".proj-card").forEach(el=>el.addEventListener("click",()=>openProjectDetail(el.dataset.id,"overview")));
+}
+
+// ---- Project Detail ----
+function openProjectDetail(pid, tab){
+  currentProjectId=pid; currentDetailTab=tab||"overview";
+  showPage("project-detail"); renderProjectDetail();
+}
+
+function renderProjectDetail(){
+  const p=db.projects.find(x=>x.id===currentProjectId);
+  if(!p){ showPage("projects"); return; }
+  const el=document.getElementById("detailProjectName"); if(el) el.textContent=p.name||"Proyecto";
+  const meta=document.getElementById("detailProjectMeta"); if(meta) meta.textContent=[p.client?("\u{1F464} "+p.client):null,p.deliveryDate?("\u{1F4C5} "+p.deliveryDate):null].filter(Boolean).join(" \u00b7 ")||"---";
+  document.querySelectorAll("#detailTabs .tab").forEach(t=>t.classList.toggle("active",t.dataset.dtab===currentDetailTab));
+  const content=document.getElementById("detailContent");
+  if(currentDetailTab==="overview") renderDetailOverview(p,content);
+  else if(currentDetailTab==="quotes") renderDetailQuotes(p,content);
+  else if(currentDetailTab==="ops") renderDetailOps(p,content);
+}
+
+function renderDetailOverview(p, content){
+  const authTotal=projectAuthorizedTotal(p.id);
+  const quotes=db.quotes.filter(q=>q.projectId===p.id);
+  const tasks=db.tasks.filter(t=>t.projectId===p.id);
+  const doneCount=tasks.filter(t=>t.done).length;
+  const photos=loadPhotos(p.id);
+
+  content.innerHTML=`
+    <div class="kpi-grid">
+      <div class="kpi-box"><div class="kl">Total autorizado</div><div class="kv" style="font-size:18px;color:var(--accent2);">$${money(authTotal)}</div></div>
+      <div class="kpi-box"><div class="kl">Cotizaciones</div><div class="kv">${quotes.length}</div></div>
+      <div class="kpi-box"><div class="kl">Tareas</div><div class="kv">${doneCount}/${tasks.length}</div></div>
+      <div class="kpi-box"><div class="kl">Estado</div><div class="kv" style="font-size:13px;">${projectIsDone(p.id)?"\u2705 Listo":projectHasAuthorized(p.id)?"\u2B50 Autorizado":"\u{1F504} En curso"}</div></div>
+    </div>
+    <div class="card">
+      <div class="card-header"><div class="card-title">Datos del proyecto</div></div>
+      <div class="field-label">Nombre</div><div class="field"><input id="pName" value="${escapeAttr(p.name||"")}"></div>
+      <div class="field-label">Cliente</div><div class="field"><input id="pClient" value="${escapeAttr(p.client||"")}"></div>
+      <div class="field-label">Fecha de entrega</div><div class="field"><input id="pDelivery" type="date" value="${escapeAttr(p.deliveryDate||"")}"></div>
+      <div class="field-label">Notas</div><div class="field"><input id="pNotes" value="${escapeAttr(p.notes||"")}"></div>
+      <div style="height:12px;"></div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn primary" id="btnSaveP" style="flex:1;justify-content:center;">\u{1F4BE} Guardar</button>
+        <button class="btn danger" id="btnDelP">\u{1F5D1}</button>
+      </div>
+    </div>
+    <div class="card" style="margin-top:10px;">
+      <div class="card-header">
+        <div class="card-title">\u{1F4F7} Fotos</div>
+        <label class="btn small" style="cursor:pointer;">\uFF0B Agregar<input type="file" id="photoInput" accept="image/*" multiple style="display:none"></label>
+      </div>
+      <div id="photoUploading" style="display:none;font-size:12px;color:var(--muted);padding:4px 0;">\u2B06 Subiendo fotos...</div>
+      <div class="photo-grid" id="photosGrid">
+        ${photos.length===0?'<div style="font-size:12px;color:var(--muted);">Sin fotos aun.</div>':photos.map((ph,i)=>{
+          const src=ph.url||ph.data||"";
+          return `<div class="photo-item"><img src="${escapeAttr(src)}" data-photo-src="${escapeAttr(src)}"><button class="del-btn" data-del-photo="${i}">\u2715</button></div>`;
+        }).join('')}
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
+      <button class="btn" id="btnMarkDone">\u2705 Marcar terminado</button>
+      <button class="btn primary" id="btnQuickQuote" style="flex:1;justify-content:center;">\uFF0B Cotizacion</button>
+    </div>
+  `;
+
+  document.getElementById("btnSaveP").addEventListener("click",()=>{ p.name=document.getElementById("pName").value.trim()||p.name; p.client=document.getElementById("pClient").value.trim(); p.deliveryDate=document.getElementById("pDelivery").value||""; p.notes=document.getElementById("pNotes").value.trim(); save(); renderProjectsPage(); renderProjectDetail(); });
+  document.getElementById("btnDelP").addEventListener("click",()=>{ if(!confirm("\u00BFEliminar el proyecto y todos sus datos?")) return; deleteProjectPhotos(p.id); db.projects=db.projects.filter(x=>x.id!==p.id); db.quotes=db.quotes.filter(x=>x.projectId!==p.id); db.tasks=db.tasks.filter(x=>x.projectId!==p.id); db.installs=db.installs.filter(x=>x.projectId!==p.id); db.purchases=db.purchases.filter(x=>x.projectId!==p.id); save(); showPage("projects"); });
+  document.getElementById("btnQuickQuote").addEventListener("click",()=>{ openQuoteEditorPage(createQuote(p.id)); renderProjectsPage(); });
+  document.getElementById("btnMarkDone").addEventListener("click",()=>{ const t=db.tasks.filter(x=>x.projectId===p.id); if(!t.length) db.tasks.push({id:uid(),projectId:p.id,date:todayISO(),title:"Cierre de proyecto",done:true}); db.tasks.filter(x=>x.projectId===p.id).forEach(x=>x.done=true); p.manualDone=true; save(); renderProjectDetail(); });
+
+  // Photo upload
+  const photoInput=document.getElementById("photoInput");
+  if(photoInput){
+    photoInput.addEventListener("change",async(e)=>{
+      const files=[...e.target.files]; if(!files.length) return;
+      p.photos=p.photos||[];
+      document.getElementById("photoUploading").style.display="";
+      for(const file of files){
+        try{
+          const base64=await new Promise((res,rej)=>{ const img=new Image(); const objUrl=URL.createObjectURL(file); img.onload=()=>{ const MAX=800; const scale=Math.min(1,MAX/Math.max(img.width,img.height)); const canvas=document.createElement("canvas"); canvas.width=Math.round(img.width*scale); canvas.height=Math.round(img.height*scale); canvas.getContext("2d").drawImage(img,0,0,canvas.width,canvas.height); URL.revokeObjectURL(objUrl); res(canvas.toDataURL("image/jpeg",0.7)); }; img.onerror=rej; img.src=objUrl; });
+          const url=await uploadToImgbb(base64);
+          p.photos.push({name:file.name,url});
+        }catch(err){ alert("Error al subir foto: "+err.message); }
+      }
+      document.getElementById("photoUploading").style.display="none";
+      savePhotos(p.id,p.photos); save(); renderDetailOverview(p,document.getElementById("detailContent"));
+    });
+  }
+  document.querySelectorAll("button[data-del-photo]").forEach(btn=>btn.addEventListener("click",()=>{ const idx=Number(btn.dataset.delPhoto); p.photos=p.photos||[]; p.photos.splice(idx,1); savePhotos(p.id,p.photos); save(); renderDetailOverview(p,document.getElementById("detailContent")); }));
+  document.querySelectorAll("img[data-photo-src]").forEach(img=>img.addEventListener("click",()=>{ const lb=document.createElement("div"); lb.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.95);z-index:9999;display:flex;align-items:center;justify-content:center;cursor:zoom-out;"; lb.innerHTML='<img src="'+img.dataset.photoSrc+'" style="max-width:95vw;max-height:95vh;border-radius:12px;object-fit:contain;">'; lb.onclick=()=>lb.remove(); document.body.appendChild(lb); }));
+}
+
+function renderDetailQuotes(p, content){
+  const quotes=db.quotes.filter(q=>q.projectId===p.id).sort((a,b)=>String(b.createdAt||"").localeCompare(String(a.createdAt||"")));
+  content.innerHTML=`
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+      <span style="font-size:13px;color:var(--muted);">${quotes.length} cotizacion${quotes.length!==1?"es":""}</span>
+      <button class="btn primary small" id="btnAddQuote">\uFF0B Nueva</button>
+    </div>
+    ${quotes.length?quotes.map(q=>{
+      const t=quoteSellTotals(q); const isAuth=q.status==="authorized";
+      return `<div class="card" style="margin-bottom:10px;"><div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;"><div style="flex:1;min-width:0;"><div style="font-size:15px;font-weight:800;">${escapeHTML(q.name||"Cotizacion")}</div><div style="font-size:12px;color:var(--muted);margin-top:3px;">Folio: ${escapeHTML((q.code||q.id.slice(0,8)).toUpperCase())} \u00b7 ${q.createdAt||"---"}</div></div><div style="text-align:right;"><div style="font-size:16px;font-weight:900;color:var(--accent2);">$${money(t.venta)}</div><span class="badge ${isAuth?"green":"amber"}" style="margin-top:4px;">${isAuth?"Autorizada":"Borrador"}</span></div></div><div style="display:flex;gap:8px;margin-top:12px;"><button class="btn small" data-edit-q="${q.id}" style="flex:1;justify-content:center;">\u270F\uFE0F Editar</button><button class="btn small ${isAuth?"danger":""}" data-toggle-q="${q.id}">${isAuth?"Desautorizar":"Autorizar"}</button><button class="btn small danger" data-del-q="${q.id}">\u{1F5D1}</button></div></div>`;
+    }).join(""):'<div class="empty"><div class="ico">\u{1F9FE}</div><h3>Sin cotizaciones</h3><p>Crea la primera cotizacion.</p></div>'}
+  `;
+  document.getElementById("btnAddQuote").addEventListener("click",()=>{ openQuoteEditorPage(createQuote(p.id)); renderProjectsPage(); });
+  content.querySelectorAll("button[data-edit-q]").forEach(b=>b.addEventListener("click",()=>{ const q=db.quotes.find(x=>x.id===b.dataset.editQ); if(q) openQuoteEditorPage(q); }));
+  content.querySelectorAll("button[data-toggle-q]").forEach(b=>b.addEventListener("click",()=>{ const q=db.quotes.find(x=>x.id===b.dataset.toggleQ); if(!q) return; q.status=q.status==="authorized"?"draft":"authorized"; save(); renderProjectsPage(); renderDetailQuotes(p,content); }));
+  content.querySelectorAll("button[data-del-q]").forEach(b=>b.addEventListener("click",()=>{ if(!confirm("\u00BFEliminar cotizacion?")) return; db.quotes=db.quotes.filter(x=>x.id!==b.dataset.delQ); save(); renderProjectsPage(); renderDetailQuotes(p,content); }));
+}
+
+function renderDetailOps(p, content){
+  const tasks=db.tasks.filter(t=>t.projectId===p.id);
+  const installs=db.installs.filter(t=>t.projectId===p.id);
+  const purchases=db.purchases.filter(t=>t.projectId===p.id);
+
+  const tRow=(t,cols)=>`<tr data-id="${t.id}"><td><input type="date" data-f="date" value="${escapeAttr(t.date||"")}" style="background:transparent;border:none;color:var(--text);font-family:inherit;font-size:12px;width:100%;"></td><td><textarea data-f="title" style="background:transparent;border:none;color:var(--text);font-family:inherit;font-size:13px;resize:none;width:100%;min-height:36px;">${escapeHTML(t.title||"")}</textarea></td>${cols}<td><button class="btn small danger" data-act="del">\u2715</button></td></tr>`;
+
+  content.innerHTML=`
+    <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
+      <button class="btn small" id="addTask">\uFF0B Tarea</button>
+      <button class="btn small" id="addInstall">\uFF0B Instalacion</button>
+      <button class="btn small" id="addPurchase">\uFF0B Compra</button>
+    </div>
+    <div class="card" style="margin-bottom:10px;"><div class="card-header"><div class="card-title">\u2705 Tareas</div></div>
+      <div class="table-wrap"><table><thead><tr><th>Fecha</th><th>Tarea</th><th>\u2713</th><th></th></tr></thead>
+        <tbody id="tbTasks">${tasks.map(t=>tRow(t,`<td><input type="checkbox" data-f="done" ${t.done?"checked":""}></td>`)).join("")||'<tr><td colspan="4" style="color:var(--muted);padding:12px;font-size:13px;">Sin tareas.</td></tr>'}</tbody>
+      </table></div></div>
+    <div class="card" style="margin-bottom:10px;"><div class="card-header"><div class="card-title">\u{1F6E0}\uFE0F Instalaciones</div></div>
+      <div class="table-wrap"><table><thead><tr><th>Fecha</th><th>Detalle</th><th></th></tr></thead>
+        <tbody id="tbInst">${installs.map(t=>tRow(t,"")).join("")||'<tr><td colspan="3" style="color:var(--muted);padding:12px;font-size:13px;">Sin instalaciones.</td></tr>'}</tbody>
+      </table></div></div>
+    <div class="card"><div class="card-header"><div class="card-title">\u{1F6D2} Compras</div></div>
+      <div class="table-wrap"><table><thead><tr><th>Fecha</th><th>Detalle</th><th></th></tr></thead>
+        <tbody id="tbPurch">${purchases.map(t=>tRow(t,"")).join("")||'<tr><td colspan="3" style="color:var(--muted);padding:12px;font-size:13px;">Sin compras.</td></tr>'}</tbody>
+      </table></div></div>
+  `;
+
+  document.getElementById("addTask").addEventListener("click",()=>{ db.tasks.push({id:uid(),projectId:p.id,date:todayISO(),title:"Nueva tarea",done:false}); save(); renderDetailOps(p,content); });
+  document.getElementById("addInstall").addEventListener("click",()=>{ db.installs.push({id:uid(),projectId:p.id,date:todayISO(),title:"Instalacion"}); save(); renderDetailOps(p,content); });
+  document.getElementById("addPurchase").addEventListener("click",()=>{ db.purchases.push({id:uid(),projectId:p.id,date:todayISO(),title:"Compra"}); save(); renderDetailOps(p,content); });
+  bindInlineTable("tbTasks",db.tasks); bindInlineTable("tbInst",db.installs); bindInlineTable("tbPurch",db.purchases);
+}
+
+// ---- Quote Editor ----
+function openQuoteEditorPage(q){
+  showPage("quote-editor");
+  const content=document.getElementById("quoteEditorContent");
+  const p=db.projects.find(x=>x.id===q.projectId); if(!p) return;
+  const routeOpts=(db.settings.routeDB||[]).map(r=>`<option value="${escapeAttr(r.name)}">${escapeHTML(r.name)} \u00b7 $${money(r.costPerHour||0)}/h</option>`).join("");
+
+  content.innerHTML=`<div style="padding:16px 0 10px;">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
+      <button class="btn icon" id="btnBackFromQuote">\u2190</button>
+      <input id="qNameInput" value="${escapeAttr(q.name||"Cotizacion")}" style="flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:9px 12px;color:var(--text);font-family:inherit;font-size:15px;font-weight:800;">
+      <button class="btn small ${q.status==="authorized"?"danger":"primary"}" id="btnToggleAuth">${q.status==="authorized"?"Desautorizar":"Autorizar"}</button>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
+      <span class="badge ${q.status==="authorized"?"green":"amber"}">${q.status==="authorized"?"Autorizada":"Borrador"}</span>
+      <span style="font-size:12px;color:var(--muted);align-self:center;">Folio: ${escapeHTML((q.code||q.id.slice(0,8)).toUpperCase())}</span>
+      <button class="btn small" id="btnQuotePDF2" style="margin-left:auto;">\u{1F5A8} PDF</button>
+    </div>
+
+    <div class="qe-section">
+      <div class="qe-section-title">Productos <button class="btn small primary" id="addProd">\uFF0B</button></div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Material</th><th>Descripcion</th><th>Cant.</th><th>Costo</th><th>Total</th><th></th></tr></thead>
+        <tbody id="tbProd"></tbody>
+      </table></div>
+    </div>
+
+    <div class="qe-section">
+      <div class="qe-section-title">Ruta / M.O. <button class="btn small primary" id="addRoute">\uFF0B</button></div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Ruta</th><th>Horas</th><th>$/h</th><th>Total</th><th></th></tr></thead>
+        <tbody id="tbRoutes"></tbody>
+      </table></div>
+    </div>
+
+    <div class="qe-section">
+      <div class="qe-section-title">Extras <button class="btn small primary" id="addExtra">\uFF0B</button></div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Concepto</th><th>Importe</th><th></th></tr></thead>
+        <tbody id="tbExtras"></tbody>
+      </table></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title" style="margin-bottom:12px;">Desglose</div>
+      <div class="breakdown">
+        <div class="breakdown-row"><span class="label">MP + Ruta</span><span id="bdCosto">$0.00</span></div>
+        <div class="breakdown-row"><span class="label">Admin <input id="adminPctInput" type="number" step="0.1" style="width:50px;background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--text);font-family:inherit;text-align:center;">%</span><span id="bdAdmin">$0.00</span></div>
+        <div class="breakdown-row"><span class="label">Costo total</span><span id="bdCostoAdmin">$0.00</span></div>
+        <div class="breakdown-row"><span class="label">Utilidad <input id="qMarginPct" type="number" step="0.1" style="width:50px;background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--text);font-family:inherit;text-align:center;">%</span><span id="bdUtil">$0.00</span></div>
+        <div class="breakdown-row"><span class="label">Subtotal</span><span id="bdSinExtras">$0.00</span></div>
+        <div class="breakdown-row"><span class="label">+ Extras (sin margen)</span><span id="bdExtra">$0.00</span></div>
+        <div class="breakdown-row total"><span class="label">Precio de venta</span><span id="bdVenta" style="color:var(--green);">$0.00</span></div>
+        <div class="breakdown-row"><span class="label" style="color:var(--muted);font-size:12px;">Retorno neto</span><span id="bdRetorno" style="font-size:12px;">$0.00</span></div>
+      </div>
+    </div>
+  </div>`;
+
+  document.getElementById("btnBackFromQuote").addEventListener("click",()=>{ currentProjectId=q.projectId; currentDetailTab="quotes"; showPage("project-detail"); renderProjectDetail(); });
+  document.getElementById("qNameInput").addEventListener("blur",()=>{ q.name=document.getElementById("qNameInput").value.trim()||"Cotizacion"; save(); });
+  document.getElementById("btnToggleAuth").addEventListener("click",()=>{ q.status=q.status==="authorized"?"draft":"authorized"; save(); renderProjectsPage(); openQuoteEditorPage(q); });
+  document.getElementById("btnQuotePDF2").addEventListener("click",()=>{
+    const proj=db.projects.find(x=>x.id===q.projectId)||{name:""};
+    const iframe=document.createElement("iframe"); iframe.style.cssText="position:fixed;right:0;bottom:0;width:0;height:0;border:0;"; document.body.appendChild(iframe);
+    const doc=iframe.contentWindow.document; doc.open(); doc.write(buildQuotePDFHTML(proj,q)); doc.close();
+    iframe.onload=()=>{ try{ iframe.contentWindow.focus(); iframe.contentWindow.print(); } finally { setTimeout(()=>iframe.remove(),1000); }};
+    setTimeout(()=>{ try{ iframe.contentWindow.focus(); iframe.contentWindow.print(); }catch(e){} },450);
+  });
+
+  if(document.getElementById("adminPctInput")) document.getElementById("adminPctInput").value=Number(db.settings.adminPercent??12);
+
+  function renderLines(){
+    const prod=q.products||[];
+    if(!prod.length){
+      document.getElementById("tbProd").innerHTML='<tr><td colspan="6" style="color:var(--muted);padding:12px;font-size:13px;">Sin productos.</td></tr>';
+    } else {
+      document.getElementById("tbProd").innerHTML=prod.map(r=>`<tr data-id="${r.id}"><td class="mpCell" style="min-width:160px;"></td><td><input data-f="desc" value="${escapeAttr(r.desc||"")}" placeholder="Descripcion..." style="background:transparent;border:none;color:var(--text);font-family:inherit;font-size:13px;width:100%;min-width:100px;"></td><td><input data-f="qty" type="number" step="0.01" value="${Number(r.qty||0)}" style="background:transparent;border:none;color:var(--text);font-family:inherit;width:55px;"></td><td><input data-f="unitPrice" type="number" step="0.01" value="${Number(r.unitPrice||0)}" style="background:transparent;border:none;color:var(--text);font-family:inherit;width:75px;"></td><td class="tdImp" style="font-weight:700;color:var(--accent2);white-space:nowrap;">$${money(Number(r.qty||0)*Number(r.unitPrice||0))}</td><td><button class="btn small danger" data-act="delProd">\u2715</button></td></tr>`).join("");
+      document.querySelectorAll("#tbProd tr[data-id]").forEach(tr=>{
+        const r=prod.find(x=>x.id===tr.dataset.id); if(!r) return;
+        const cell=tr.querySelector(".mpCell"); if(!cell) return;
+        const picker=createMatPicker(r.matPick||"",(val)=>{
+          r.matPick=val; const mm=materialByDesc(val);
+          if(mm){ r.unitPrice=Number(mm.cost||0); if(!r.desc) r.desc=mm.desc; const upi=tr.querySelector('input[data-f="unitPrice"]'); if(upi) upi.value=r.unitPrice; const di=tr.querySelector('input[data-f="desc"]'); if(di&&!di.value) di.value=r.desc; }
+          const imp=tr.querySelector(".tdImp"); if(imp) imp.textContent="$"+money(Number(r.qty||0)*Number(r.unitPrice||0));
+          save(); renderQuoteBreakdown(q);
+        });
+        cell.appendChild(picker);
+      });
+    }
+    const routes=q.routes||[];
+    document.getElementById("tbRoutes").innerHTML=routes.length?routes.map(r=>`<tr data-id="${r.id}"><td><select data-f="routeName" style="background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:6px 8px;font-family:inherit;font-size:12px;"><option value="">---</option>${routeOpts}</select></td><td><input data-f="hours" type="number" step="0.01" value="${Number(r.hours||0)}" style="background:transparent;border:none;color:var(--text);font-family:inherit;width:60px;"></td><td><input data-f="rate" type="number" step="0.01" value="${Number(r.rate||0)}" style="background:transparent;border:none;color:var(--text);font-family:inherit;width:70px;"></td><td style="font-weight:700;color:var(--accent2);">$${money(Number(r.hours||0)*Number(r.rate||0))}</td><td><button class="btn small danger" data-act="delRoute">\u2715</button></td></tr>`).join(""):'<tr><td colspan="5" style="color:var(--muted);padding:12px;font-size:13px;">Sin rutas.</td></tr>';
+    document.querySelectorAll("#tbRoutes tr[data-id]").forEach(tr=>{ const r=routes.find(x=>x.id===tr.dataset.id); const sel=tr.querySelector('select[data-f="routeName"]'); if(sel) sel.value=r.routeName||""; });
+    const extras=q.extras||[];
+    document.getElementById("tbExtras").innerHTML=extras.length?extras.map(r=>`<tr data-id="${r.id}"><td><input data-f="label" value="${escapeAttr(r.label||"")}" placeholder="Concepto..." style="background:transparent;border:none;color:var(--text);font-family:inherit;font-size:13px;width:100%;"></td><td><input data-f="amount" type="number" step="0.01" value="${Number(r.amount||0)}" style="background:transparent;border:none;color:var(--text);font-family:inherit;width:100px;"></td><td><button class="btn small danger" data-act="delExtra">\u2715</button></td></tr>`).join(""):'<tr><td colspan="3" style="color:var(--muted);padding:12px;font-size:13px;">Sin extras.</td></tr>';
+    bindQT("tbProd","prod"); bindQT("tbRoutes","routes"); bindQT("tbExtras","extras");
+    renderQuoteBreakdown(q);
+  }
+
+  function bindQT(tbodyId,kind){
+    const tb=document.getElementById(tbodyId); if(!tb) return;
+    tb.querySelectorAll("tr[data-id]").forEach(tr=>{
+      const id=tr.dataset.id;
+      tr.querySelectorAll("input,select").forEach(el=>{
+        if(el.classList.contains("matPickerInput")||el.classList.contains("matPickerSearch")) return;
+        if(el.closest&&el.closest(".matPickerDropdown")) return;
+        const commit=()=>{
+          const f=el.dataset.f; if(!f) return;
+          const arr=(kind==="prod")?q.products:(kind==="routes")?q.routes:q.extras;
+          const row=arr.find(x=>x.id===id); if(!row) return;
+          if(kind==="prod"){ if(el.type==="number") row[f]=Number(el.value||0); else row[f]=el.value; const r=arr.find(x=>x.id===id); if(r){ const imp=tr.querySelector(".tdImp"); if(imp) imp.textContent="$"+money(Number(r.qty||0)*Number(r.unitPrice||0)); } save(); renderQuoteBreakdown(q); }
+          else if(kind==="routes"){ if(f==="routeName"){ row.routeName=el.value; const rm=routeByName(row.routeName); if(rm) row.rate=Number(rm.costPerHour||0); } else if(el.type==="number") row[f]=Number(el.value||0); else row[f]=el.value; save(); renderLines(); }
+          else { if(el.type==="number") row[f]=Number(el.value||0); else row[f]=el.value; save(); renderLines(); }
+        };
+        if(el.tagName==="SELECT") el.addEventListener("change",commit);
+        else { el.addEventListener("blur",commit); el.addEventListener("keydown",(e)=>{ if(e.key==="Enter"){e.preventDefault();el.blur();} }); }
+      });
+      tr.querySelectorAll("button[data-act]").forEach(btn=>btn.addEventListener("click",()=>{
+        if(btn.dataset.act==="delProd") q.products=q.products.filter(x=>x.id!==id);
+        if(btn.dataset.act==="delRoute") q.routes=q.routes.filter(x=>x.id!==id);
+        if(btn.dataset.act==="delExtra") q.extras=q.extras.filter(x=>x.id!==id);
+        save(); renderLines();
+      }));
+    });
+  }
+
+  document.getElementById("addProd").addEventListener("click",()=>{ q.products=q.products||[]; q.products.push({id:uid(),matPick:"",desc:"",qty:1,unitPrice:0}); save(); renderLines(); });
+  document.getElementById("addRoute").addEventListener("click",()=>{ q.routes=q.routes||[]; const first=db.settings.routeDB[0]?.name||""; const rate=first?(routeByName(first)?.costPerHour||0):0; q.routes.push({id:uid(),routeName:first,hours:1,rate:Number(rate||0)}); save(); renderLines(); });
+  document.getElementById("addExtra").addEventListener("click",()=>{ q.extras=q.extras||[]; q.extras.push({id:uid(),label:"",amount:0}); save(); renderLines(); });
+  document.getElementById("qMarginPct").addEventListener("blur",()=>{ q.marginPct=Number(document.getElementById("qMarginPct").value||0); save(); renderQuoteBreakdown(q); });
+  document.getElementById("adminPctInput").addEventListener("blur",()=>{ db.settings.adminPercent=Number(document.getElementById("adminPctInput").value||0); save(); renderQuoteBreakdown(q); });
+
+  renderLines();
+  renderQuoteBreakdown(q);
+}
+
+// ---- Calendar ----
+function renderCalendarPage(){
+  const content=document.getElementById("calendarContent"); if(!content) return;
+  const y=_calCursor.getFullYear(), m=_calCursor.getMonth();
+  const DOW=["L","M","M","J","V","S","D"];
+  const first=new Date(y,m,1); const last=new Date(y,m+1,0);
+  const dow=(first.getDay()+6)%7; const daysInMonth=last.getDate();
+  const cells=[];
+  for(let i=0;i<42;i++){
+    const dayNum=i-dow+1;
+    if(dayNum<1||dayNum>daysInMonth) cells.push({blank:true});
+    else{ const iso=new Date(y,m,dayNum).toISOString().slice(0,10); const ev=calendarEventsForDay(iso); const counts={delivery:ev.filter(e=>e.type==="delivery").length,install:ev.filter(e=>e.type==="install").length,purchase:ev.filter(e=>e.type==="purchase").length,task:ev.filter(e=>e.type==="task").length}; cells.push({iso,dayNum,counts}); }
+  }
+  const today=todayISO();
+  content.innerHTML=`
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
+      <button class="btn icon" id="calPrev">\u2190</button>
+      <span style="flex:1;text-align:center;font-size:17px;font-weight:800;">${MONTHS_ES[m]} ${y}</span>
+      <button class="btn icon" id="calNext">\u2192</button>
+      <button class="btn small" id="calToday">Hoy</button>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
+      <label style="display:flex;align-items:center;gap:5px;font-size:12px;"><input type="checkbox" id="fDelivery" ${_calFilter.delivery?"checked":""}> Entregas</label>
+      <label style="display:flex;align-items:center;gap:5px;font-size:12px;"><input type="checkbox" id="fInstall" ${_calFilter.install?"checked":""}> Instalaciones</label>
+      <label style="display:flex;align-items:center;gap:5px;font-size:12px;"><input type="checkbox" id="fPurchase" ${_calFilter.purchase?"checked":""}> Compras</label>
+      <label style="display:flex;align-items:center;gap:5px;font-size:12px;"><input type="checkbox" id="fTask" ${_calFilter.task?"checked":""}> Tareas</label>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-bottom:4px;">${DOW.map(d=>`<div style="text-align:center;font-size:10px;font-weight:700;color:var(--muted);padding:4px 0;">${d}</div>`).join("")}</div>
+    <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;" id="calGrid">
+      ${cells.map(c=>{
+        if(c.blank) return '<div style="min-height:56px;"></div>';
+        const isToday=c.iso===today; const isSel=c.iso===_calSelectedDay;
+        const b=[]; if(c.counts.delivery) b.push('<div style="font-size:9px;background:rgba(245,158,11,.2);color:var(--amber);border-radius:4px;padding:1px 3px;margin-top:2px;">\u{1F4E6}'+c.counts.delivery+'</div>'); if(c.counts.install) b.push('<div style="font-size:9px;background:rgba(34,197,94,.2);color:var(--green);border-radius:4px;padding:1px 3px;margin-top:2px;">\u{1F6E0}'+c.counts.install+'</div>'); if(c.counts.purchase) b.push('<div style="font-size:9px;background:rgba(148,163,184,.15);color:var(--muted);border-radius:4px;padding:1px 3px;margin-top:2px;">\u{1F6D2}'+c.counts.purchase+'</div>'); if(c.counts.task) b.push('<div style="font-size:9px;background:rgba(148,163,184,.15);color:var(--muted);border-radius:4px;padding:1px 3px;margin-top:2px;">\u2705'+c.counts.task+'</div>');
+        return `<div data-cal-date="${c.iso}" style="min-height:56px;background:${isToday?"rgba(59,130,246,.15)":isSel?"rgba(255,255,255,.05)":"var(--card)"};border:1px solid ${isToday?"var(--accent)":isSel?"rgba(255,255,255,.2)":"var(--border)"};border-radius:8px;padding:5px;cursor:pointer;"><div style="font-size:11px;font-weight:800;color:${isToday?"var(--accent)":"var(--muted)"};">${c.dayNum}</div>${b.join("")}</div>`;
+      }).join("")}
+    </div>
+    <div id="calDayEvents" style="margin-top:14px;"></div>
+  `;
+  document.getElementById("calPrev").addEventListener("click",()=>{ _calCursor.setMonth(_calCursor.getMonth()-1); renderCalendarPage(); });
+  document.getElementById("calNext").addEventListener("click",()=>{ _calCursor.setMonth(_calCursor.getMonth()+1); renderCalendarPage(); });
+  document.getElementById("calToday").addEventListener("click",()=>{ _calCursor=new Date(); _calCursor.setDate(1); renderCalendarPage(); });
+  ["fDelivery","fInstall","fPurchase","fTask"].forEach(id=>{ const el=document.getElementById(id); if(el) el.addEventListener("change",()=>{ _calFilter.delivery=document.getElementById("fDelivery").checked; _calFilter.install=document.getElementById("fInstall").checked; _calFilter.purchase=document.getElementById("fPurchase").checked; _calFilter.task=document.getElementById("fTask").checked; renderCalendarPage(); }); });
+  document.querySelectorAll("[data-cal-date]").forEach(cell=>{
+    cell.addEventListener("click",()=>{
+      _calSelectedDay=cell.dataset.calDate;
+      const evs=calendarEventsForDay(_calSelectedDay);
+      const box=document.getElementById("calDayEvents"); if(!box) return;
+      if(!evs.length){ box.innerHTML='<div style="color:var(--muted);font-size:13px;padding:10px;">Sin eventos el '+_calSelectedDay+'.</div>'; renderCalendarPage(); return; }
+      box.innerHTML='<div style="font-size:13px;font-weight:800;margin-bottom:10px;">'+_calSelectedDay+'</div>'+evs.map(e=>{
+        const tag=e.type==="delivery"?"\u{1F4E6}":e.type==="install"?"\u{1F6E0}\uFE0F":e.type==="purchase"?"\u{1F6D2}":"\u2705";
+        const targetTab=(e.type==="task"||e.type==="install"||e.type==="purchase")?"ops":"overview";
+        return `<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;gap:10px;"><div><div style="font-size:13px;font-weight:700;">${tag} ${escapeHTML(e.title)}</div></div><button class="btn small" data-open="${e.projectId}" data-tab="${targetTab}">Abrir</button></div>`;
+      }).join("");
+      box.querySelectorAll("button[data-open]").forEach(b=>b.addEventListener("click",()=>openProjectDetail(b.dataset.open,b.dataset.tab)));
+      renderCalendarPage();
+    });
+  });
+}
+
+// ---- Sales ----
+function renderSalesPage(){
+  const content=document.getElementById("salesContent"); if(!content) return;
+  const y=_salesCursor.getFullYear(), m=_salesCursor.getMonth();
+  const start=new Date(y,m,1), end=new Date(y,m+1,1);
+  const rows=[]; let total=0;
+  db.projects.forEach(p=>{ const d=parseISO(p.deliveryDate); if(!d||!(d>=start&&d<end)) return; const aqs=db.quotes.filter(q=>q.projectId===p.id&&q.status==="authorized"); if(!aqs.length) return; let pt=0; aqs.forEach(q=>{ const qty=Number(q.qty)||1; const t=quoteSellTotals(q); pt+=t.venta*qty; }); total+=pt; rows.push({name:p.name,client:p.client,delivery:p.deliveryDate,total:pt}); });
+  content.innerHTML=`
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
+      <button class="btn icon" id="salesPrev">\u2190</button>
+      <span style="flex:1;text-align:center;font-size:17px;font-weight:800;">${MONTHS_ES[m]} ${y}</span>
+      <button class="btn icon" id="salesNext">\u2192</button>
+    </div>
+    <div class="card" style="margin-bottom:14px;background:linear-gradient(135deg,rgba(59,130,246,.2),rgba(59,130,246,.05));border-color:rgba(59,130,246,.3);">
+      <div style="font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.5px;">Total del mes</div>
+      <div style="font-size:32px;font-weight:900;color:var(--accent2);margin-top:4px;">$${money(total)}</div>
+      <div style="font-size:12px;color:var(--muted);margin-top:4px;">${rows.length} proyecto${rows.length!==1?"s":""} con entrega en el mes</div>
+    </div>
+    ${rows.length?`<div class="card"><div class="table-wrap"><table><thead><tr><th>Proyecto</th><th>Cliente</th><th>Entrega</th><th style="text-align:right;">Total</th></tr></thead><tbody>${rows.map(r=>`<tr><td><b>${escapeHTML(r.name)}</b></td><td>${escapeHTML(r.client||"---")}</td><td>${r.delivery||"---"}</td><td style="text-align:right;font-weight:800;color:var(--accent2);">$${money(r.total)}</td></tr>`).join("")}</tbody></table></div></div>`:'<div class="empty"><div class="ico">\u{1F4C8}</div><h3>Sin ventas</h3><p>No hay proyectos con entrega en '+MONTHS_ES[m]+'.</p></div>'}
+  `;
+  document.getElementById("salesPrev").addEventListener("click",()=>{ _salesCursor.setMonth(_salesCursor.getMonth()-1); renderSalesPage(); });
+  document.getElementById("salesNext").addEventListener("click",()=>{ _salesCursor.setMonth(_salesCursor.getMonth()+1); renderSalesPage(); });
+}
+
+// ---- Settings ----
+function renderSettingsPage(){
+  const content=document.getElementById("settingsContent"); if(!content) return;
+  const emp=db.settings.empresa||{};
+  content.innerHTML=`
+    <div class="card" style="margin-bottom:10px;">
+      <div class="card-header"><div class="card-title">\u{1F3E2} Mi empresa</div></div>
+      <div class="field-label">Nombre</div><div class="field"><input id="empNombre" value="${escapeAttr(emp.nombre||"ESMA INDUSTRIAL")}"></div>
+      <div class="field-label">Telefono</div><div class="field"><input id="empTel" value="${escapeAttr(emp.tel||"")}" placeholder="(000) 000-0000"></div>
+      <div class="field-label">Email</div><div class="field"><input id="empEmail" value="${escapeAttr(emp.email||"")}" placeholder="contacto@esma.com"></div>
+      <div class="field-label">Direccion</div><div class="field"><input id="empDir" value="${escapeAttr(emp.direccion||"")}"></div>
+      <div class="field-label">Titulo PDF</div><div class="field"><input id="empTitulo" value="${escapeAttr(emp.titulo||"Propuesta de Servicios")}"></div>
+      <div style="height:12px;"></div>
+      <button class="btn primary" id="btnSaveEmp" style="width:100%;justify-content:center;">\u{1F4BE} Guardar empresa</button>
+    </div>
+    <div class="card" style="margin-bottom:10px;">
+      <div class="card-header"><div class="card-title">\u{1F504} Sincronizacion</div><span id="syncStatus" style="font-size:11px;color:var(--muted);"></span></div>
+      <div class="field-label">URL Apps Script</div>
+      <div class="field"><input id="gsUrlInput" value="${escapeAttr(GS_URL||"")}" placeholder="https://script.google.com/..."></div>
+      <div style="height:10px;"></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn small primary" id="btnSaveGsUrl" style="flex:1;justify-content:center;">Guardar URL</button>
+        <button class="btn small" id="btnGsPush">\u2B06 Subir</button>
+        <button class="btn small" id="btnGsPull">\u2B07 Descargar</button>
+      </div>
+      <div style="height:8px;"></div>
+      <button class="btn small danger" id="btnResetSync" style="width:100%;justify-content:center;">\u21BA Resetear y descargar</button>
+    </div>
+    <div class="card" style="margin-bottom:10px;">
+      <div class="card-header"><div class="card-title">\u{1F522} Folio cotizaciones</div></div>
+      <div style="font-size:13px;color:var(--muted);margin-bottom:10px;">Proximo folio: <b style="color:var(--text);">${String((Number(db.settings.folioCounter||0))+1).padStart(4,"0")}</b></div>
+      <div style="display:flex;gap:8px;"><div class="field" style="flex:1;"><input id="folioCounterInput" type="number" min="0" value="${Number(db.settings?.folioCounter||0)}"></div><button class="btn small primary" id="btnSaveFolio">Guardar</button></div>
+    </div>
+    <div class="card" style="margin-bottom:10px;">
+      <div class="card-header"><div class="card-title">\u{1F4BE} Datos locales</div></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn small" id="btnBackup" style="flex:1;justify-content:center;">\u2B07 Respaldo</button>
+        <button class="btn small" id="btnRestore" style="flex:1;justify-content:center;">\u2B06 Restaurar</button>
+        <input type="file" id="restoreFile" accept="application/json" style="display:none">
+      </div>
+    </div>
+    <div class="card" style="margin-bottom:10px;">
+      <div class="card-header"><div class="card-title">\u{1F5C4} Materiales</div><button class="btn small primary" id="btnAddMat">\uFF0B</button></div>
+      <div id="matList"></div>
+    </div>
+    <div class="card">
+      <div class="card-header"><div class="card-title">\u2699\uFE0F Rutas / M.O.</div><button class="btn small primary" id="btnAddRoute2">\uFF0B</button></div>
+      <div id="routeList"></div>
+    </div>
+  `;
+
+  document.getElementById("btnSaveEmp").addEventListener("click",()=>{ db.settings.empresa={...emp,nombre:document.getElementById("empNombre").value.trim()||"ESMA INDUSTRIAL",tel:document.getElementById("empTel").value.trim(),email:document.getElementById("empEmail").value.trim(),direccion:document.getElementById("empDir").value.trim(),titulo:document.getElementById("empTitulo").value.trim()||"Propuesta de Servicios",logoB64:db.settings.empresa?.logoB64||""}; save(); refreshLogo(db.settings.empresa.logoB64); const ht=document.getElementById("homeTitle"); if(ht) ht.textContent=db.settings.empresa.nombre; buildTopbar(); alert("\u2705 Guardado"); });
+  document.getElementById("btnSaveGsUrl").addEventListener("click",()=>{ const val=(document.getElementById("gsUrlInput")?.value||"").trim(); if(!val){ alert("Pega la URL"); return; } GS_URL=val; localStorage.setItem(GS_KEY,GS_URL); alert("\u2705 URL guardada"); });
+  document.getElementById("btnGsPush").addEventListener("click",gsPush);
+  document.getElementById("btnGsPull").addEventListener("click",gsPullOnBoot);
+  document.getElementById("btnResetSync").addEventListener("click",async()=>{ if(!confirm("\u00BFBorrar datos locales y descargar desde Sheets?")) return; localStorage.removeItem(STORAGE_KEY); db=defaultDB(); await gsPullOnBoot(); });
+  document.getElementById("btnSaveFolio").addEventListener("click",()=>{ const val=Number(document.getElementById("folioCounterInput").value||0); db.settings.folioCounter=val; save(); alert("\u2705 Proximo folio: "+String(val+1).padStart(4,"0")); });
+  document.getElementById("btnBackup").addEventListener("click",exportJSON);
+  document.getElementById("btnRestore").addEventListener("click",()=>document.getElementById("restoreFile").click());
+  document.getElementById("restoreFile").addEventListener("change",()=>{ const f=document.getElementById("restoreFile").files?.[0]; if(f) restoreJSON(f); });
+  document.getElementById("btnAddMat").addEventListener("click",()=>showAddMaterialModal("",()=>renderMatList()));
+  document.getElementById("btnAddRoute2").addEventListener("click",showAddRouteSheet);
+  renderMatList(); renderRouteList();
+}
+
+function renderMatList(){
+  const box=document.getElementById("matList"); if(!box) return;
+  const mats=db.settings.materialDB||[];
+  if(!mats.length){ box.innerHTML='<div style="color:var(--muted);font-size:13px;padding:8px 0;">Sin materiales.</div>'; return; }
+  box.innerHTML=mats.map((m,i)=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px;"><div><b>${escapeHTML(m.desc)}</b><span style="color:var(--muted);margin-left:8px;">$${money(m.cost||0)} / ${escapeHTML(m.uom||"---")}</span></div><button class="btn small danger" data-del-mat="${i}">\u2715</button></div>`).join("");
+  box.querySelectorAll("[data-del-mat]").forEach(b=>b.addEventListener("click",()=>{ db.settings.materialDB.splice(Number(b.dataset.delMat),1); save(); renderMatList(); }));
+}
+
+function showAddRouteSheet(){
+  openSheet("Nueva ruta / M.O.",`
+    <div class="field-label">Nombre</div><div class="field"><input id="rt_name" placeholder="Ej: Ruta LM"></div>
+    <div class="field-label">Tipo</div><div class="field"><input id="rt_type" placeholder="LM, CNC, etc."></div>
+    <div class="field-label">Costo por hora</div><div class="field"><input id="rt_cost" type="number" step="0.01" value="0"></div>
+  `,[
+    {label:"Cancelar",cls:"btn",action:closeSheet},
+    {label:"Guardar",cls:"btn primary",action:()=>{ const name=document.getElementById("rt_name").value.trim(); if(!name){ alert("Escribe un nombre"); return; } db.settings.routeDB=db.settings.routeDB||[]; db.settings.routeDB.push({id:uid(),name,type:document.getElementById("rt_type").value.trim(),costPerHour:Number(document.getElementById("rt_cost").value||0),breakdown:{renta:0,mod:0,moi:0,indirectos:0,luz:0,otros:0}}); save(); renderRouteList(); closeSheet(); }}
+  ]);
+}
+
+function renderRouteList(){
+  const box=document.getElementById("routeList"); if(!box) return;
+  const routes=db.settings.routeDB||[];
+  if(!routes.length){ box.innerHTML='<div style="color:var(--muted);font-size:13px;padding:8px 0;">Sin rutas.</div>'; return; }
+  box.innerHTML=routes.map((r,i)=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px;"><div><b>${escapeHTML(r.name)}</b><span style="color:var(--muted);margin-left:8px;">${escapeHTML(r.type||"---")} \u00b7 $${money(r.costPerHour||0)}/h</span></div><button class="btn small danger" data-del-route="${i}">\u2715</button></div>`).join("");
+  box.querySelectorAll("[data-del-route]").forEach(b=>b.addEventListener("click",()=>{ db.settings.routeDB.splice(Number(b.dataset.delRoute),1); save(); renderRouteList(); }));
+}
+
+// ---- Bottom Sheet ----
+function openSheet(title, bodyHTML, buttons=[]){
+  document.getElementById("sheetTitle").textContent=title;
+  document.getElementById("sheetBody").innerHTML=bodyHTML;
+  const footer=document.getElementById("sheetFooter");
+  footer.innerHTML=buttons.map((b,i)=>`<button class="btn ${b.cls||""}" data-sheet-btn="${i}">${b.label}</button>`).join("");
+  footer.querySelectorAll("[data-sheet-btn]").forEach(btn=>btn.addEventListener("click",buttons[Number(btn.dataset.sheetBtn)].action));
+  document.getElementById("sheetOverlay").classList.add("open");
+}
+function closeSheet(){ document.getElementById("sheetOverlay").classList.remove("open"); }
+
+// ---- Topbar ----
+function buildTopbar(){
+  const topbar=document.getElementById("mainTopbar"); if(!topbar) return;
+  const emp=(db&&db.settings&&db.settings.empresa)||{};
+  const logo=emp.logoB64||localStorage.getItem("esma_logo_b64")||"";
+  topbar.innerHTML=`
+    <div class="logo" id="topbarLogoEl" onclick="showHome()" style="cursor:pointer;">${logo?'<img src="'+escapeAttr(logo)+'" style="width:100%;height:100%;object-fit:contain;">':'E'}</div>
+    <div class="title"><h1 id="topbarTitleEl">${escapeHTML(emp.nombre||"ESMA INDUSTRIAL")}</h1><span id="syncStatusBar" style="font-size:11px;color:var(--muted);">---</span></div>
+    <div class="actions"><div class="sync-dot" id="syncDot"></div><button class="btn icon" id="btnTools">\u22EE</button></div>
+  `;
+  document.getElementById("btnTools").addEventListener("click",(e)=>{ e.stopPropagation(); openToolsMenu(); });
+}
+
+function openToolsMenu(){
+  const menu=document.getElementById("toolsMenu"); const overlay=document.getElementById("toolsOverlay");
+  menu.innerHTML=`
+    <div class="tools-label">Navegacion</div>
+    <div class="tools-item" id="tm-home"><span class="ti-ico">\u{1F3E0}</span>Inicio</div>
+    <div class="tools-item" id="tm-cotizaciones"><span class="ti-ico">\u{1F9FE}</span>Cotizaciones</div>
+    <div class="tools-item" id="tm-instalaciones"><span class="ti-ico">\u{1F6E0}\uFE0F</span>Instalaciones</div>
+    <div class="tools-item" id="tm-compras"><span class="ti-ico">\u{1F6D2}</span>Compras</div>
+    <div class="tools-item" id="tm-tareas"><span class="ti-ico">\u2705</span>Tareas</div>
+    <div class="tools-divider"></div>
+    <div class="tools-label">Herramientas</div>
+    <div class="tools-item" id="tm-push"><span class="ti-ico">\u2B06</span>Subir a Sheets</div>
+    <div class="tools-item" id="tm-pull"><span class="ti-ico">\u2B07</span>Descargar de Sheets</div>
+    <div class="tools-item" id="tm-backup"><span class="ti-ico">\u{1F4BE}</span>Respaldo local</div>
+    <div class="tools-divider"></div>
+    <div class="tools-item" id="tm-logout"><span class="ti-ico">\u{1F6AA}</span>Cerrar sesion</div>
+  `;
+  menu.classList.add("open"); overlay.classList.add("open");
+  const close=()=>{ menu.classList.remove("open"); overlay.classList.remove("open"); };
+  overlay.onclick=close;
+  document.getElementById("tm-home").onclick=()=>{ close(); showHome(); };
+  document.getElementById("tm-cotizaciones").onclick=()=>{ close(); showSection("cotizaciones"); };
+  document.getElementById("tm-instalaciones").onclick=()=>{ close(); showSection("instalaciones"); };
+  document.getElementById("tm-compras").onclick=()=>{ close(); showSection("compras"); };
+  document.getElementById("tm-tareas").onclick=()=>{ close(); showSection("tareas"); };
+  document.getElementById("tm-push").onclick=()=>{ close(); gsPush(); };
+  document.getElementById("tm-pull").onclick=()=>{ close(); gsPullOnBoot(); };
+  document.getElementById("tm-backup").onclick=()=>{ close(); exportJSON(); };
+  document.getElementById("tm-logout").onclick=()=>{ close(); logout(); };
+}
+
+// Override syncStatusUpdate
+function syncStatusUpdate(msg, color){
+  const bar=document.getElementById("syncStatusBar"); if(bar) bar.textContent=msg;
+  const dot=document.getElementById("syncDot"); if(dot){ dot.className="sync-dot"; if(color==="orange") dot.classList.add("syncing"); else if(color==="red") dot.classList.add("error"); }
+  const ss=document.getElementById("syncStatus"); if(ss){ ss.textContent=msg; ss.style.color=color||"var(--muted)"; }
+}
+
+// ---- Boot ----
+function bootNew(){
+  load();
+  gsPullOnBoot();
+
+  const u=currentUser();
+  if(u){
+    document.getElementById("loginModal").classList.remove("show");
+    document.getElementById("app").style.display="";
+    buildTopbar(); showHome();
+  } else {
+    document.getElementById("homeScreen").classList.remove("show");
+    document.getElementById("app").style.display="none";
+    document.getElementById("loginModal").classList.add("show");
+  }
+
+  document.getElementById("btnLogin").addEventListener("click",()=>{
+    const email=document.getElementById("loginEmail").value.trim();
+    const pass=document.getElementById("loginPass").value;
+    const u2=login(email,pass);
+    if(!u2){ const m=document.getElementById("loginMsg"); if(m){ m.style.display=""; m.textContent="Usuario o contrasena incorrectos."; } return; }
+    document.getElementById("loginModal").classList.remove("show");
+    document.getElementById("app").style.display=""; buildTopbar(); showHome();
+  });
+  document.getElementById("loginEmail").addEventListener("keydown",(e)=>{ if(e.key==="Enter") document.getElementById("loginPass").focus(); });
+  document.getElementById("loginPass").addEventListener("keydown",(e)=>{ if(e.key==="Enter") document.getElementById("btnLogin").click(); });
+  document.getElementById("btnSeedDemo").addEventListener("click",seedDemo);
+
+  document.querySelectorAll(".nav-item[data-nav]").forEach(btn=>btn.addEventListener("click",()=>showPage(btn.dataset.nav)));
+  document.getElementById("btnBackProjects").addEventListener("click",()=>showPage("projects"));
+  document.getElementById("btnNewQuoteDetail").addEventListener("click",()=>{ const p=db.projects.find(x=>x.id===currentProjectId); if(!p) return; openQuoteEditorPage(createQuote(p.id)); renderProjectsPage(); });
+  document.querySelectorAll("#detailTabs .tab").forEach(t=>t.addEventListener("click",()=>{ currentDetailTab=t.dataset.dtab; renderProjectDetail(); }));
+  document.getElementById("btnNewProject").addEventListener("click",()=>{
+    openSheet("Nuevo proyecto",`
+      <div class="field-label">Nombre del proyecto</div><div class="field"><input id="np_name" placeholder="Ej: Showroom Leon"></div>
+      <div class="field-label">Cliente</div><div class="field"><input id="np_client" placeholder="Nombre del cliente"></div>
+      <div class="field-label">Fecha de entrega</div><div class="field"><input id="np_delivery" type="date" value="${todayISO()}"></div>
+    `,[
+      {label:"Cancelar",cls:"btn",action:closeSheet},
+      {label:"Crear",cls:"btn primary",action:()=>{ const name=document.getElementById("np_name").value.trim(); if(!name){ alert("Escribe el nombre"); return; } const p={id:uid(),name,client:document.getElementById("np_client").value.trim(),createdAt:todayISO(),deliveryDate:document.getElementById("np_delivery").value||"",notes:""}; db.projects.unshift(p); save(); closeSheet(); renderProjectsPage(); openProjectDetail(p.id,"overview"); }}
+    ]);
+  });
+
+  // Home buttons
+  document.getElementById("hbtnProyectos").addEventListener("click",()=>showApp());
+  document.getElementById("hbtnCotizaciones").addEventListener("click",()=>showSection("cotizaciones"));
+  document.getElementById("hbtnInstalaciones").addEventListener("click",()=>showSection("instalaciones"));
+  document.getElementById("hbtnCompras").addEventListener("click",()=>showSection("compras"));
+  document.getElementById("hbtnCalendario").addEventListener("click",()=>{ showApp(); showPage("calendar"); });
+  document.getElementById("hbtnVentas").addEventListener("click",()=>{ showApp(); showPage("sales"); });
+  document.getElementById("homeBtnLogout").addEventListener("click",logout);
+
+  // Section back
+  document.getElementById("secBack").addEventListener("click",()=>{ document.getElementById("sectionScreen").classList.remove("show"); document.getElementById("homeScreen").classList.add("show"); });
+
+  // Home logo
+  const logoBox=document.getElementById("homeLogoBox"); const logoFile=document.getElementById("homeLogoFile");
+  if(logoBox) logoBox.addEventListener("click",()=>logoFile&&logoFile.click());
+  if(logoFile) logoFile.addEventListener("change",(e)=>{ const file=e.target.files[0]; if(!file) return; const reader=new FileReader(); reader.onload=ev=>{ const b64=ev.target.result; db.settings.empresa=db.settings.empresa||{}; db.settings.empresa.logoB64=b64; localStorage.setItem("esma_logo_b64",b64); save(); refreshLogo(b64); buildTopbar(); }; reader.readAsDataURL(file); });
+
+  // Search
+  document.getElementById("searchProjects").addEventListener("input",(e)=>{ projSearch=e.target.value; renderProjectsPage(); });
+
+  // Proj tabs
+  document.querySelectorAll("#projTabs .tab").forEach(t=>t.addEventListener("click",()=>{ projSeg=t.dataset.seg; document.querySelectorAll("#projTabs .tab").forEach(x=>x.classList.toggle("active",x===t)); renderProjectsPage(); }));
+
+  // Sheet modal
+  document.getElementById("sheetClose").addEventListener("click",closeSheet);
+  document.getElementById("sheetOverlay").addEventListener("click",(e)=>{ if(e.target.id==="sheetOverlay") closeSheet(); });
+
+  const logo=db.settings.empresa?.logoB64||localStorage.getItem("esma_logo_b64")||"";
+  refreshLogo(logo);
+}
+
+document.addEventListener("DOMContentLoaded", bootNew);
 
 </script>
 </body>
