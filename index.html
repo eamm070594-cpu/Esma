@@ -567,7 +567,7 @@ tbody tr:hover td{background:rgba(0,0,0,.02);}
     </button>
     <button class="nav-item" data-nav="sales">
       <span class="nav-ico">📈</span>
-      <span class="nav-lbl">Ventas</span>
+      <span class="nav-lbl">Resultados</span>
     </button>
     <button class="nav-item" data-nav="settings">
       <span class="nav-ico">⚙️</span>
@@ -2963,6 +2963,7 @@ function showPage(name){
   document.querySelectorAll(".nav-item").forEach(n=>n.classList.toggle("active", n.dataset.nav===name));
   const scr = document.getElementById("screen");
   if(scr) scr.scrollTop = 0;
+  _pushNav(name, {});
   if(name==="projects") renderProjectsPage();
   if(name==="calendar") renderCalendarPage();
   if(name==="sales") renderSalesPage();
@@ -3127,7 +3128,13 @@ function renderProjectsPage(){
 // ---- Project Detail ----
 function openProjectDetail(pid, tab){
   currentProjectId=pid; currentDetailTab=tab||"overview";
-  showPage("project-detail"); renderProjectDetail();
+  currentPage="project-detail";
+  document.querySelectorAll(".page").forEach(p=>p.classList.remove("active"));
+  const pg=document.getElementById("page-project-detail"); if(pg) pg.classList.add("active");
+  document.querySelectorAll(".nav-item").forEach(n=>n.classList.remove("active"));
+  const scr=document.getElementById("screen"); if(scr) scr.scrollTop=0;
+  _pushNav("project-detail",{pid,tab:tab||"overview"});
+  renderProjectDetail();
 }
 
 function renderProjectDetail(){
@@ -3267,7 +3274,12 @@ function renderDetailOps(p, content){
 
 // ---- Quote Editor ----
 function openQuoteEditorPage(q){
-  showPage("quote-editor");
+  currentPage="quote-editor";
+  document.querySelectorAll(".page").forEach(p=>p.classList.remove("active"));
+  const pg=document.getElementById("page-quote-editor"); if(pg) pg.classList.add("active");
+  document.querySelectorAll(".nav-item").forEach(n=>n.classList.remove("active"));
+  const scr=document.getElementById("screen"); if(scr) scr.scrollTop=0;
+  _pushNav("quote-editor",{qid:q.id});
   const content=document.getElementById("quoteEditorContent");
   const p=db.projects.find(x=>x.id===q.projectId); if(!p) return;
   const routeOpts=(db.settings.routeDB||[]).map(r=>`<option value="${escapeAttr(r.name)}">${escapeHTML(r.name)} \u00b7 $${money(r.costPerHour||0)}/h</option>`).join("");
@@ -3334,8 +3346,6 @@ function openQuoteEditorPage(q){
     setTimeout(()=>{ try{ iframe.contentWindow.focus(); iframe.contentWindow.print(); }catch(e){} },450);
   });
 
-  if(document.getElementById("adminPctInput")) document.getElementById("adminPctInput").value=Number(db.settings.adminPercent??12);
-
   function renderLines(){
     const prod=q.products||[];
     if(!prod.length){
@@ -3360,6 +3370,8 @@ function openQuoteEditorPage(q){
     const extras=q.extras||[];
     document.getElementById("tbExtras").innerHTML=extras.length?extras.map(r=>`<tr data-id="${r.id}"><td><input data-f="label" value="${escapeAttr(r.label||"")}" placeholder="Concepto..." style="background:transparent;border:none;color:var(--text);font-family:inherit;font-size:13px;width:100%;"></td><td><input data-f="amount" type="number" step="0.01" value="${Number(r.amount||0)}" style="background:transparent;border:none;color:var(--text);font-family:inherit;width:100px;"></td><td><button class="btn small danger" data-act="delExtra">\u2715</button></td></tr>`).join(""):'<tr><td colspan="3" style="color:var(--muted);padding:12px;font-size:13px;">Sin extras.</td></tr>';
     bindQT("tbProd","prod"); bindQT("tbRoutes","routes"); bindQT("tbExtras","extras");
+    const apct=document.getElementById("adminPctInput"); if(apct) apct.value=Number(db.settings.adminPercent??12);
+    const mpct=document.getElementById("qMarginPct"); if(mpct) mpct.value=Number(q.marginPct??25);
     renderQuoteBreakdown(q);
   }
 
@@ -3448,10 +3460,29 @@ function renderCalendarPage(){
       const evs=calendarEventsForDay(_calSelectedDay);
       const box=document.getElementById("calDayEvents"); if(!box) return;
       if(!evs.length){ box.innerHTML='<div style="color:var(--muted);font-size:13px;padding:10px;">Sin eventos el '+_calSelectedDay+'.</div>'; renderCalendarPage(); return; }
-      box.innerHTML='<div style="font-size:13px;font-weight:800;margin-bottom:10px;">'+_calSelectedDay+'</div>'+evs.map(e=>{
-        const tag=e.type==="delivery"?"\u{1F4E6}":e.type==="install"?"\u{1F6E0}\uFE0F":e.type==="purchase"?"\u{1F6D2}":"\u2705";
-        const targetTab=(e.type==="task"||e.type==="install"||e.type==="purchase")?"ops":"overview";
-        return `<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;gap:10px;"><div><div style="font-size:13px;font-weight:700;">${tag} ${escapeHTML(e.title)}</div></div><button class="btn small" data-open="${e.projectId}" data-tab="${targetTab}">Abrir</button></div>`;
+      // Group events by project
+      const byProj={};
+      evs.forEach(e=>{ if(!byProj[e.projectId]) byProj[e.projectId]=[]; byProj[e.projectId].push(e); });
+      box.innerHTML='<div style="font-size:13px;font-weight:800;margin-bottom:10px;">'+_calSelectedDay+'</div>'+Object.entries(byProj).map(([pid,pevs])=>{
+        const p=db.projects.find(x=>x.id===pid)||{};
+        const photos=loadPhotos(pid);
+        const thumbSrc=photos.length?(photos[0].url||photos[0].data||""):"";
+        const thumb=thumbSrc?`<img src="${escapeAttr(thumbSrc)}" style="width:48px;height:48px;border-radius:8px;object-fit:cover;flex-shrink:0;">`:`<div style="width:48px;height:48px;border-radius:8px;background:var(--bg3);display:grid;place-items:center;font-size:22px;flex-shrink:0;">&#128193;</div>`;
+        const typeMap={delivery:"&#128230; Entrega",install:"&#128736;&#65039; Instalacion",purchase:"&#128722; Compra",task:"&#10003; Tarea"};
+        const targetTab=pevs.some(e=>e.type==="task"||e.type==="install"||e.type==="purchase")?"ops":"overview";
+        return `<div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:10px;">
+          <div style="display:flex;gap:10px;align-items:center;margin-bottom:8px;">
+            ${thumb}
+            <div style="flex:1;min-width:0;">
+              <div style="font-size:14px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHTML(p.name||"Proyecto")}</div>
+              <div style="font-size:12px;color:var(--muted);">${escapeHTML(p.client||"")}</div>
+            </div>
+            <button class="btn small primary" data-open="${pid}" data-tab="${targetTab}">Abrir</button>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;">
+            ${pevs.map(e=>`<span class="badge ${e.type==="delivery"?"amber":e.type==="install"?"green":"gray"}">${typeMap[e.type]||e.type}: ${escapeHTML(e.title)}</span>`).join("")}
+          </div>
+        </div>`;
       }).join("");
       box.querySelectorAll("button[data-open]").forEach(b=>b.addEventListener("click",()=>openProjectDetail(b.dataset.open,b.dataset.tab)));
       renderCalendarPage();
@@ -3459,28 +3490,137 @@ function renderCalendarPage(){
   });
 }
 
-// ---- Sales ----
+// ---- Estado de Resultados ----
+function _getGastosFijos(y, m){
+  const key = "esma_gastos_"+y+"_"+m;
+  try{ const v=localStorage.getItem(key); return v?JSON.parse(v):[]; }catch(e){ return []; }
+}
+function _saveGastosFijos(y, m, arr){
+  localStorage.setItem("esma_gastos_"+y+"_"+m, JSON.stringify(arr));
+}
+
 function renderSalesPage(){
   const content=document.getElementById("salesContent"); if(!content) return;
   const y=_salesCursor.getFullYear(), m=_salesCursor.getMonth();
-  const start=new Date(y,m,1), end=new Date(y,m+1,1);
-  const rows=[]; let total=0;
-  db.projects.forEach(p=>{ const d=parseISO(p.deliveryDate); if(!d||!(d>=start&&d<end)) return; const aqs=db.quotes.filter(q=>q.projectId===p.id&&q.status==="authorized"); if(!aqs.length) return; let pt=0; aqs.forEach(q=>{ const qty=Number(q.qty)||1; const t=quoteSellTotals(q); pt+=t.venta*qty; }); total+=pt; rows.push({name:p.name,client:p.client,delivery:p.deliveryDate,total:pt}); });
+
+  // Proyectos TERMINADOS en el mes (manualDone o allTasks done, con al menos una cotizacion autorizada)
+  const rows=[];
+  let totalVentas=0, totalCostoVar=0;
+  db.projects.forEach(p=>{
+    if(!projectIsDone(p.id)) return;
+    // Check terminado date: use deliveryDate or today if manualDone
+    const fechaRef = p.deliveryDate||p.createdAt||"";
+    const d = parseISO(fechaRef);
+    const inMonth = d && d.getFullYear()===y && d.getMonth()===m;
+    if(!inMonth) return;
+    const aqs=db.quotes.filter(q=>q.projectId===p.id&&q.status==="authorized");
+    if(!aqs.length) return;
+    let venta=0, costoVar=0;
+    aqs.forEach(q=>{ const qty=Number(q.qty)||1; const t=quoteSellTotals(q); venta+=t.venta*qty; costoVar+=(t.mp+t.ruta)*qty; });
+    totalVentas+=venta; totalCostoVar+=costoVar;
+    rows.push({id:p.id, name:p.name, client:p.client||"---", venta, costoVar});
+  });
+
+  const gastos = _getGastosFijos(y, m);
+  const totalFijos = gastos.reduce((s,g)=>s+Number(g.monto||0), 0);
+  const margenContribucion = totalVentas - totalCostoVar;
+  const pctMC = totalVentas>0 ? (margenContribucion/totalVentas*100) : 0;
+  const utilidadOperacion = margenContribucion - totalFijos;
+  // PE en pesos = GastosFijos / % Margen Contribucion
+  const pePesos = pctMC>0 ? (totalFijos / (pctMC/100)) : 0;
+
+  const erRow=(label,val,bold,color,indent)=>`<div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border);font-size:13px;${indent?"padding-left:16px;":""}"><span style="color:${color||"var(--text)"};font-weight:${bold?"800":"400"};">${label}</span><span style="font-weight:${bold?"900":"600"};color:${color||"var(--text)"};">$${money(val)}</span></div>`;
+  const pctRow=(label,val)=>`<div style="display:flex;justify-content:space-between;padding:3px 0 7px;font-size:11px;padding-left:16px;"><span style="color:var(--muted);">${label}</span><span style="color:var(--muted);">${val.toFixed(1)}%</span></div>`;
+
   content.innerHTML=`
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
-      <button class="btn icon" id="salesPrev">\u2190</button>
+      <button class="btn icon" id="salesPrev">&#8592;</button>
       <span style="flex:1;text-align:center;font-size:17px;font-weight:800;">${MONTHS_ES[m]} ${y}</span>
-      <button class="btn icon" id="salesNext">\u2192</button>
+      <button class="btn icon" id="salesNext">&#8594;</button>
     </div>
-    <div class="card" style="margin-bottom:14px;background:linear-gradient(135deg,rgba(29,78,216,.1),rgba(29,78,216,.02));border-color:rgba(29,78,216,.2);">
-      <div style="font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.5px;">Total del mes</div>
-      <div style="font-size:32px;font-weight:900;color:var(--accent2);margin-top:4px;">$${money(total)}</div>
-      <div style="font-size:12px;color:var(--muted);margin-top:4px;">${rows.length} proyecto${rows.length!==1?"s":""} con entrega en el mes</div>
+
+    <!-- KPIs -->
+    <div class="kpi-grid" style="margin-bottom:12px;">
+      <div class="kpi-box"><div class="kl">Ventas</div><div class="kv" style="font-size:18px;color:var(--accent2);">$${money(totalVentas)}</div><div class="ks">${rows.length} proyecto${rows.length!==1?"s":""}</div></div>
+      <div class="kpi-box"><div class="kl">Margen Contrib.</div><div class="kv" style="font-size:18px;color:var(--green);">$${money(margenContribucion)}</div><div class="ks">${pctMC.toFixed(1)}% de ventas</div></div>
+      <div class="kpi-box"><div class="kl">Ut. Operacion</div><div class="kv" style="font-size:18px;color:${utilidadOperacion>=0?"var(--green)":"var(--red)"};">$${money(utilidadOperacion)}</div></div>
+      <div class="kpi-box"><div class="kl">Punto Equilibrio</div><div class="kv" style="font-size:15px;color:var(--amber);">$${money(pePesos)}</div><div class="ks">${totalVentas>=pePesos&&pePesos>0?'&#10003; Alcanzado':'&#9888; Pendiente'}</div></div>
     </div>
-    ${rows.length?`<div class="card"><div class="table-wrap"><table><thead><tr><th>Proyecto</th><th>Cliente</th><th>Entrega</th><th style="text-align:right;">Total</th></tr></thead><tbody>${rows.map(r=>`<tr><td><b>${escapeHTML(r.name)}</b></td><td>${escapeHTML(r.client||"---")}</td><td>${r.delivery||"---"}</td><td style="text-align:right;font-weight:800;color:var(--accent2);">$${money(r.total)}</td></tr>`).join("")}</tbody></table></div></div>`:'<div class="empty"><div class="ico">\u{1F4C8}</div><h3>Sin ventas</h3><p>No hay proyectos con entrega en '+MONTHS_ES[m]+'.</p></div>'}
+
+    <!-- Estado de Resultados -->
+    <div class="card" style="margin-bottom:10px;">
+      <div class="card-title" style="margin-bottom:10px;">&#128202; Estado de Resultados</div>
+      ${erRow("(+) Ventas netas", totalVentas, true, "var(--accent2)")}
+      ${erRow("(-) Costo de ventas (MP + M.O.)", totalCostoVar, false, "var(--red)", true)}
+      ${erRow("= Margen de contribucion", margenContribucion, true, margenContribucion>=0?"var(--green)":"var(--red)")}
+      ${pctRow("% sobre ventas", pctMC)}
+      ${erRow("(-) Gastos fijos", totalFijos, false, "var(--red)", true)}
+      <div style="height:4px;"></div>
+      ${erRow("= Utilidad de operacion", utilidadOperacion, true, utilidadOperacion>=0?"var(--green)":"var(--red)")}
+    </div>
+
+    <!-- Punto de Equilibrio -->
+    <div class="card" style="margin-bottom:10px;">
+      <div class="card-title" style="margin-bottom:10px;">&#9878; Punto de Equilibrio</div>
+      <div style="display:flex;gap:10px;margin-bottom:12px;">
+        <div style="flex:1;background:var(--bg3);border-radius:10px;padding:12px;text-align:center;">
+          <div style="font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;">PE en pesos</div>
+          <div style="font-size:22px;font-weight:900;color:var(--amber);margin-top:4px;">$${money(pePesos)}</div>
+        </div>
+        <div style="flex:1;background:var(--bg3);border-radius:10px;padding:12px;text-align:center;">
+          <div style="font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;">Ventas actuales</div>
+          <div style="font-size:22px;font-weight:900;color:${totalVentas>=pePesos&&pePesos>0?"var(--green)":"var(--accent2)"};margin-top:4px;">$${money(totalVentas)}</div>
+        </div>
+      </div>
+      ${pePesos>0?`<div style="background:var(--bg3);border-radius:8px;overflow:hidden;height:10px;margin-bottom:6px;"><div style="height:100%;background:${totalVentas>=pePesos?"var(--green)":"var(--accent)"};border-radius:8px;width:${Math.min(100,(totalVentas/pePesos*100)).toFixed(1)}%;transition:width .4s;"></div></div><div style="font-size:11px;color:var(--muted);text-align:right;">${Math.min(100,(totalVentas/pePesos*100)).toFixed(1)}% del PE</div>`:""}
+    </div>
+
+    <!-- Gastos Fijos -->
+    <div class="card" style="margin-bottom:10px;">
+      <div class="card-header">
+        <div class="card-title">&#127968; Gastos Fijos del Mes</div>
+        <button class="btn small primary" id="btnAddGasto">&#xFF0B; Agregar</button>
+      </div>
+      <div id="gastosList">
+        ${gastos.length===0?'<div style="font-size:13px;color:var(--muted);padding:8px 0;">Sin gastos registrados. Agrega renta, sueldos, servicios, etc.</div>':
+          gastos.map((g,i)=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--border);font-size:13px;"><div><b>${escapeHTML(g.nombre)}</b></div><div style="display:flex;align-items:center;gap:10px;"><span style="font-weight:800;">$${money(g.monto)}</span><button class="btn small danger" data-del-gasto="${i}">&#x2715;</button></div></div>`).join("")
+        }
+        ${gastos.length?`<div style="display:flex;justify-content:space-between;padding:9px 0;font-size:13px;font-weight:800;"><span>Total gastos fijos</span><span>$${money(totalFijos)}</span></div>`:""}
+      </div>
+    </div>
+
+    <!-- Proyectos del mes -->
+    ${rows.length?`<div class="card">
+      <div class="card-title" style="margin-bottom:10px;">Proyectos terminados</div>
+      ${rows.map(r=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--border);font-size:13px;gap:10px;"><div style="flex:1;min-width:0;"><div style="font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHTML(r.name)}</div><div style="color:var(--muted);font-size:12px;">${escapeHTML(r.client)}</div></div><div style="text-align:right;flex-shrink:0;"><div style="font-weight:900;color:var(--accent2);">$${money(r.venta)}</div><div style="font-size:11px;color:var(--muted);">CV: $${money(r.costoVar)}</div></div></div>`).join("")}
+    </div>`:
+    `<div class="empty"><div class="ico">&#128202;</div><h3>Sin proyectos terminados</h3><p>Marca proyectos como terminados para verlos aqui.</p></div>`}
   `;
+
   document.getElementById("salesPrev").addEventListener("click",()=>{ _salesCursor.setMonth(_salesCursor.getMonth()-1); renderSalesPage(); });
   document.getElementById("salesNext").addEventListener("click",()=>{ _salesCursor.setMonth(_salesCursor.getMonth()+1); renderSalesPage(); });
+  document.getElementById("btnAddGasto").addEventListener("click",()=>{
+    openSheet("Agregar gasto fijo",`
+      <div class="field-label">Concepto</div><div class="field"><input id="gasto_nombre" placeholder="Ej: Renta, Sueldo, Luz..."></div>
+      <div class="field-label">Monto mensual</div><div class="field"><input id="gasto_monto" type="number" step="0.01" placeholder="0.00"></div>
+    `,[
+      {label:"Cancelar",cls:"btn",action:closeSheet},
+      {label:"Agregar",cls:"btn primary",action:()=>{
+        const nombre=document.getElementById("gasto_nombre").value.trim();
+        const monto=Number(document.getElementById("gasto_monto").value||0);
+        if(!nombre){ alert("Escribe el concepto"); return; }
+        const arr=_getGastosFijos(y,m);
+        arr.push({id:uid(),nombre,monto});
+        _saveGastosFijos(y,m,arr);
+        closeSheet(); renderSalesPage();
+      }}
+    ]);
+  });
+  content.querySelectorAll("[data-del-gasto]").forEach(b=>b.addEventListener("click",()=>{
+    const arr=_getGastosFijos(y,m);
+    arr.splice(Number(b.dataset.delGasto),1);
+    _saveGastosFijos(y,m,arr); renderSalesPage();
+  }));
 }
 
 // ---- Settings ----
@@ -3587,17 +3727,40 @@ function openSheet(title, bodyHTML, buttons=[]){
 function closeSheet(){ document.getElementById("sheetOverlay").classList.remove("open"); }
 
 // ---- Topbar ----
+// Navigation stack for back button
+let _navStack = [];
+
+function _pushNav(page, extra){
+  _navStack.push({page, extra});
+  if(_navStack.length > 20) _navStack.shift();
+  _updateBackBtn();
+}
+function _popNav(){
+  _navStack.pop();
+  const prev = _navStack[_navStack.length-1];
+  _navStack.pop(); // will be re-pushed by showPage/openProjectDetail
+  if(!prev){ showPage("projects"); return; }
+  if(prev.page==="project-detail"){ openProjectDetail(prev.extra.pid, prev.extra.tab); }
+  else if(prev.page==="quote-editor"){ const q=db.quotes.find(x=>x.id===prev.extra.qid); if(q) openQuoteEditorPage(q); else showPage("projects"); }
+  else showPage(prev.page);
+}
+function _updateBackBtn(){
+  const btn=document.getElementById("btnGoBack");
+  if(btn) btn.style.display=_navStack.length>1?"":"none";
+}
+
 function buildTopbar(){
   const topbar=document.getElementById("mainTopbar"); if(!topbar) return;
   const emp=(db&&db.settings&&db.settings.empresa)||{};
   const logo=emp.logoB64||localStorage.getItem("esma_logo_b64")||"";
   topbar.innerHTML=`
-    <div class="logo" id="topbarLogoEl" onclick="showHome()" style="cursor:pointer;">${logo?'<img src="'+escapeAttr(logo)+'" style="width:100%;height:100%;object-fit:contain;">':'E'}</div>
+    <button class="btn icon" id="btnGoBack" style="display:none;">&#8592;</button>
+    <div class="logo" id="topbarLogoEl" onclick="showHome()" style="cursor:pointer;flex-shrink:0;">${logo?'<img src="'+escapeAttr(logo)+'" style="width:100%;height:100%;object-fit:contain;">':'E'}</div>
     <div class="title"><h1 id="topbarTitleEl">${escapeHTML(emp.nombre||"ESMA INDUSTRIAL")}</h1><span id="syncStatusBar" style="font-size:11px;color:var(--muted);">---</span></div>
-    <div class="actions"><div class="sync-dot" id="syncDot"></div><button class="btn small" id="btnGoHome" title="Inicio" style="font-size:18px;padding:6px 10px;">&#127968;</button><button class="btn icon" id="btnTools">\u22EE</button></div>
+    <div class="actions"><div class="sync-dot" id="syncDot"></div><button class="btn icon" id="btnTools">\u22EE</button></div>
   `;
   document.getElementById("btnTools").addEventListener("click",(e)=>{ e.stopPropagation(); openToolsMenu(); });
-  const ghb=document.getElementById("btnGoHome"); if(ghb) ghb.addEventListener("click",showHome);
+  const back=document.getElementById("btnGoBack"); if(back){ back.addEventListener("click",_popNav); back.style.display=_navStack.length>1?"":"none"; }
 }
 
 function openToolsMenu(){
