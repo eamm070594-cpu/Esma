@@ -4,6 +4,7 @@
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
 <meta name="theme-color" content="#0f172a"/>
 <title>ESMA Industrial</title>
@@ -781,12 +782,23 @@ function applyRemoteData(data){
   db = data;
   normalizeDB();
   localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
-  setSeg(seg);
-  renderProjectsList();
-  renderMain();
+  // Refresh new UI
+  renderProjectsPage();
+  if(currentPage==="project-detail") renderProjectDetail();
+  if(currentPage==="sales") renderSalesPage();
+  if(currentPage==="calendar") renderCalendarPage();
+  if(currentPage==="settings") renderSettingsPage();
 }
 
-// Auto-sync disabled
+// Auto-sync cada 2 minutos
+let _autoSyncTimer = null;
+function startAutoSync(){
+  if(_autoSyncTimer) clearInterval(_autoSyncTimer);
+  _autoSyncTimer = setInterval(async()=>{
+    if(!GS_URL || _syncInProgress) return;
+    await gsPush();
+  }, 2 * 60 * 1000); // 2 minutos
+}
 
 function currentUser(){
   const id = db.settings.session?.userId;
@@ -3812,6 +3824,7 @@ function syncStatusUpdate(msg, color){
 function bootNew(){
   load();
   gsPullOnBoot();
+  startAutoSync();
 
   const u=currentUser();
   if(u){
