@@ -782,12 +782,22 @@ function applyRemoteData(data){
   db = data;
   normalizeDB();
   localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
-  // Refresh new UI
+  // Rebuild topbar with possibly new company name/logo
+  buildTopbar();
+  // Always refresh projects list
   renderProjectsPage();
-  if(currentPage==="project-detail") renderProjectDetail();
-  if(currentPage==="sales") renderSalesPage();
-  if(currentPage==="calendar") renderCalendarPage();
-  if(currentPage==="settings") renderSettingsPage();
+  // Refresh current page if open
+  try{
+    if(currentPage==="project-detail") renderProjectDetail();
+    else if(currentPage==="sales") renderSalesPage();
+    else if(currentPage==="calendar") renderCalendarPage();
+    else if(currentPage==="settings") renderSettingsPage();
+    else if(currentPage==="quote-editor"){
+      // re-open current quote
+      const q = db.quotes.find(x=>x.id===(_navStack[_navStack.length-1]||{}).extra?.qid);
+      if(q) openQuoteEditorPage(q);
+    }
+  } catch(e){ console.warn("applyRemoteData refresh error:", e); }
 }
 
 // Auto-sync cada 2 minutos
