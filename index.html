@@ -733,20 +733,29 @@ function syncStatusUpdate(msg, color){
 async function gsPush(){
   if(!GS_URL || _syncInProgress) return;
   _syncInProgress = true;
-  syncStatusUpdate("Sincronizando...", "orange");
+  syncStatusUpdate("Subiendo...", "orange");
   try {
     const dbToSync = JSON.parse(JSON.stringify(db));
     if(dbToSync.settings && dbToSync.settings.empresa)
       dbToSync.settings.empresa.logoB64 = localStorage.getItem("esma_logo_b64") || "";
-    // Subir fotos con URL (imgbb) pero NO base64
     dbToSync.projects.forEach(p=>{
       p.photos = (p.photos||[]).filter(ph=>ph.url && !ph.data);
     });
     const payload = JSON.stringify({action:"save", data:dbToSync});
-    await fetch(GS_URL, {method:"POST", mode:"no-cors", headers:{"Content-Type":"text/plain"}, body:payload});
-    syncStatusUpdate("✓ Sync " + new Date().toLocaleTimeString("es-MX",{hour:"2-digit",minute:"2-digit"}), "green");
+    const res = await fetch(GS_URL, {
+      method:"POST",
+      headers:{"Content-Type":"text/plain;charset=utf-8"},
+      body:payload
+    });
+    const json = await res.json();
+    if(json.ok){
+      syncStatusUpdate("✓ Subido " + new Date().toLocaleTimeString("es-MX",{hour:"2-digit",minute:"2-digit"}), "green");
+    } else {
+      throw new Error(json.error||"Error al guardar");
+    }
   } catch(e) {
-    syncStatusUpdate("⚠ Sin conexión", "orange");
+    console.error("gsPush error:", e);
+    syncStatusUpdate("⚠ Error: "+e.message, "red");
   } finally { _syncInProgress = false; }
 }
 
