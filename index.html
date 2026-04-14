@@ -709,12 +709,16 @@ function load(){
 const GS_KEY = "esma_gs_url";
 const DEFAULT_GS_URL = "https://script.google.com/macros/s/AKfycbyn9__H4FS_tp1lUKrdPTuKGhIwats7M3iNT33raDR1M0qCZqwUaKYCJTtFGpX6M7jmTQ/exec";
 let GS_URL = localStorage.getItem(GS_KEY) || DEFAULT_GS_URL;
+let _syncInProgress = false;
+let _lastSaveTime = 0;
 
 function save(){
   db.projects.forEach(p=>{ if(p.photos && p.photos.length) savePhotos(p.id, p.photos); });
   const dbSin = JSON.parse(JSON.stringify(db));
   dbSin.projects.forEach(p=>{ p.photos = (p.photos||[]).filter(ph=>ph.url && !ph.data); });
   localStorage.setItem(STORAGE_KEY, JSON.stringify(dbSin));
+  _lastSaveTime = Date.now();
+  if(GS_URL){ clearTimeout(save._t); save._t = setTimeout(gsPush, 300); }
 }
 
 function syncStatusUpdate(msg, color){
@@ -727,43 +731,42 @@ function syncStatusUpdate(msg, color){
 }
 
 async function gsPush(){
-  if(!GS_URL) return;
-  syncStatusUpdate("Subiendo...", "orange");
+  if(!GS_URL || _syncInProgress) return;
+  _syncInProgress = true;
+  syncStatusUpdate("Sincronizando...", "orange");
   try {
     const dbToSync = JSON.parse(JSON.stringify(db));
     if(dbToSync.settings && dbToSync.settings.empresa)
       dbToSync.settings.empresa.logoB64 = localStorage.getItem("esma_logo_b64") || "";
     dbToSync.projects.forEach(p=>{ p.photos = (p.photos||[]).filter(ph=>ph.url && !ph.data); });
     const payload = JSON.stringify({action:"save", data:dbToSync});
-    const res = await fetch(GS_URL, {method:"POST", headers:{"Content-Type":"text/plain;charset=utf-8"}, body:payload});
-    const json = await res.json();
-    if(json.ok){
-      syncStatusUpdate("\u2713 " + new Date().toLocaleTimeString("es-MX",{hour:"2-digit",minute:"2-digit"}), "green");
-    } else { throw new Error(json.error||"Error"); }
+    await fetch(GS_URL, {method:"POST", mode:"no-cors", headers:{"Content-Type":"text/plain"}, body:payload});
+    syncStatusUpdate("\u2713 " + new Date().toLocaleTimeString("es-MX",{hour:"2-digit",minute:"2-digit"}), "green");
   } catch(e) {
-    console.error("gsPush:", e.message);
-    syncStatusUpdate("\u26A0 " + e.message, "red");
-  }
+    syncStatusUpdate("\u26A0 Sin conexi\u00F3n", "orange");
+  } finally { _syncInProgress = false; }
 }
 
 async function gsPullOnBoot(){
   if(!GS_URL) return;
+  _syncInProgress = true;
   syncStatusUpdate("Descargando...", "orange");
   try {
     const res = await fetch(GS_URL + "?action=load");
     const json = await res.json();
-    const remoteData = (json.ok && json.data) ? json.data : null;
-    if(remoteData && remoteData.projects){
-      applyRemoteData(remoteData);
-      syncStatusUpdate("\u2193 " + new Date().toLocaleTimeString("es-MX",{hour:"2-digit",minute:"2-digit"}), "green");
+    const data = (json.ok && json.data) ? json.data : (!json.error && json.projects) ? json : null;
+    if(data && data.projects){
+      applyRemoteData(data);
+      syncStatusUpdate("\u2193 Sincronizado", "green");
     } else if(json.ok && !json.data){
-      syncStatusUpdate("Sheets vac\u00EDo", "orange");
+      syncStatusUpdate("Sheets vac\u00EDo, subiendo...", "orange");
+      _syncInProgress = false;
       await gsPush();
-    } else { throw new Error(json.error||"Sin datos"); }
+      return;
+    } else { throw new Error(json.error||"Error"); }
   } catch(e) {
-    console.error("gsPull:", e.message);
-    syncStatusUpdate("\u26A0 " + e.message, "red");
-  }
+    syncStatusUpdate("\u26A0 Error al descargar", "orange");
+  } finally { _syncInProgress = false; }
 }
 
 function applyRemoteData(data){
@@ -780,14 +783,15 @@ function applyRemoteData(data){
     else if(currentPage==="sales") renderSalesPage();
     else if(currentPage==="calendar") renderCalendarPage();
     else if(currentPage==="settings") renderSettingsPage();
-  } catch(e){ console.warn("refresh:", e.message); }
+  } catch(e){}
 }
-// Auto-sync cada 2 minutos
+
+// Auto-pull cada 30s si no hubo cambios locales recientes
+setInterval(()=>{ if(GS_URL && !_syncInProgress && (Date.now()-(_lastSaveTime||0))>60000) gsPullOnBoot(); }, 30000);
+
+// Auto-sync timer (legacy compat)
 let _autoSyncTimer = null;
-function startAutoSync(){
-  if(_autoSyncTimer) clearInterval(_autoSyncTimer);
-  _autoSyncTimer = setInterval(()=>{ gsPush(); }, 2 * 60 * 1000);
-}
+function startAutoSync(){ /* handled by setInterval above */ }
 
 function currentUser(){
   const id = db.settings.session?.userId;
@@ -3812,7 +3816,7 @@ function syncStatusUpdate(msg, color){
 // ---- Boot ----
 function bootNew(){
   load();
-  startAutoSync();
+  gsPullOnBoot();
 
   const u=currentUser();
   if(u){
