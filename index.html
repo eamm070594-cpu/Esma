@@ -2766,38 +2766,12 @@ function seedDemo(){
 // ---- PANTALLA DE INICIO ----
 let currentScreen = "home"; // "home" | "app"
 
-function showHome(){
-  currentScreen = "home";
-  hideAllScreens();
-  document.getElementById("homeScreen").style.display = "flex";
-  // Sync nombre empresa
-  const emp = db.settings.empresa || {};
-  const nombre = emp.nombre || "ESMA INDUSTRIAL";
-  document.getElementById("homeTitle").textContent = nombre;
-  document.getElementById("topbarTitle").textContent = nombre;
-  // Sync logo
-  const logo = emp.logoB64 || localStorage.getItem("esma_logo_b64") || "";
-  refreshHomeLogo(logo);
-  // Sync usuario
-  const u = currentUser();
-  document.getElementById("homeWhoami").textContent = u ? (u.name + " · " + u.role.toUpperCase()) : "—";
-  document.getElementById("homeBtnLogout").style.display = u ? "" : "none";
-}
-
-// ---- VISTAS DE SECCIÓN GLOBAL ----
-let currentSection = ""; // compras | instalaciones | cotizaciones | tareas
 
 function hideAllScreens(){
   document.getElementById("homeScreen").style.display = "none";
   document.getElementById("sectionScreen").style.display = "none";
 }
 
-function showSection(section){
-  hideAllScreens();
-  currentSection = section;
-  document.getElementById("sectionScreen").style.display = "flex";
-  renderSection(section);
-}
 
 function renderSection(section){
   const titles = {
@@ -2966,12 +2940,6 @@ function renderSecCotizaciones(filtersEl, contentEl, addBtn){
   renderList();
 }
 
-function showApp(){
-  currentScreen = "app";
-  hideAllScreens();
-  renderProjectsList();
-  renderMain();
-}
 
 function refreshHomeLogo(logoB64){
   const box = document.getElementById("homeLogoBox");
@@ -4128,13 +4096,7 @@ function openToolsMenu(){
 }
 
 // Override syncStatusUpdate
-function syncStatusUpdate(msg, color){
-  const bar=document.getElementById("syncStatusBar"); if(bar) bar.textContent=msg;
-  const dot=document.getElementById("syncDot"); if(dot){ dot.className="sync-dot"; if(color==="orange") dot.classList.add("syncing"); else if(color==="red") dot.classList.add("error"); }
-  const ss=document.getElementById("syncStatus"); if(ss){ ss.textContent=msg; ss.style.color=color||"var(--muted)"; }
-}
 
-// ---- Boot ----
 function bootNew(){
   load();
   gsPullOnBoot();
