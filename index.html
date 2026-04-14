@@ -709,79 +709,61 @@ function load(){
 const GS_KEY = "esma_gs_url";
 const DEFAULT_GS_URL = "https://script.google.com/macros/s/AKfycbyn9__H4FS_tp1lUKrdPTuKGhIwats7M3iNT33raDR1M0qCZqwUaKYCJTtFGpX6M7jmTQ/exec";
 let GS_URL = localStorage.getItem(GS_KEY) || DEFAULT_GS_URL;
-let _syncInProgress = false;
-let _lastSaveTime = 0;
 
 function save(){
-  // Guardar fotos separado en localStorage
   db.projects.forEach(p=>{ if(p.photos && p.photos.length) savePhotos(p.id, p.photos); });
-  // En el DB principal guardar solo fotos con URL (imgbb) — no base64
   const dbSin = JSON.parse(JSON.stringify(db));
-  dbSin.projects.forEach(p=>{
-    p.photos = (p.photos||[]).filter(ph=>ph.url && !ph.data);
-  });
+  dbSin.projects.forEach(p=>{ p.photos = (p.photos||[]).filter(ph=>ph.url && !ph.data); });
   localStorage.setItem(STORAGE_KEY, JSON.stringify(dbSin));
-  _lastSaveTime = Date.now();
-  if(GS_URL){ clearTimeout(save._t); save._t = setTimeout(gsPush, 300); }
 }
 
 function syncStatusUpdate(msg, color){
+  const bar = document.getElementById("syncStatusBar");
+  if(bar) bar.textContent = msg;
+  const dot = document.getElementById("syncDot");
+  if(dot){ dot.className="sync-dot"; if(color==="orange") dot.classList.add("syncing"); else if(color==="red") dot.classList.add("error"); }
   const el = document.getElementById("syncStatus");
   if(el){ el.textContent = msg; el.style.color = color||"var(--muted)"; }
 }
 
 async function gsPush(){
-  if(!GS_URL || _syncInProgress) return;
-  _syncInProgress = true;
+  if(!GS_URL) return;
   syncStatusUpdate("Subiendo...", "orange");
   try {
     const dbToSync = JSON.parse(JSON.stringify(db));
     if(dbToSync.settings && dbToSync.settings.empresa)
       dbToSync.settings.empresa.logoB64 = localStorage.getItem("esma_logo_b64") || "";
-    dbToSync.projects.forEach(p=>{
-      p.photos = (p.photos||[]).filter(ph=>ph.url && !ph.data);
-    });
+    dbToSync.projects.forEach(p=>{ p.photos = (p.photos||[]).filter(ph=>ph.url && !ph.data); });
     const payload = JSON.stringify({action:"save", data:dbToSync});
-    const res = await fetch(GS_URL, {
-      method:"POST",
-      headers:{"Content-Type":"text/plain;charset=utf-8"},
-      body:payload
-    });
+    const res = await fetch(GS_URL, {method:"POST", headers:{"Content-Type":"text/plain;charset=utf-8"}, body:payload});
     const json = await res.json();
     if(json.ok){
-      syncStatusUpdate("✓ Subido " + new Date().toLocaleTimeString("es-MX",{hour:"2-digit",minute:"2-digit"}), "green");
-    } else {
-      throw new Error(json.error||"Error al guardar");
-    }
+      syncStatusUpdate("\u2713 " + new Date().toLocaleTimeString("es-MX",{hour:"2-digit",minute:"2-digit"}), "green");
+    } else { throw new Error(json.error||"Error"); }
   } catch(e) {
-    console.error("gsPush error:", e);
-    syncStatusUpdate("⚠ Error: "+e.message, "red");
-  } finally { _syncInProgress = false; }
+    console.error("gsPush:", e.message);
+    syncStatusUpdate("\u26A0 " + e.message, "red");
+  }
 }
 
 async function gsPullOnBoot(){
   if(!GS_URL) return;
-  _syncInProgress = true;
   syncStatusUpdate("Descargando...", "orange");
   try {
     const res = await fetch(GS_URL + "?action=load");
     const json = await res.json();
-    const remoteData = (json.ok && json.data) ? json.data : (!json.error && json.projects) ? json : null;
-
+    const remoteData = (json.ok && json.data) ? json.data : null;
     if(remoteData && remoteData.projects){
       applyRemoteData(remoteData);
-      syncStatusUpdate("↓ Sincronizado " + new Date().toLocaleTimeString("es-MX",{hour:"2-digit",minute:"2-digit"}), "green");
-
+      syncStatusUpdate("\u2193 " + new Date().toLocaleTimeString("es-MX",{hour:"2-digit",minute:"2-digit"}), "green");
     } else if(json.ok && !json.data){
-      // Sheets vacío — subir local
-      syncStatusUpdate("Sheets vacío, subiendo...", "orange");
-      _syncInProgress = false;
+      syncStatusUpdate("Sheets vac\u00EDo", "orange");
       await gsPush();
-      return;
-    } else { throw new Error(json.error||"Error"); }
+    } else { throw new Error(json.error||"Sin datos"); }
   } catch(e) {
-    syncStatusUpdate("⚠ Error al descargar", "orange");
-  } finally { _syncInProgress = false; }
+    console.error("gsPull:", e.message);
+    syncStatusUpdate("\u26A0 " + e.message, "red");
+  }
 }
 
 function applyRemoteData(data){
@@ -791,32 +773,20 @@ function applyRemoteData(data){
   db = data;
   normalizeDB();
   localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
-  // Rebuild topbar with possibly new company name/logo
-  buildTopbar();
-  // Always refresh projects list
-  renderProjectsPage();
-  // Refresh current page if open
+  try{ buildTopbar(); }catch(e){}
+  try{ renderProjectsPage(); }catch(e){}
   try{
     if(currentPage==="project-detail") renderProjectDetail();
     else if(currentPage==="sales") renderSalesPage();
     else if(currentPage==="calendar") renderCalendarPage();
     else if(currentPage==="settings") renderSettingsPage();
-    else if(currentPage==="quote-editor"){
-      // re-open current quote
-      const q = db.quotes.find(x=>x.id===(_navStack[_navStack.length-1]||{}).extra?.qid);
-      if(q) openQuoteEditorPage(q);
-    }
-  } catch(e){ console.warn("applyRemoteData refresh error:", e); }
+  } catch(e){ console.warn("refresh:", e.message); }
 }
-
 // Auto-sync cada 2 minutos
 let _autoSyncTimer = null;
 function startAutoSync(){
   if(_autoSyncTimer) clearInterval(_autoSyncTimer);
-  _autoSyncTimer = setInterval(async()=>{
-    if(!GS_URL || _syncInProgress) return;
-    await gsPush();
-  }, 2 * 60 * 1000); // 2 minutos
+  _autoSyncTimer = setInterval(()=>{ gsPush(); }, 2 * 60 * 1000);
 }
 
 function currentUser(){
