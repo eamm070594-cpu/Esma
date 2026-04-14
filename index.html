@@ -6,9 +6,10 @@
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
-<meta name="theme-color" content="#0f172a"/>
+<meta name="theme-color" content="#2563eb"/>
 <title>ESMA Industrial</title>
-<link rel="manifest" href="data:application/json,{%22name%22:%22ESMA%20Industrial%22,%22short_name%22:%22ESMA%22,%22display%22:%22standalone%22,%22background_color%22:%22%230f172a%22,%22theme_color%22:%22%230f172a%22}">
+<link rel="manifest" href="data:application/json,{%22name%22:%22ESMA%20Industrial%22,%22short_name%22:%22ESMA%22,%22display%22:%22standalone%22,%22start_url%22:%22.%22,%22background_color%22:%22%23ffffff%22,%22theme_color%22:%22%232563eb%22,%22icons%22:[{%22src%22:%22data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20100%20100'%3E%3Crect%20width='100'%20height='100'%20rx='20'%20fill='%232563eb'/%3E%3Ctext%20y='.9em'%20font-size='80'%20x='10'%20fill='white'%20font-family='system-ui'%20font-weight='900'%3EE%3C/text%3E%3C/svg%3E%22,%22sizes%22:%22192x192%22,%22type%22:%22image/svg+xml%22}]}">
+<meta name="apple-mobile-web-app-title" content="ESMA">
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap');
 
@@ -717,7 +718,7 @@ tbody tr:hover td{background:rgba(0,0,0,.02);}
   <div class="nav-dd-overlay" id="navDdOverlay" onclick="closeAllDropdowns()"></div>
 
   <!-- DROPDOWN: Proyectos -->
-  <div class="nav-dropdown" id="dd-projects" style="left:0;">
+  <div class="nav-dropdown" id="dd-projects">
     <div class="nav-dd-item active" id="dd-proj-list" onclick="closeAllDropdowns();showPage('projects')"><span class="dd-ico">📁</span>Lista de proyectos</div>
     <div class="nav-dd-divider"></div>
     <div class="nav-dd-item" id="dd-proj-tasks" onclick="closeAllDropdowns();showSection('tareas')"><span class="dd-ico">✅</span>Tareas</div>
@@ -725,13 +726,13 @@ tbody tr:hover td{background:rgba(0,0,0,.02);}
   </div>
 
   <!-- DROPDOWN: Resultados -->
-  <div class="nav-dropdown" id="dd-results" style="left:50%;">
+  <div class="nav-dropdown" id="dd-results">
     <div class="nav-dd-item" id="dd-res-sales" onclick="closeAllDropdowns();showPage('sales')"><span class="dd-ico">📈</span>Ventas</div>
     <div class="nav-dd-item" id="dd-res-be" onclick="closeAllDropdowns();showSection('costos')"><span class="dd-ico">💰</span>Costos</div>
   </div>
 
   <!-- DROPDOWN: Más -->
-  <div class="nav-dropdown" id="dd-more" style="right:0;">
+  <div class="nav-dropdown" id="dd-more">
     <div class="nav-dd-item" onclick="closeAllDropdowns();showSection('cotizaciones')"><span class="dd-ico">🧾</span>Cotizaciones</div>
     <div class="nav-dd-item" onclick="closeAllDropdowns();showSection('compras')"><span class="dd-ico">🛒</span>Compras</div>
     <div class="nav-dd-divider"></div>
@@ -3247,25 +3248,77 @@ function _renderSecInstalaciones(filtersEl, contentEl){
 function _renderSecCotizaciones(filtersEl, contentEl){
   if(filtersEl) filtersEl.innerHTML='<button class="tab active" data-qf="all">Todas</button><button class="tab" data-qf="authorized">Autorizadas</button><button class="tab" data-qf="draft">Borradores</button>';
   let filter="all";
+  let selectedIds = new Set();
+  let selectMode = false;
+
   function renderList(){
     let items=[...db.quotes].sort((a,b)=>String(b.createdAt||"").localeCompare(String(a.createdAt||"")));
     if(filter==="authorized") items=items.filter(x=>x.status==="authorized");
     if(filter==="draft") items=items.filter(x=>x.status!=="authorized");
     if(!items.length){ contentEl.innerHTML='<div class="empty"><div class="ico">\u{1F9FE}</div><h3>Sin cotizaciones</h3></div>'; return; }
-    contentEl.innerHTML=items.map(q=>{
+
+    const toolbarHtml = `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;gap:8px;flex-wrap:wrap;">
+      <button class="btn small" id="btnToggleSelect" style="gap:6px;">${selectMode?"✕ Cancelar":"☑ Seleccionar para PDF"}</button>
+      ${selectMode && selectedIds.size>0 ? `<button class="btn small primary" id="btnMultiPDF">🖨 PDF (${selectedIds.size} cotización${selectedIds.size!==1?"es":""})</button>` : ""}
+    </div>`;
+
+    contentEl.innerHTML = toolbarHtml + items.map(q=>{
       const t=quoteSellTotals(q); const isAuth=q.status==="authorized";
-      return `<div class="sec-item"><div class="si-ico">\u{1F9FE}</div><div class="si-body"><div class="si-title">${escapeHTML(q.name||"Cotizacion")}</div><div class="si-meta">\u{1F4C1} ${escapeHTML(projectName(q.projectId))} \u00b7 ${isAuth?'<span style="color:var(--green)">Autorizada</span>':"Borrador"}</div></div><div class="si-right" style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;"><span style="font-size:14px;font-weight:900;">$${money(t.venta)}</span><button class="btn small" data-qid="${q.id}" data-pid="${q.projectId}">Abrir</button></div></div>`;
+      const checked = selectMode && selectedIds.has(q.id);
+      return `<div class="sec-item" style="${checked?"background:var(--accent-light);border-color:var(--accent2);":""}" data-qid="${q.id}">
+        ${selectMode ? `<div style="display:grid;place-items:center;padding:4px 2px;"><input type="checkbox" data-chk="${q.id}" ${checked?"checked":""} style="width:18px;height:18px;cursor:pointer;accent-color:var(--accent);"></div>` : `<div class="si-ico">🧾</div>`}
+        <div class="si-body" style="cursor:pointer;" data-open-qid="${q.id}" data-open-pid="${q.projectId}">
+          <div class="si-title">${escapeHTML(q.name||"Cotizacion")}</div>
+          <div class="si-meta">📁 ${escapeHTML(projectName(q.projectId))} · ${isAuth?'<span style="color:var(--green)">Autorizada</span>':"Borrador"}</div>
+        </div>
+        <div class="si-right" style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;">
+          <span style="font-size:14px;font-weight:900;">$${money(t.venta)}</span>
+          ${!selectMode ? `<button class="btn small" data-open-qid="${q.id}" data-open-pid="${q.projectId}">Abrir</button>` : ""}
+        </div>
+      </div>`;
     }).join("");
-    contentEl.querySelectorAll("button[data-qid]").forEach(b=>{
+
+    // Toggle select mode
+    document.getElementById("btnToggleSelect").addEventListener("click",()=>{
+      selectMode=!selectMode; selectedIds.clear(); renderList();
+    });
+
+    // Multi PDF button
+    const pdfBtn = document.getElementById("btnMultiPDF");
+    if(pdfBtn) pdfBtn.addEventListener("click",()=>{
+      const selected = [...selectedIds].map(id=>db.quotes.find(x=>x.id===id)).filter(Boolean);
+      if(!selected.length) return;
+      // Group by project for PDF — use first quote's project
+      const firstQ = selected[0];
+      const proj = db.projects.find(x=>x.id===firstQ.projectId)||{name:"Cotizaciones"};
+      const iframe=document.createElement("iframe"); iframe.style.cssText="position:fixed;right:0;bottom:0;width:0;height:0;border:0;"; document.body.appendChild(iframe);
+      const doc=iframe.contentWindow.document; doc.open(); doc.write(buildQuotePDFHTML(proj, selected[0], selected.slice(1))); doc.close();
+      iframe.onload=()=>{ try{ iframe.contentWindow.focus(); iframe.contentWindow.print(); } finally { setTimeout(()=>iframe.remove(),1000); }};
+      setTimeout(()=>{ try{ iframe.contentWindow.focus(); iframe.contentWindow.print(); }catch(e){} },450);
+    });
+
+    // Checkboxes
+    contentEl.querySelectorAll("input[data-chk]").forEach(chk=>{
+      chk.addEventListener("change",()=>{
+        if(chk.checked) selectedIds.add(chk.dataset.chk);
+        else selectedIds.delete(chk.dataset.chk);
+        renderList();
+      });
+    });
+
+    // Open quote (only when not in select mode)
+    contentEl.querySelectorAll("[data-open-qid]").forEach(b=>{
       b.addEventListener("click",()=>{
-        const q=db.quotes.find(x=>x.id===b.dataset.qid); if(!q) return;
-        showApp(); openProjectDetail(b.dataset.pid,"quotes");
+        if(selectMode) return;
+        const q=db.quotes.find(x=>x.id===b.dataset.openQid); if(!q) return;
+        showApp(); openProjectDetail(b.dataset.openPid,"quotes");
         setTimeout(()=>openQuoteEditorPage(q),100);
       });
     });
   }
+
   if(filtersEl) filtersEl.querySelectorAll(".tab").forEach(btn=>btn.addEventListener("click",()=>{
-    filter=btn.dataset.qf;
+    filter=btn.dataset.qf; selectedIds.clear(); selectMode=false;
     filtersEl.querySelectorAll(".tab").forEach(b=>b.classList.toggle("active",b===btn));
     renderList();
   }));
@@ -3522,14 +3575,16 @@ function openQuoteEditorPage(q){
     <div class="card">
       <div class="card-title" style="margin-bottom:12px;">Desglose</div>
       <div class="breakdown">
-        <div class="breakdown-row"><span class="label">MP + Ruta</span><span id="bdCosto">$0.00</span></div>
+        <div class="breakdown-row"><span class="label">Costo directo (MP + Ruta)</span><b><span id="bdCosto">$0.00</span></b></div>
+        <div class="breakdown-row" style="padding-left:12px;"><span class="label">↳ Materiales</span><span id="bdMP">$0.00</span></div>
+        <div class="breakdown-row" style="padding-left:12px;"><span class="label">↳ Ruta / M.O.</span><span id="bdRuta">$0.00</span></div>
         <div class="breakdown-row"><span class="label">Admin <input id="adminPctInput" type="number" step="0.1" style="width:50px;background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--text);font-family:inherit;text-align:center;">%</span><span id="bdAdmin">$0.00</span></div>
-        <div class="breakdown-row"><span class="label">Costo total</span><span id="bdCostoAdmin">$0.00</span></div>
+        <div class="breakdown-row"><span class="label"><b>Costo total</b></span><b><span id="bdCostoAdmin">$0.00</span></b></div>
         <div class="breakdown-row"><span class="label">Utilidad <input id="qMarginPct" type="number" step="0.1" style="width:50px;background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--text);font-family:inherit;text-align:center;">%</span><span id="bdUtil">$0.00</span></div>
-        <div class="breakdown-row"><span class="label">Subtotal</span><span id="bdSinExtras">$0.00</span></div>
-        <div class="breakdown-row"><span class="label">+ Extras (sin margen)</span><span id="bdExtra">$0.00</span></div>
+        <div class="breakdown-row"><span class="label">Subtotal sin extras</span><span id="bdSinExtras">$0.00</span></div>
+        <div class="breakdown-row"><span class="label">+ Extras (suma directa)</span><span id="bdExtra">$0.00</span></div>
         <div class="breakdown-row total"><span class="label">Precio de venta</span><span id="bdVenta" style="color:var(--green);">$0.00</span></div>
-        <div class="breakdown-row"><span class="label" style="color:var(--muted);font-size:12px;">Retorno neto</span><span id="bdRetorno" style="font-size:12px;">$0.00</span></div>
+        <div class="breakdown-row"><span class="label" style="color:var(--muted);font-size:12px;">Retorno neto (sin ruta/extras)</span><span id="bdRetorno" style="font-size:12px;">$0.00</span></div>
       </div>
     </div>
   </div>`;
@@ -4126,8 +4181,14 @@ function sNavGo(page){
 // Mobile dropdown nav
 function closeAllDropdowns(){
   document.querySelectorAll('.nav-dropdown').forEach(el=>el.classList.remove('open'));
-  document.getElementById('navDdOverlay').classList.remove('open');
+  const ov = document.getElementById('navDdOverlay');
+  if(ov) ov.classList.remove('open');
   document.querySelectorAll('.nav-item').forEach(el=>el.classList.remove('active'));
+  // Restore active based on current page
+  const mMap = {projects:'mnav-projects',calendar:'mnav-calendar',sales:'mnav-results',settings:'mnav-more'};
+  const cur = mMap[currentPage||'projects'];
+  const btn = cur && document.getElementById(cur);
+  if(btn) btn.classList.add('active');
 }
 function mNavToggle(key, e){
   e && e.stopPropagation();
@@ -4136,6 +4197,16 @@ function mNavToggle(key, e){
   const isOpen = dd && dd.classList.contains('open');
   closeAllDropdowns();
   if(!isOpen && dd){
+    // Position dropdown above the button
+    if(btn){
+      const rect = btn.getBoundingClientRect();
+      const ddW = 200;
+      let left = rect.left + rect.width/2 - ddW/2;
+      if(left < 8) left = 8;
+      if(left + ddW > window.innerWidth - 8) left = window.innerWidth - ddW - 8;
+      dd.style.left = left + 'px';
+      dd.style.bottom = (window.innerHeight - rect.top + 8) + 'px';
+    }
     dd.classList.add('open');
     document.getElementById('navDdOverlay').classList.add('open');
     if(btn) btn.classList.add('active');
@@ -4146,6 +4217,10 @@ function mNavGo(page){
   document.querySelectorAll('.nav-item').forEach(el=>el.classList.remove('active'));
   const btn = document.getElementById('mnav-'+page);
   if(btn) btn.classList.add('active');
+  // Make sure app is visible
+  document.getElementById('homeScreen').classList.remove('show');
+  document.getElementById('sectionScreen').classList.remove('show');
+  document.getElementById('app').style.display = '';
   showPage(page);
 }
 
