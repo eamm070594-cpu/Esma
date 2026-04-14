@@ -4257,17 +4257,17 @@ function mNavToggle(key, e){
 }
 function mNavGo(page){
   closeAllDropdowns();
-  // Force app visible, hide home and section screens
-  const hs = document.getElementById('homeScreen');
-  const ss = document.getElementById('sectionScreen');
+  // Hide ALL overlapping screens
+  ['homeScreen','sectionScreen','loginModal'].forEach(id=>{
+    const el = document.getElementById(id);
+    if(el){ el.classList.remove('show'); el.style.display='none'; }
+  });
+  // Show app
   const ap = document.getElementById('app');
-  if(hs){ hs.classList.remove('show'); hs.style.display='none'; }
-  if(ss){ ss.classList.remove('show'); ss.style.display='none'; }
-  if(ap){ ap.style.display='flex'; }
+  if(ap){ ap.style.cssText='display:flex;'; }
   document.querySelectorAll('.nav-item').forEach(el=>el.classList.remove('active'));
   const mMap = {projects:'mnav-projects',calendar:'mnav-calendar',sales:'mnav-results',settings:'mnav-more',resumen:'mnav-more'};
-  const btnId = mMap[page] || 'mnav-projects';
-  const btn = document.getElementById(btnId);
+  const btn = document.getElementById(mMap[page]||'mnav-projects');
   if(btn) btn.classList.add('active');
   showPage(page);
 }
