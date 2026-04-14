@@ -3812,7 +3812,8 @@ function syncStatusUpdate(msg, color){
 // ---- Boot ----
 function bootNew(){
   load();
-  gsPullOnBoot();
+  // Solo subir al arrancar, no descargar (evita pisar datos locales)
+  gsPush();
   startAutoSync();
 
   const u=currentUser();
