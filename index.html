@@ -604,6 +604,9 @@ tbody tr:hover td{background:rgba(0,0,0,.02);}
     <button class="s-nav-item" id="snav-purchases" onclick="showSection('compras');sNavActive('purchases')">
       <span class="s-ico">🛒</span>Compras
     </button>
+    <button class="s-nav-item" id="snav-resumen" onclick="sNavGo('resumen')">
+      <span class="s-ico">📋</span>Resumen
+    </button>
     <button class="s-nav-item" id="snav-settings" onclick="sNavGo('settings')">
       <span class="s-ico">⚙️</span>Ajustes
     </button>
@@ -692,6 +695,14 @@ tbody tr:hover td{background:rgba(0,0,0,.02);}
       </div>
     </div>
 
+    <!-- PAGE: RESUMEN -->
+    <div class="page" id="page-resumen">
+      <div style="padding:16px 0 10px;">
+        <div class="sec-head"><div><h2>📋 Resumen</h2></div></div>
+        <div id="resumenContent"></div>
+      </div>
+    </div>
+
   </div>
 
   <!-- BOTTOM NAV (mobile) -->
@@ -719,24 +730,25 @@ tbody tr:hover td{background:rgba(0,0,0,.02);}
 
   <!-- DROPDOWN: Proyectos -->
   <div class="nav-dropdown" id="dd-projects">
-    <div class="nav-dd-item active" id="dd-proj-list" onclick="closeAllDropdowns();showPage('projects')"><span class="dd-ico">📁</span>Lista de proyectos</div>
+    <div class="nav-dd-item active" id="dd-proj-list" onclick="mNavGo('projects')"><span class="dd-ico">📁</span>Lista de proyectos</div>
     <div class="nav-dd-divider"></div>
-    <div class="nav-dd-item" id="dd-proj-tasks" onclick="closeAllDropdowns();showSection('tareas')"><span class="dd-ico">✅</span>Tareas</div>
-    <div class="nav-dd-item" id="dd-proj-inst" onclick="closeAllDropdowns();showSection('instalaciones')"><span class="dd-ico">🛠️</span>Instalaciones</div>
+    <div class="nav-dd-item" id="dd-proj-tasks" onclick="closeAllDropdowns();mShowSection('tareas')"><span class="dd-ico">✅</span>Tareas</div>
+    <div class="nav-dd-item" id="dd-proj-inst" onclick="closeAllDropdowns();mShowSection('instalaciones')"><span class="dd-ico">🛠️</span>Instalaciones</div>
   </div>
 
   <!-- DROPDOWN: Resultados -->
   <div class="nav-dropdown" id="dd-results">
-    <div class="nav-dd-item" id="dd-res-sales" onclick="closeAllDropdowns();showPage('sales')"><span class="dd-ico">📈</span>Ventas</div>
-    <div class="nav-dd-item" id="dd-res-be" onclick="closeAllDropdowns();showSection('costos')"><span class="dd-ico">💰</span>Costos</div>
+    <div class="nav-dd-item" id="dd-res-sales" onclick="mNavGo('sales')"><span class="dd-ico">📈</span>Ventas</div>
+    <div class="nav-dd-item" id="dd-res-be" onclick="closeAllDropdowns();mShowSection('costos')"><span class="dd-ico">💰</span>Costos</div>
   </div>
 
   <!-- DROPDOWN: Más -->
   <div class="nav-dropdown" id="dd-more">
-    <div class="nav-dd-item" onclick="closeAllDropdowns();showSection('cotizaciones')"><span class="dd-ico">🧾</span>Cotizaciones</div>
-    <div class="nav-dd-item" onclick="closeAllDropdowns();showSection('compras')"><span class="dd-ico">🛒</span>Compras</div>
+    <div class="nav-dd-item" onclick="mNavGo('resumen')"><span class="dd-ico">📋</span>Resumen diario/semanal</div>
+    <div class="nav-dd-item" onclick="closeAllDropdowns();mShowSection('cotizaciones')"><span class="dd-ico">🧾</span>Cotizaciones</div>
+    <div class="nav-dd-item" onclick="closeAllDropdowns();mShowSection('compras')"><span class="dd-ico">🛒</span>Compras</div>
     <div class="nav-dd-divider"></div>
-    <div class="nav-dd-item" onclick="closeAllDropdowns();showPage('settings')"><span class="dd-ico">⚙️</span>Ajustes</div>
+    <div class="nav-dd-item" onclick="mNavGo('settings')"><span class="dd-ico">⚙️</span>Ajustes</div>
     <div class="nav-dd-item" onclick="closeAllDropdowns();gsPush()"><span class="dd-ico">⬆</span>Subir a Sheets</div>
     <div class="nav-dd-item" onclick="closeAllDropdowns();exportJSON()"><span class="dd-ico">💾</span>Respaldo</div>
     <div class="nav-dd-divider"></div>
@@ -2529,7 +2541,34 @@ function buildQuotePDFHTML(p, q, extraQuotes, includeIVA){
     const qty = Number(cot.qty||1);
     const totalConQty = t.venta * qty;
     grandTotal += totalConQty;
-    rowsHTML += `<tr><td>${cotName}${qty>1?` <span style="color:#888;font-size:11px;">(x${qty})</span>`:""}</td><td style="text-align:right;font-weight:700;">$${money(totalConQty)}</td></tr>`;
+
+    // Section header per quote
+    if(allQuotes.length > 1){
+      rowsHTML += `<tr class="section-header"><td colspan="5">${cotName}${qty>1?` (x${qty})`:""}`;
+      rowsHTML += `<span style="float:right;font-weight:700;">$${money(totalConQty)}</span></td></tr>`;
+    }
+
+    // Products
+    (cot.products||[]).forEach(r=>{
+      const imp = Number(r.qty||0)*Number(r.unitPrice||0);
+      rowsHTML += `<tr><td>${escapeHTML(r.desc||r.matPick||"Producto")}</td><td style="text-align:right;">${Number(r.qty||0)}</td><td style="text-align:right;">$${money(r.unitPrice||0)}</td><td style="text-align:right;">$${money(imp)}</td><td></td></tr>`;
+    });
+
+    // Routes
+    (cot.routes||[]).forEach(r=>{
+      const imp = Number(r.hours||0)*Number(r.rate||0);
+      rowsHTML += `<tr><td style="color:#555;">${escapeHTML(r.routeName||"Mano de obra")} <span style="font-size:10px;color:#aaa;">${Number(r.hours||0)}h × $${money(r.rate||0)}/h</span></td><td style="text-align:right;">1</td><td style="text-align:right;">—</td><td style="text-align:right;">$${money(imp)}</td><td></td></tr>`;
+    });
+
+    // Extras
+    (cot.extras||[]).forEach(r=>{
+      rowsHTML += `<tr><td style="color:#555;">${escapeHTML(r.label||"Extra")}</td><td style="text-align:right;">1</td><td style="text-align:right;">—</td><td style="text-align:right;">$${money(r.amount||0)}</td><td></td></tr>`;
+    });
+
+    // Subtotal per quote if multiple
+    if(allQuotes.length > 1){
+      rowsHTML += `<tr style="background:#f8faff;"><td colspan="3" style="text-align:right;color:#1a3a6b;font-weight:700;">Subtotal ${cotName}</td><td style="text-align:right;font-weight:800;color:#1a3a6b;">$${money(totalConQty)}</td><td></td></tr>`;
+    }
   });
 
   const subtotal = grandTotal;
@@ -2638,8 +2677,11 @@ function buildQuotePDFHTML(p, q, extraQuotes, includeIVA){
     <table>
       <thead>
         <tr>
-          <th>Concepto</th>
-          <th style="width:140px; text-align:right;">Importe</th>
+          <th>Concepto / Material</th>
+          <th style="width:60px; text-align:right;">Cant.</th>
+          <th style="width:100px; text-align:right;">Precio unit.</th>
+          <th style="width:110px; text-align:right;">Importe</th>
+          <th style="width:10px;"></th>
         </tr>
       </thead>
       <tbody>
@@ -3157,6 +3199,7 @@ function showPage(name){
   if(name==="calendar") renderCalendarPage();
   if(name==="sales") renderSalesPage();
   if(name==="settings") renderSettingsPage();
+  if(name==="resumen") renderResumenPage();
 }
 
 function showHome(){
@@ -4140,6 +4183,15 @@ document.addEventListener("DOMContentLoaded", bootNew);
 
 // ── NEW NAV SYSTEM ──────────────────────────────────────────
 
+// Mobile-safe showSection: ensures app is visible first
+function mShowSection(section){
+  const hs=document.getElementById('homeScreen');
+  const ap=document.getElementById('app');
+  if(hs) hs.classList.remove('show');
+  if(ap) ap.style.display='';
+  showSection(section);
+}
+
 function sNavActive(key){
   document.querySelectorAll('.s-nav-item').forEach(el=>el.classList.remove('active'));
   const el = document.getElementById('snav-'+key);
@@ -4214,13 +4266,16 @@ function mNavToggle(key, e){
 }
 function mNavGo(page){
   closeAllDropdowns();
+  // Force app visible, hide home and section screens
+  const hs = document.getElementById('homeScreen');
+  const ss = document.getElementById('sectionScreen');
+  const ap = document.getElementById('app');
+  if(hs) hs.classList.remove('show');
+  if(ss) ss.classList.remove('show');
+  if(ap) ap.style.display = '';
   document.querySelectorAll('.nav-item').forEach(el=>el.classList.remove('active'));
   const btn = document.getElementById('mnav-'+page);
   if(btn) btn.classList.add('active');
-  // Make sure app is visible
-  document.getElementById('homeScreen').classList.remove('show');
-  document.getElementById('sectionScreen').classList.remove('show');
-  document.getElementById('app').style.display = '';
   showPage(page);
 }
 
@@ -4245,6 +4300,110 @@ buildTopbar = function(){
   if(sLogo) sLogo.innerHTML = logo ? '<img src="'+escapeAttr(logo)+'" style="width:100%;height:100%;object-fit:contain;">' : 'E';
   if(sName) sName.textContent = emp.nombre||"ESMA INDUSTRIAL";
 };
+
+
+// ── ESCAPE KEY = BACK ─────────────────────────────────────
+document.addEventListener('keydown', (e)=>{
+  if(e.key==='Escape'){ e.preventDefault(); _popNav(); }
+});
+
+// ── FIX _popNav: never go to homeScreen, stay in app ──────
+// Override _popNav to fix "goes back to home" bug
+const _origPopNav = _popNav;
+_popNav = function(){
+  if(_navStack.length <= 1){
+    // Instead of going home, go to projects
+    showPage('projects');
+    return;
+  }
+  _navStack.pop();
+  const prev = _navStack[_navStack.length-1];
+  _navStack.pop();
+  if(!prev){ showPage('projects'); return; }
+  if(prev.page==='project-detail'){ openProjectDetail(prev.extra.pid, prev.extra.tab); }
+  else if(prev.page==='quote-editor'){ const q=db.quotes.find(x=>x.id===prev.extra.qid); if(q) openQuoteEditorPage(q); else showPage('projects'); }
+  else{ showPage(prev.page); }
+};
+
+// ── RESUMEN DIARIO / SEMANAL ───────────────────────────────
+function renderResumenPage(){
+  const content = document.getElementById('resumenContent'); if(!content) return;
+  let mode = 'day'; // 'day' or 'week'
+
+  function render(){
+    const today = new Date(); today.setHours(0,0,0,0);
+    let dateStart, dateEnd, label;
+    if(mode==='day'){
+      dateStart = new Date(today); dateEnd = new Date(today);
+      label = 'Hoy — ' + today.toLocaleDateString('es-MX',{weekday:'long',day:'numeric',month:'long'});
+    } else {
+      // Monday to Sunday of current week
+      const dow = today.getDay(); // 0=sun
+      const diffMon = (dow===0)?-6:(1-dow);
+      dateStart = new Date(today); dateStart.setDate(today.getDate()+diffMon);
+      dateEnd = new Date(dateStart); dateEnd.setDate(dateStart.getDate()+6);
+      label = dateStart.toLocaleDateString('es-MX',{day:'numeric',month:'short'}) + ' – ' + dateEnd.toLocaleDateString('es-MX',{day:'numeric',month:'short',year:'numeric'});
+    }
+
+    function inRange(dateStr){
+      if(!dateStr) return false;
+      const d = new Date(dateStr+'T00:00:00');
+      return d >= dateStart && d <= dateEnd;
+    }
+
+    // Tareas
+    const tareas = (db.tasks||[]).filter(t=> !t.done && inRange(t.date));
+    // Instalaciones
+    const installs = (db.installs||[]).filter(i=> i.status!=='done' && inRange(i.date||i.scheduledDate));
+    // Compras
+    const compras = (db.purchases||[]).filter(c=> c.status!=='received' && inRange(c.date||c.requestedDate));
+
+    const total = tareas.length + installs.length + compras.length;
+
+    const sectionHtml = (title, ico, items, renderItem) => items.length ? `
+      <div class="card" style="margin-bottom:10px;">
+        <div class="card-header" style="margin-bottom:10px;">
+          <div class="card-title">${ico} ${title} <span style="font-size:12px;color:var(--muted);font-weight:400;">(${items.length})</span></div>
+        </div>
+        ${items.map(renderItem).join('')}
+      </div>` : '';
+
+    const itemRow = (title, sub, status, color) => `
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;padding:9px 0;border-bottom:1px solid var(--border);gap:10px;">
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHTML(title)}</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px;">${escapeHTML(sub||'')}</div>
+        </div>
+        ${status?`<span class="badge" style="background:${color||'var(--bg3)'};color:var(--text);border:none;font-size:10px;flex-shrink:0;">${escapeHTML(status)}</span>`:''}
+      </div>`;
+
+    content.innerHTML = `
+      <div style="display:flex;gap:8px;margin-bottom:16px;">
+        <button class="btn${mode==='day'?' primary':''}" id="rBtn-day" style="flex:1;justify-content:center;">📅 Hoy</button>
+        <button class="btn${mode==='week'?' primary':''}" id="rBtn-week" style="flex:1;justify-content:center;">📆 Esta semana</button>
+      </div>
+      <div style="font-size:13px;color:var(--muted);margin-bottom:14px;text-align:center;">${label}</div>
+
+      ${total===0 ? `<div class="empty"><div class="ico">✅</div><h3>Todo al día</h3><p>No hay pendientes para ${mode==='day'?'hoy':'esta semana'}.</p></div>` : ''}
+
+      ${sectionHtml('Tareas', '✅', tareas, t=>
+        itemRow(t.title||'Sin título', projectName(t.projectId)+(t.date?' · '+t.date:''), t.priority||'', t.priority==='alta'?'rgba(239,68,68,.15)':t.priority==='media'?'rgba(217,119,6,.15)':'var(--bg3)')
+      )}
+
+      ${sectionHtml('Instalaciones', '🛠️', installs, i=>
+        itemRow(i.title||i.name||'Instalación', projectName(i.projectId)+(i.date||i.scheduledDate?' · '+(i.date||i.scheduledDate):''), i.status||'pendiente', 'rgba(59,130,246,.15)')
+      )}
+
+      ${sectionHtml('Compras', '🛒', compras, c=>
+        itemRow(c.title||c.item||'Compra', projectName(c.projectId)+(c.date||c.requestedDate?' · '+(c.date||c.requestedDate):''), c.status||'pendiente', 'rgba(217,119,6,.15)')
+      )}
+    `;
+
+    document.getElementById('rBtn-day').addEventListener('click',()=>{ mode='day'; render(); });
+    document.getElementById('rBtn-week').addEventListener('click',()=>{ mode='week'; render(); });
+  }
+  render();
+}
 
 </script>
 </body>
