@@ -743,7 +743,7 @@ async function gsPush(){
     if(dbToSync.settings && dbToSync.settings.empresa)
       dbToSync.settings.empresa.logoB64 = localStorage.getItem("esma_logo_b64") || "";
     dbToSync.projects.forEach(p=>{ p.photos = (p.photos||[]).filter(ph=>ph.url && !ph.data); });
-    const payload = JSON.stringify({action:"save", data:dbToSync});
+    const payload = JSON.stringify({action:"save", data:dbToSync, savedAt:new Date().toISOString()});
     const res = await fetch(GS_URL, {method:"POST", headers:{"Content-Type":"text/plain"}, body:payload});
     const result = await res.json();
     if(!result.ok) throw new Error(result.error||"Error al guardar");
