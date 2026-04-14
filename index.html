@@ -3685,7 +3685,7 @@ function renderSettingsPage(){
   document.getElementById("btnSaveGsUrl").addEventListener("click",()=>{ const val=(document.getElementById("gsUrlInput")?.value||"").trim(); if(!val){ alert("Pega la URL"); return; } GS_URL=val; localStorage.setItem(GS_KEY,GS_URL); alert("\u2705 URL guardada"); });
   document.getElementById("btnGsPush").addEventListener("click",gsPush);
   document.getElementById("btnGsPull").addEventListener("click",gsPullOnBoot);
-  document.getElementById("btnResetSync").addEventListener("click",async()=>{ if(!confirm("\u00BFBorrar datos locales y descargar desde Sheets?")) return; localStorage.removeItem(STORAGE_KEY); db=defaultDB(); await gsPullOnBoot(); });
+  document.getElementById("btnResetSync").addEventListener("click",async()=>{ if(!confirm("\u00BFDescargar datos de Sheets y reemplazar los locales?")) return; await gsPullOnBoot(); });
   document.getElementById("btnSaveFolio").addEventListener("click",()=>{ const val=Number(document.getElementById("folioCounterInput").value||0); db.settings.folioCounter=val; save(); alert("\u2705 Proximo folio: "+String(val+1).padStart(4,"0")); });
   document.getElementById("btnBackup").addEventListener("click",exportJSON);
   document.getElementById("btnRestore").addEventListener("click",()=>document.getElementById("restoreFile").click());
@@ -3812,8 +3812,6 @@ function syncStatusUpdate(msg, color){
 // ---- Boot ----
 function bootNew(){
   load();
-  // Solo subir al arrancar, no descargar (evita pisar datos locales)
-  gsPush();
   startAutoSync();
 
   const u=currentUser();
