@@ -707,7 +707,7 @@ tbody tr:hover td{background:rgba(0,0,0,.02);}
 
   <!-- BOTTOM NAV (mobile) -->
   <nav class="bottomnav">
-    <button class="nav-item active" id="mnav-projects" onclick="mNavToggle('projects',event)">
+    <button class="nav-item active" id="mnav-projects" onclick="mNavGo('projects')">
       <div class="nav-ico-wrap"><span class="nav-ico">📁</span></div>
       <span class="nav-lbl">Proyectos</span>
     </button>
@@ -715,7 +715,7 @@ tbody tr:hover td{background:rgba(0,0,0,.02);}
       <div class="nav-ico-wrap"><span class="nav-ico">📅</span></div>
       <span class="nav-lbl">Calendario</span>
     </button>
-    <button class="nav-item" id="mnav-results" onclick="mNavToggle('results',event)">
+    <button class="nav-item" id="mnav-results" onclick="mNavGo('sales')">
       <div class="nav-ico-wrap"><span class="nav-ico">📊</span></div>
       <span class="nav-lbl">Resultados</span>
     </button>
@@ -3177,7 +3177,9 @@ function showPage(name){
 }
 
 function showHome(){
-  document.getElementById("homeScreen").classList.add("show");
+  const hs = document.getElementById("homeScreen");
+  hs.classList.add("show");
+  hs.style.display = "";
   document.getElementById("app").style.display = "none";
   const emp = (db&&db.settings&&db.settings.empresa)||{};
   const ht = document.getElementById("homeTitle"); if(ht) ht.textContent = emp.nombre||"ESMA INDUSTRIAL";
@@ -3900,7 +3902,18 @@ function renderSalesPage(){
 function renderSettingsPage(){
   const content=document.getElementById("settingsContent"); if(!content) return;
   const emp=db.settings.empresa||{};
+
+  // Count local photos
+  let localPhotoCount = 0;
+  db.projects.forEach(p=>{ (p.photos||[]).forEach(ph=>{ if(!ph.url && ph.data) localPhotoCount++; }); });
+
   content.innerHTML=`
+    ${localPhotoCount>0 ? `<div class="card" style="margin-bottom:10px;background:rgba(217,119,6,.06);border-color:rgba(217,119,6,.3);">
+      <div class="card-header"><div class="card-title">⚠️ Fotos solo locales</div></div>
+      <div style="font-size:13px;color:var(--muted);margin-bottom:12px;">Tienes <b style="color:var(--text);">${localPhotoCount} foto${localPhotoCount!==1?"s":""}</b> guardadas solo en este dispositivo. Súbelas a ImgBB para verlas desde cualquier lugar.</div>
+      <button class="btn primary" id="btnMigratePhotos">⬆ Subir fotos a ImgBB (${localPhotoCount})</button>
+      <div id="migrateStatus" style="font-size:12px;color:var(--muted);margin-top:8px;display:none;"></div>
+    </div>` : ""}
     <div class="card" style="margin-bottom:10px;">
       <div class="card-header"><div class="card-title">\u{1F3E2} Mi empresa</div></div>
       <div class="field-label">Nombre</div><div class="field"><input id="empNombre" value="${escapeAttr(emp.nombre||"ESMA INDUSTRIAL")}"></div>
@@ -3959,6 +3972,44 @@ function renderSettingsPage(){
   document.getElementById("btnAddMat").addEventListener("click",()=>showAddMaterialModal("",()=>renderMatList()));
   document.getElementById("btnAddRoute2").addEventListener("click",showAddRouteSheet);
   renderMatList(); renderRouteList();
+
+  // Migrate local photos to ImgBB
+  const migrateBtn = document.getElementById("btnMigratePhotos");
+  if(migrateBtn){
+    migrateBtn.addEventListener("click", async ()=>{
+      migrateBtn.disabled = true;
+      migrateBtn.textContent = "Subiendo...";
+      const statusEl = document.getElementById("migrateStatus");
+      if(statusEl) statusEl.style.display = "";
+      let uploaded = 0, failed = 0, total = 0;
+
+      for(const p of db.projects){
+        const photos = p.photos || [];
+        for(let i = 0; i < photos.length; i++){
+          const ph = photos[i];
+          if(!ph.url && ph.data){
+            total++;
+            if(statusEl) statusEl.textContent = `Subiendo foto ${total}...`;
+            try{
+              const url = await uploadToImgbb(ph.data);
+              photos[i] = {name: ph.name||"foto", url};
+              uploaded++;
+            } catch(err){
+              failed++;
+              console.error("Error subiendo foto:", err);
+            }
+          }
+        }
+        p.photos = photos;
+        savePhotos(p.id, photos);
+      }
+
+      save();
+      if(statusEl) statusEl.textContent = `✅ ${uploaded} foto${uploaded!==1?"s":""} subida${uploaded!==1?"s":""}${failed>0?" · ⚠️ "+failed+" fallaron":""}.`;
+      migrateBtn.textContent = "✅ Completado";
+      setTimeout(()=>renderSettingsPage(), 1500);
+    });
+  }
 }
 
 function renderMatList(){
@@ -4248,11 +4299,13 @@ function mNavGo(page){
   const hs = document.getElementById('homeScreen');
   const ss = document.getElementById('sectionScreen');
   const ap = document.getElementById('app');
-  if(hs) hs.classList.remove('show');
-  if(ss) ss.classList.remove('show');
-  if(ap) ap.style.display = '';
+  if(hs){ hs.classList.remove('show'); hs.style.display='none'; }
+  if(ss){ ss.classList.remove('show'); ss.style.display='none'; }
+  if(ap){ ap.style.display='flex'; }
   document.querySelectorAll('.nav-item').forEach(el=>el.classList.remove('active'));
-  const btn = document.getElementById('mnav-'+page);
+  const mMap = {projects:'mnav-projects',calendar:'mnav-calendar',sales:'mnav-results',settings:'mnav-more',resumen:'mnav-more'};
+  const btnId = mMap[page] || 'mnav-projects';
+  const btn = document.getElementById(btnId);
   if(btn) btn.classList.add('active');
   showPage(page);
 }
