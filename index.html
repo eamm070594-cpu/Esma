@@ -2541,34 +2541,11 @@ function buildQuotePDFHTML(p, q, extraQuotes, includeIVA){
     const qty = Number(cot.qty||1);
     const totalConQty = t.venta * qty;
     grandTotal += totalConQty;
-
-    // Section header per quote
-    if(allQuotes.length > 1){
-      rowsHTML += `<tr class="section-header"><td colspan="5">${cotName}${qty>1?` (x${qty})`:""}`;
-      rowsHTML += `<span style="float:right;font-weight:700;">$${money(totalConQty)}</span></td></tr>`;
-    }
-
-    // Products
-    (cot.products||[]).forEach(r=>{
-      const imp = Number(r.qty||0)*Number(r.unitPrice||0);
-      rowsHTML += `<tr><td>${escapeHTML(r.desc||r.matPick||"Producto")}</td><td style="text-align:right;">${Number(r.qty||0)}</td><td style="text-align:right;">$${money(r.unitPrice||0)}</td><td style="text-align:right;">$${money(imp)}</td><td></td></tr>`;
-    });
-
-    // Routes
-    (cot.routes||[]).forEach(r=>{
-      const imp = Number(r.hours||0)*Number(r.rate||0);
-      rowsHTML += `<tr><td style="color:#555;">${escapeHTML(r.routeName||"Mano de obra")} <span style="font-size:10px;color:#aaa;">${Number(r.hours||0)}h × $${money(r.rate||0)}/h</span></td><td style="text-align:right;">1</td><td style="text-align:right;">—</td><td style="text-align:right;">$${money(imp)}</td><td></td></tr>`;
-    });
-
-    // Extras
-    (cot.extras||[]).forEach(r=>{
-      rowsHTML += `<tr><td style="color:#555;">${escapeHTML(r.label||"Extra")}</td><td style="text-align:right;">1</td><td style="text-align:right;">—</td><td style="text-align:right;">$${money(r.amount||0)}</td><td></td></tr>`;
-    });
-
-    // Subtotal per quote if multiple
-    if(allQuotes.length > 1){
-      rowsHTML += `<tr style="background:#f8faff;"><td colspan="3" style="text-align:right;color:#1a3a6b;font-weight:700;">Subtotal ${cotName}</td><td style="text-align:right;font-weight:800;color:#1a3a6b;">$${money(totalConQty)}</td><td></td></tr>`;
-    }
+    // Clean client-facing row: just the concept name and price
+    rowsHTML += `<tr>
+      <td>${cotName}${qty>1?` <span style="color:#888;font-size:11px;">(x${qty})</span>`:""}</td>
+      <td style="text-align:right;font-weight:700;">$${money(totalConQty)}</td>
+    </tr>`;
   });
 
   const subtotal = grandTotal;
@@ -2677,11 +2654,8 @@ function buildQuotePDFHTML(p, q, extraQuotes, includeIVA){
     <table>
       <thead>
         <tr>
-          <th>Concepto / Material</th>
-          <th style="width:60px; text-align:right;">Cant.</th>
-          <th style="width:100px; text-align:right;">Precio unit.</th>
-          <th style="width:110px; text-align:right;">Importe</th>
-          <th style="width:10px;"></th>
+          <th>Concepto</th>
+          <th style="width:160px; text-align:right;">Importe</th>
         </tr>
       </thead>
       <tbody>
@@ -3636,11 +3610,7 @@ function openQuoteEditorPage(q){
   document.getElementById("qNameInput").addEventListener("blur",()=>{ q.name=document.getElementById("qNameInput").value.trim()||"Cotizacion"; save(); });
   document.getElementById("btnToggleAuth").addEventListener("click",()=>{ q.status=q.status==="authorized"?"draft":"authorized"; save(); renderProjectsPage(); openQuoteEditorPage(q); });
   document.getElementById("btnQuotePDF2").addEventListener("click",()=>{
-    const proj=db.projects.find(x=>x.id===q.projectId)||{name:""};
-    const iframe=document.createElement("iframe"); iframe.style.cssText="position:fixed;right:0;bottom:0;width:0;height:0;border:0;"; document.body.appendChild(iframe);
-    const doc=iframe.contentWindow.document; doc.open(); doc.write(buildQuotePDFHTML(proj,q)); doc.close();
-    iframe.onload=()=>{ try{ iframe.contentWindow.focus(); iframe.contentWindow.print(); } finally { setTimeout(()=>iframe.remove(),1000); }};
-    setTimeout(()=>{ try{ iframe.contentWindow.focus(); iframe.contentWindow.print(); }catch(e){} },450);
+    openPDFSelector(q.projectId);
   });
 
   function renderLines(){
@@ -4039,10 +4009,18 @@ function _pushNav(page, extra){
   _updateBackBtn();
 }
 function _popNav(){
+  if(_navStack.length <= 1){ showPage("projects"); return; }
   _navStack.pop();
   const prev = _navStack[_navStack.length-1];
   _navStack.pop(); // will be re-pushed by showPage/openProjectDetail
   if(!prev){ showPage("projects"); return; }
+  // Make sure app is visible
+  const hs=document.getElementById("homeScreen");
+  const ss=document.getElementById("sectionScreen");
+  const ap=document.getElementById("app");
+  if(hs) hs.classList.remove("show");
+  if(ss) ss.classList.remove("show");
+  if(ap) ap.style.display="";
   if(prev.page==="project-detail"){ openProjectDetail(prev.extra.pid, prev.extra.tab); }
   else if(prev.page==="quote-editor"){ const q=db.quotes.find(x=>x.id===prev.extra.qid); if(q) openQuoteEditorPage(q); else showPage("projects"); }
   else showPage(prev.page);
@@ -4304,26 +4282,68 @@ buildTopbar = function(){
 
 // ── ESCAPE KEY = BACK ─────────────────────────────────────
 document.addEventListener('keydown', (e)=>{
-  if(e.key==='Escape'){ e.preventDefault(); _popNav(); }
+  if(e.key==='Escape'){
+    e.preventDefault();
+    // Close any open sheet first
+    const overlay = document.getElementById('sheetOverlay');
+    if(overlay && overlay.classList.contains('open')){ closeSheet(); return; }
+    // Close dropdowns
+    closeAllDropdowns();
+    _popNav();
+  }
 });
 
-// ── FIX _popNav: never go to homeScreen, stay in app ──────
-// Override _popNav to fix "goes back to home" bug
-const _origPopNav = _popNav;
-_popNav = function(){
-  if(_navStack.length <= 1){
-    // Instead of going home, go to projects
-    showPage('projects');
-    return;
-  }
-  _navStack.pop();
-  const prev = _navStack[_navStack.length-1];
-  _navStack.pop();
-  if(!prev){ showPage('projects'); return; }
-  if(prev.page==='project-detail'){ openProjectDetail(prev.extra.pid, prev.extra.tab); }
-  else if(prev.page==='quote-editor'){ const q=db.quotes.find(x=>x.id===prev.extra.qid); if(q) openQuoteEditorPage(q); else showPage('projects'); }
-  else{ showPage(prev.page); }
-};
+// ── PDF SELECTOR ───────────────────────────────────────────
+function openPDFSelector(projectId){
+  const proj = db.projects.find(x=>x.id===projectId)||{name:"Proyecto"};
+  const quotes = db.quotes.filter(x=>x.projectId===projectId);
+  if(!quotes.length){ alert("Este proyecto no tiene cotizaciones."); return; }
+
+  const quotesHtml = quotes.map(q=>{
+    const t = quoteSellTotals(q);
+    return `<label style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);cursor:pointer;">
+      <input type="checkbox" data-pdf-q="${q.id}" checked style="width:18px;height:18px;accent-color:var(--accent);flex-shrink:0;">
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:13px;font-weight:700;">${escapeHTML(q.name||"Cotización")}</div>
+        <div style="font-size:11px;color:var(--muted);">${q.status==="authorized"?'✅ Autorizada':'📝 Borrador'}</div>
+      </div>
+      <div style="font-size:13px;font-weight:800;color:var(--accent2);">$${money(t.venta)}</div>
+    </label>`;
+  }).join("");
+
+  openSheet("Generar PDF — "+escapeHTML(proj.name), `
+    <div style="font-size:12px;color:var(--muted);margin-bottom:10px;">Selecciona las cotizaciones a incluir en el PDF:</div>
+    <div id="pdfQuoteList">${quotesHtml}</div>
+    <div style="margin-top:16px;padding:14px;background:var(--bg3);border-radius:12px;">
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px;font-weight:700;">
+        <input type="checkbox" id="pdfIVA" style="width:18px;height:18px;accent-color:var(--accent);">
+        Incluir IVA (16%)
+      </label>
+    </div>
+  `, [
+    {label:"Cancelar", cls:"btn", action: closeSheet},
+    {label:"🖨 Generar PDF", cls:"btn primary", action: ()=>{
+      const selected = [...document.querySelectorAll("input[data-pdf-q]:checked")].map(el=>el.dataset.pdfQ);
+      if(!selected.length){ alert("Selecciona al menos una cotización."); return; }
+      const includeIVA = document.getElementById("pdfIVA").checked;
+      const selQuotes = selected.map(id=>db.quotes.find(x=>x.id===id)).filter(Boolean);
+      closeSheet();
+      setTimeout(()=>{
+        const iframe=document.createElement("iframe");
+        iframe.style.cssText="position:fixed;right:0;bottom:0;width:0;height:0;border:0;";
+        document.body.appendChild(iframe);
+        const doc=iframe.contentWindow.document;
+        doc.open();
+        doc.write(buildQuotePDFHTML(proj, selQuotes[0], selQuotes.slice(1), includeIVA));
+        doc.close();
+        iframe.onload=()=>{ try{ iframe.contentWindow.focus(); iframe.contentWindow.print(); } finally { setTimeout(()=>iframe.remove(),1000); }};
+        setTimeout(()=>{ try{ iframe.contentWindow.focus(); iframe.contentWindow.print(); }catch(e){} },450);
+      }, 300);
+    }}
+  ]);
+}
+
+// _popNav fixed directly in original function
 
 // ── RESUMEN DIARIO / SEMANAL ───────────────────────────────
 function renderResumenPage(){
