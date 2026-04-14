@@ -708,8 +708,12 @@ function load(){
 // ============================================================
 const GS_KEY = "esma_gs_url";
 const DEFAULT_GS_URL = "https://script.google.com/macros/s/AKfycbyn9__H4FS_tp1lUKrdPTuKGhIwats7M3iNT33raDR1M0qCZqwUaKYCJTtFGpX6M7jmTQ/exec";
-let GS_URL = localStorage.getItem(GS_KEY) || DEFAULT_GS_URL;
-let _syncInProgress = false;
+// Fix any corrupted GS_URL saved in localStorage
+(function(){ const s = localStorage.getItem(GS_KEY); if(s) localStorage.setItem(GS_KEY, s.replace(/['"]/g,'')); })();
+let GS_URL = (localStorage.getItem(GS_KEY) || DEFAULT_GS_URL).replace(/['"]/g,'');
+let _pushInProgress = false;
+let _pullInProgress = false;
+let _syncInProgress = false; // legacy compat
 let _lastSaveTime = 0;
 
 function save(){
@@ -731,8 +735,8 @@ function syncStatusUpdate(msg, color){
 }
 
 async function gsPush(){
-  if(!GS_URL || _syncInProgress) return;
-  _syncInProgress = true;
+  if(!GS_URL || _pushInProgress) return;
+  _pushInProgress = true; _syncInProgress = true;
   syncStatusUpdate("Sincronizando...", "orange");
   try {
     const dbToSync = JSON.parse(JSON.stringify(db));
@@ -740,16 +744,19 @@ async function gsPush(){
       dbToSync.settings.empresa.logoB64 = localStorage.getItem("esma_logo_b64") || "";
     dbToSync.projects.forEach(p=>{ p.photos = (p.photos||[]).filter(ph=>ph.url && !ph.data); });
     const payload = JSON.stringify({action:"save", data:dbToSync});
-    await fetch(GS_URL, {method:"POST", mode:"no-cors", headers:{"Content-Type":"text/plain"}, body:payload});
+    const res = await fetch(GS_URL, {method:"POST", headers:{"Content-Type":"text/plain"}, body:payload});
+    const result = await res.json();
+    if(!result.ok) throw new Error(result.error||"Error al guardar");
     syncStatusUpdate("\u2713 " + new Date().toLocaleTimeString("es-MX",{hour:"2-digit",minute:"2-digit"}), "green");
   } catch(e) {
     syncStatusUpdate("\u26A0 Sin conexi\u00F3n", "orange");
-  } finally { _syncInProgress = false; }
+    console.error("gsPush error:", e);
+  } finally { _pushInProgress = false; _syncInProgress = false; }
 }
 
 async function gsPullOnBoot(){
-  if(!GS_URL) return;
-  _syncInProgress = true;
+  if(!GS_URL || _pullInProgress) return;
+  _pullInProgress = true; _syncInProgress = true;
   syncStatusUpdate("Descargando...", "orange");
   try {
     const res = await fetch(GS_URL + "?action=load");
@@ -764,9 +771,7 @@ async function gsPullOnBoot(){
       await gsPush();
       return;
     } else { throw new Error(json.error||"Error"); }
-  } catch(e) {
-    syncStatusUpdate("\u26A0 Error al descargar", "orange");
-  } finally { _syncInProgress = false; }
+  } finally { _pullInProgress = false; _syncInProgress = false; }
 }
 
 function applyRemoteData(data){
