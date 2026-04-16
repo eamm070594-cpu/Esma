@@ -1320,7 +1320,7 @@ function renderQuotes(p){
     <div class="card" style="box-shadow:none;">
       <div class="pad">
         <table class="table">
-          <thead><tr><th>Fecha</th><th>Estatus</th><th style="text-align:right;">Total</th><th style="width:260px; text-align:right;">Acciones</th></tr></thead>
+          <thead><tr><th>Fecha</th><th>Estatus</th><th style="text-align:right;">Total</th><th style="width:160px; text-align:right;">Acciones</th></tr></thead>
           <tbody>
             ${quotes.length ? quotes.map(q=>`
               <tr>
@@ -1329,7 +1329,6 @@ function renderQuotes(p){
                 <td style="text-align:right;"><b>$${money(quoteSellTotals(q).venta)}</b></td>
                 <td style="text-align:right;">
                   <button class="btn small" data-act="edit" data-id="${q.id}">Editar</button>
-                  <button class="btn small" data-act="dupQuote" data-id="${q.id}">Duplicar</button>
                   <button class="btn small ${q.status==="authorized"?"danger":""}" data-act="toggle" data-id="${q.id}">${q.status==="authorized"?"Desautorizar":"Autorizar"}</button>
                   <button class="btn small danger" data-act="delQuote" data-id="${q.id}">Eliminar</button>
                 </td>
@@ -1344,7 +1343,6 @@ function renderQuotes(p){
   $("mainContent").querySelectorAll("button[data-act]").forEach(b=>on(b,"click", ()=>{
     const q=db.quotes.find(x=>x.id===b.dataset.id); if(!q) return;
     if(b.dataset.act==="edit") openQuoteEditor(q);
-    if(b.dataset.act==="dupQuote"){ const copy=duplicateQuote(q); renderProjectsList(); if(copy) openQuoteEditor(copy); }
     if(b.dataset.act==="toggle"){ q.status=(q.status==="authorized")?"draft":"authorized"; save(); renderProjectsList(); renderMain(); }
     if(b.dataset.act==="delQuote"){ if(!confirm("¿Eliminar esta cotización?")) return; db.quotes=db.quotes.filter(x=>x.id!==q.id); save(); renderProjectsList(); renderMain(); }
   }));
@@ -1513,27 +1511,6 @@ function createQuote(projectId){
   const folio = String(db.settings.folioCounter).padStart(4,"0");
   const q={id:uid(), projectId, code: folio, name:"Cotización "+folio, qty:1, status:"draft", saleType:"manufactured", marginPct:25, createdAt:todayISO(), products:[], routes:[], extras:[]};
   db.quotes.unshift(q); save(); return q;
-}
-
-function duplicateQuote(sourceQuote){
-  if(!sourceQuote) return null;
-  const copy = createQuote(sourceQuote.projectId);
-  const cloneRows = (rows)=>(rows||[]).map(row=>{
-    const cloned = JSON.parse(JSON.stringify(row));
-    cloned.id = uid();
-    return cloned;
-  });
-  const baseName = String(sourceQuote.name || ("Cotización " + (sourceQuote.code||""))).trim();
-  copy.name = baseName ? (baseName + " - copia") : ("Cotización " + copy.code + " - copia");
-  copy.qty = Math.max(1, Number(sourceQuote.qty||1));
-  copy.saleType = sourceQuote.saleType || "manufactured";
-  copy.marginPct = Number(sourceQuote.marginPct ?? 25);
-  copy.status = "draft";
-  copy.products = cloneRows(sourceQuote.products);
-  copy.routes = cloneRows(sourceQuote.routes);
-  copy.extras = cloneRows(sourceQuote.extras);
-  save();
-  return copy;
 }
 function routeByName(name){ return (db.settings.routeDB||[]).find(r=>r.name===name)||null; }
 function materialByDesc(desc){ return (db.settings.materialDB||[]).find(m=>(m.desc||"")===desc)||null; }
@@ -2935,12 +2912,9 @@ function renderSecCotizaciones(filtersEl, contentEl, addBtn){
           <div class="si-title"><span class="status-dot ${isAuth?"auth":"pending"}"></span>${escapeHTML(q.name||"Cotización")}</div>
           <div class="si-meta">📁 ${escapeHTML(pname)} · ${isAuth?"<b style='color:#14532d;'>Autorizada</b>":"Borrador"} · 📅 ${q.createdAt||"—"}</div>
         </div>
-        <div class="si-right" style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;">
+        <div class="si-right">
           <b style="font-size:14px;">$${money(t.venta)}</b>
-          <div style="display:flex;gap:6px;">
-            <button class="btn small" data-qid="${q.id}" data-pid="${q.projectId}">Abrir</button>
-            <button class="btn small" data-dup-qid="${q.id}">Duplicar</button>
-          </div>
+          <button class="btn small" data-qid="${q.id}" data-pid="${q.projectId}">Abrir</button>
         </div>
       </div>`;
     }).join("");
@@ -2953,18 +2927,6 @@ function renderSecCotizaciones(filtersEl, contentEl, addBtn){
         renderProjectsList();
         renderMain();
         setTimeout(()=>openQuoteEditor(q), 50);
-      });
-    });
-    contentEl.querySelectorAll("button[data-dup-qid]").forEach(b=>{
-      b.addEventListener("click",()=>{
-        const q = db.quotes.find(x=>x.id===b.dataset.dupQid); if(!q) return;
-        const copy = duplicateQuote(q);
-        showApp();
-        selectedProjectId = q.projectId;
-        mainTab = "quotes";
-        renderProjectsList();
-        renderMain();
-        if(copy) setTimeout(()=>openQuoteEditor(copy), 50);
       });
     });
   }
@@ -3280,7 +3242,7 @@ function _renderSecCotizaciones(filtersEl, contentEl){
     let items=[...db.quotes].sort((a,b)=>String(b.createdAt||"").localeCompare(String(a.createdAt||"")));
     if(filter==="authorized") items=items.filter(x=>x.status==="authorized");
     if(filter==="draft") items=items.filter(x=>x.status!=="authorized");
-    if(!items.length){ contentEl.innerHTML='<div class="empty"><div class="ico">🧾</div><h3>Sin cotizaciones</h3></div>'; return; }
+    if(!items.length){ contentEl.innerHTML='<div class="empty"><div class="ico">\u{1F9FE}</div><h3>Sin cotizaciones</h3></div>'; return; }
 
     const toolbarHtml = `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;gap:8px;flex-wrap:wrap;">
       <button class="btn small" id="btnToggleSelect" style="gap:6px;">${selectMode?"✕ Cancelar":"☑ Seleccionar para PDF"}</button>
@@ -3298,19 +3260,22 @@ function _renderSecCotizaciones(filtersEl, contentEl){
         </div>
         <div class="si-right" style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;">
           <span style="font-size:14px;font-weight:900;">$${money(t.venta)}</span>
-          ${!selectMode ? `<div style="display:flex;gap:6px;"><button class="btn small" data-open-qid="${q.id}" data-open-pid="${q.projectId}">Abrir</button><button class="btn small" data-dup-q="${q.id}">Duplicar</button></div>` : ""}
+          ${!selectMode ? `<button class="btn small" data-open-qid="${q.id}" data-open-pid="${q.projectId}">Abrir</button>` : ""}
         </div>
       </div>`;
     }).join("");
 
+    // Toggle select mode
     document.getElementById("btnToggleSelect").addEventListener("click",()=>{
       selectMode=!selectMode; selectedIds.clear(); renderList();
     });
 
+    // Multi PDF button
     const pdfBtn = document.getElementById("btnMultiPDF");
     if(pdfBtn) pdfBtn.addEventListener("click",()=>{
       const selected = [...selectedIds].map(id=>db.quotes.find(x=>x.id===id)).filter(Boolean);
       if(!selected.length) return;
+      // Group by project for PDF — use first quote's project
       const firstQ = selected[0];
       const proj = db.projects.find(x=>x.id===firstQ.projectId)||{name:"Cotizaciones"};
       const iframe=document.createElement("iframe"); iframe.style.cssText="position:fixed;right:0;bottom:0;width:0;height:0;border:0;"; document.body.appendChild(iframe);
@@ -3319,6 +3284,7 @@ function _renderSecCotizaciones(filtersEl, contentEl){
       setTimeout(()=>{ try{ iframe.contentWindow.focus(); iframe.contentWindow.print(); }catch(e){} },450);
     });
 
+    // Checkboxes
     contentEl.querySelectorAll("input[data-chk]").forEach(chk=>{
       chk.addEventListener("change",()=>{
         if(chk.checked) selectedIds.add(chk.dataset.chk);
@@ -3327,21 +3293,13 @@ function _renderSecCotizaciones(filtersEl, contentEl){
       });
     });
 
+    // Open quote (only when not in select mode)
     contentEl.querySelectorAll("[data-open-qid]").forEach(b=>{
       b.addEventListener("click",()=>{
         if(selectMode) return;
         const q=db.quotes.find(x=>x.id===b.dataset.openQid); if(!q) return;
         showApp(); openProjectDetail(b.dataset.openPid,"quotes");
         setTimeout(()=>openQuoteEditorPage(q),100);
-      });
-    });
-
-    contentEl.querySelectorAll("button[data-dup-q]").forEach(btn=>{
-      btn.addEventListener("click",()=>{
-        const q=db.quotes.find(x=>x.id===btn.dataset.dupQ); if(!q) return;
-        const copy = duplicateQuote(q);
-        showApp(); openProjectDetail(q.projectId,"quotes");
-        if(copy) setTimeout(()=>openQuoteEditorPage(copy),100);
       });
     });
   }
@@ -3353,7 +3311,6 @@ function _renderSecCotizaciones(filtersEl, contentEl){
   }));
   renderList();
 }
-
 
 function _renderSecTareas(filtersEl, contentEl){
   if(filtersEl) filtersEl.innerHTML='<button class="tab active" data-tf="all">Todas</button><button class="tab" data-tf="pending">Pendientes</button><button class="tab" data-tf="done">Completadas</button>';
@@ -3508,18 +3465,17 @@ function renderDetailQuotes(p, content){
   content.innerHTML=`
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
       <span style="font-size:13px;color:var(--muted);">${quotes.length} cotizacion${quotes.length!==1?"es":""}</span>
-      <button class="btn primary small" id="btnAddQuote">＋ Nueva</button>
+      <button class="btn primary small" id="btnAddQuote">\uFF0B Nueva</button>
     </div>
     ${quotes.length?quotes.map(q=>{
       const t=quoteSellTotals(q); const isAuth=q.status==="authorized";
-      return `<div class="card" style="margin-bottom:10px;"><div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;"><div style="flex:1;min-width:0;"><div style="font-size:15px;font-weight:800;">${escapeHTML(q.name||"Cotizacion")}</div><div style="font-size:12px;color:var(--muted);margin-top:3px;">Folio: ${escapeHTML((q.code||q.id.slice(0,8)).toUpperCase())} · ${q.createdAt||"---"}</div></div><div style="text-align:right;"><div style="font-size:16px;font-weight:900;color:var(--accent2);">$${money(t.venta)}</div><span class="badge ${isAuth?"green":"amber"}" style="margin-top:4px;">${isAuth?"Autorizada":"Borrador"}</span></div></div><div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;"><button class="btn small" data-edit-q="${q.id}" style="flex:1;justify-content:center;">✏️ Editar</button><button class="btn small" data-dup-q="${q.id}">Duplicar</button><button class="btn small ${isAuth?"danger":""}" data-toggle-q="${q.id}">${isAuth?"Desautorizar":"Autorizar"}</button><button class="btn small danger" data-del-q="${q.id}">🗑</button></div></div>`;
-    }).join(""):'<div class="empty"><div class="ico">🧾</div><h3>Sin cotizaciones</h3><p>Crea la primera cotizacion.</p></div>'}
+      return `<div class="card" style="margin-bottom:10px;"><div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;"><div style="flex:1;min-width:0;"><div style="font-size:15px;font-weight:800;">${escapeHTML(q.name||"Cotizacion")}</div><div style="font-size:12px;color:var(--muted);margin-top:3px;">Folio: ${escapeHTML((q.code||q.id.slice(0,8)).toUpperCase())} \u00b7 ${q.createdAt||"---"}</div></div><div style="text-align:right;"><div style="font-size:16px;font-weight:900;color:var(--accent2);">$${money(t.venta)}</div><span class="badge ${isAuth?"green":"amber"}" style="margin-top:4px;">${isAuth?"Autorizada":"Borrador"}</span></div></div><div style="display:flex;gap:8px;margin-top:12px;"><button class="btn small" data-edit-q="${q.id}" style="flex:1;justify-content:center;">\u270F\uFE0F Editar</button><button class="btn small ${isAuth?"danger":""}" data-toggle-q="${q.id}">${isAuth?"Desautorizar":"Autorizar"}</button><button class="btn small danger" data-del-q="${q.id}">\u{1F5D1}</button></div></div>`;
+    }).join(""):'<div class="empty"><div class="ico">\u{1F9FE}</div><h3>Sin cotizaciones</h3><p>Crea la primera cotizacion.</p></div>'}
   `;
   document.getElementById("btnAddQuote").addEventListener("click",()=>{ openQuoteEditorPage(createQuote(p.id)); renderProjectsPage(); });
   content.querySelectorAll("button[data-edit-q]").forEach(b=>b.addEventListener("click",()=>{ const q=db.quotes.find(x=>x.id===b.dataset.editQ); if(q) openQuoteEditorPage(q); }));
-  content.querySelectorAll("button[data-dup-q]").forEach(b=>b.addEventListener("click",()=>{ const q=db.quotes.find(x=>x.id===b.dataset.dupQ); if(!q) return; const copy=duplicateQuote(q); renderProjectsPage(); if(copy) openQuoteEditorPage(copy); }));
   content.querySelectorAll("button[data-toggle-q]").forEach(b=>b.addEventListener("click",()=>{ const q=db.quotes.find(x=>x.id===b.dataset.toggleQ); if(!q) return; q.status=q.status==="authorized"?"draft":"authorized"; save(); renderProjectsPage(); renderDetailQuotes(p,content); }));
-  content.querySelectorAll("button[data-del-q]").forEach(b=>b.addEventListener("click",()=>{ if(!confirm("¿Eliminar cotizacion?")) return; db.quotes=db.quotes.filter(x=>x.id!==b.dataset.delQ); save(); renderProjectsPage(); renderDetailQuotes(p,content); }));
+  content.querySelectorAll("button[data-del-q]").forEach(b=>b.addEventListener("click",()=>{ if(!confirm("\u00BFEliminar cotizacion?")) return; db.quotes=db.quotes.filter(x=>x.id!==b.dataset.delQ); save(); renderProjectsPage(); renderDetailQuotes(p,content); }));
 }
 
 function renderDetailOps(p, content){
