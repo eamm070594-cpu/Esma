@@ -887,10 +887,10 @@ function load(){
 //  GOOGLE SHEETS SYNC
 // ============================================================
 const GS_KEY = "esma_gs_url";
-const DEFAULT_GS_URL = "https://script.google.com/macros/s/AKfycbzydhalj4D_X_R0XYp6K7eUxdtgWYrWVQruw5NlHMQCqyn4cDf-IkOwXj8eqU-dXf-S9g/exec";
+const DEFAULT_GS_URL = "https://script.google.com/macros/s/AKfycbyn9__H4FS_tp1lUKrdPTuKGhIwats7M3iNT33raDR1M0qCZqwUaKYCJTtFGpX6M7jmTQ/exec";
 // Fix any corrupted GS_URL saved in localStorage, and reset if it matches old URL
 (function(){
-  const OLD_URL = "https://script.google.com/macros/s/AKfycbyn9__H4FS_tp1lUKrdPTuKGhIwats7M3iNT33raDR1M0qCZqwUaKYCJTtFGpX6M7jmTQ/exec";
+  const OLD_URL = "https://script.google.com/macros/s/AKfycbzydhalj4D_X_R0XYp6K7eUxdtgWYrWVQruw5NlHMQCqyn4cDf-IkOwXj8eqU-dXf-S9g/exec";
   const s = localStorage.getItem(GS_KEY);
   if(!s || s.replace(/['"]/g,'') === OLD_URL) {
     localStorage.setItem(GS_KEY, DEFAULT_GS_URL);
