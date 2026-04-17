@@ -2738,7 +2738,15 @@ function restoreJSON(file){
         localStorage.setItem("esma_logo_b64", data._logoB64);
         delete data._logoB64;
       }
-      db=data; normalizeDB(); save(); location.reload();
+      db=data; normalizeDB();
+      // Save locally first
+      const dbSin = JSON.parse(JSON.stringify(db));
+      dbSin.projects.forEach(p=>{ p.photos = (p.photos||[]).filter(ph=>ph.url && !ph.data); });
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(dbSin));
+      _bootPullDone = true; // allow push
+      // Push to Sheets before reloading so remote data is updated
+      syncStatusUpdate("Subiendo respaldo...", "orange");
+      gsPush().then(()=>{ setTimeout(()=>location.reload(), 800); }).catch(()=>location.reload());
     }catch(e){ alert("Archivo inválido."); }
   };
   reader.readAsText(file);
