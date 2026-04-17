@@ -126,6 +126,9 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);overscroll-b
 .nav-dd-overlay{position:fixed;inset:0;z-index:55;display:none;}
 .nav-dd-overlay.open{display:block;}
 
+/* ── SIDEBAR: hidden on mobile by default ── */
+.sidebar{display:none;}
+
 /* ── SIDEBAR (desktop 768px+) ── */
 @media(min-width:768px){
   #app{flex-direction:row;}
@@ -1344,6 +1347,7 @@ function renderQuotes(p){
                 <td style="text-align:right;"><b>$${money(quoteSellTotals(q).venta)}</b></td>
                 <td style="text-align:right;">
                   <button class="btn small" data-act="edit" data-id="${q.id}">Editar</button>
+                  <button class="btn small" data-act="duplicate" data-id="${q.id}">📋 Duplicar</button>
                   <button class="btn small ${q.status==="authorized"?"danger":""}" data-act="toggle" data-id="${q.id}">${q.status==="authorized"?"Desautorizar":"Autorizar"}</button>
                   <button class="btn small danger" data-act="delQuote" data-id="${q.id}">Eliminar</button>
                 </td>
@@ -1359,6 +1363,14 @@ function renderQuotes(p){
     const q=db.quotes.find(x=>x.id===b.dataset.id); if(!q) return;
     if(b.dataset.act==="edit") openQuoteEditor(q);
     if(b.dataset.act==="toggle"){ q.status=(q.status==="authorized")?"draft":"authorized"; save(); renderProjectsList(); renderMain(); }
+    if(b.dataset.act==="duplicate"){
+      const copy=JSON.parse(JSON.stringify(q));
+      copy.id=uid(); copy.status="draft"; copy.createdAt=todayISO();
+      copy.name=(q.name||q.createdAt||"Cotización")+" (copia)";
+      copy.code="";
+      db.quotes.push(copy); save(); renderProjectsList(); renderMain();
+      openQuoteEditor(copy);
+    }
     if(b.dataset.act==="delQuote"){ if(!confirm("¿Eliminar esta cotización?")) return; db.quotes=db.quotes.filter(x=>x.id!==q.id); save(); renderProjectsList(); renderMain(); }
   }));
 }
@@ -3492,13 +3504,14 @@ function renderDetailQuotes(p, content){
     </div>
     ${quotes.length?quotes.map(q=>{
       const t=quoteSellTotals(q); const isAuth=q.status==="authorized";
-      return `<div class="card" style="margin-bottom:10px;"><div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;"><div style="flex:1;min-width:0;"><div style="font-size:15px;font-weight:800;">${escapeHTML(q.name||"Cotizacion")}</div><div style="font-size:12px;color:var(--muted);margin-top:3px;">Folio: ${escapeHTML((q.code||q.id.slice(0,8)).toUpperCase())} \u00b7 ${q.createdAt||"---"}</div></div><div style="text-align:right;"><div style="font-size:16px;font-weight:900;color:var(--accent2);">$${money(t.venta)}</div><span class="badge ${isAuth?"green":"amber"}" style="margin-top:4px;">${isAuth?"Autorizada":"Borrador"}</span></div></div><div style="display:flex;gap:8px;margin-top:12px;"><button class="btn small" data-edit-q="${q.id}" style="flex:1;justify-content:center;">\u270F\uFE0F Editar</button><button class="btn small ${isAuth?"danger":""}" data-toggle-q="${q.id}">${isAuth?"Desautorizar":"Autorizar"}</button><button class="btn small danger" data-del-q="${q.id}">\u{1F5D1}</button></div></div>`;
+      return `<div class="card" style="margin-bottom:10px;"><div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;"><div style="flex:1;min-width:0;"><div style="font-size:15px;font-weight:800;">${escapeHTML(q.name||"Cotizacion")}</div><div style="font-size:12px;color:var(--muted);margin-top:3px;">Folio: ${escapeHTML((q.code||q.id.slice(0,8)).toUpperCase())} \u00b7 ${q.createdAt||"---"}</div></div><div style="text-align:right;"><div style="font-size:16px;font-weight:900;color:var(--accent2);">$${money(t.venta)}</div><span class="badge ${isAuth?"green":"amber"}" style="margin-top:4px;">${isAuth?"Autorizada":"Borrador"}</span></div></div><div style="display:flex;gap:8px;margin-top:12px;"><button class="btn small" data-edit-q="${q.id}" style="flex:1;justify-content:center;">\u270F\uFE0F Editar</button><button class="btn small" data-dup-q="${q.id}">📋 Duplicar</button><button class="btn small ${isAuth?"danger":""}" data-toggle-q="${q.id}">${isAuth?"Desautorizar":"Autorizar"}</button><button class="btn small danger" data-del-q="${q.id}">\u{1F5D1}</button></div></div>`;
     }).join(""):'<div class="empty"><div class="ico">\u{1F9FE}</div><h3>Sin cotizaciones</h3><p>Crea la primera cotizacion.</p></div>'}
   `;
   document.getElementById("btnAddQuote").addEventListener("click",()=>{ openQuoteEditorPage(createQuote(p.id)); renderProjectsPage(); });
   content.querySelectorAll("button[data-edit-q]").forEach(b=>b.addEventListener("click",()=>{ const q=db.quotes.find(x=>x.id===b.dataset.editQ); if(q) openQuoteEditorPage(q); }));
   content.querySelectorAll("button[data-toggle-q]").forEach(b=>b.addEventListener("click",()=>{ const q=db.quotes.find(x=>x.id===b.dataset.toggleQ); if(!q) return; q.status=q.status==="authorized"?"draft":"authorized"; save(); renderProjectsPage(); renderDetailQuotes(p,content); }));
   content.querySelectorAll("button[data-del-q]").forEach(b=>b.addEventListener("click",()=>{ if(!confirm("\u00BFEliminar cotizacion?")) return; db.quotes=db.quotes.filter(x=>x.id!==b.dataset.delQ); save(); renderProjectsPage(); renderDetailQuotes(p,content); }));
+  content.querySelectorAll("button[data-dup-q]").forEach(b=>b.addEventListener("click",()=>{ const q=db.quotes.find(x=>x.id===b.dataset.dupQ); if(!q) return; const copy=JSON.parse(JSON.stringify(q)); copy.id=uid(); copy.status="draft"; copy.createdAt=todayISO(); copy.name=(q.name||q.createdAt||"Cotizaci\u00F3n")+" (copia)"; copy.code=""; db.quotes.push(copy); save(); renderProjectsPage(); renderDetailQuotes(p,content); openQuoteEditorPage(copy); }));
 }
 
 function renderDetailOps(p, content){
