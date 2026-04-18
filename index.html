@@ -2701,6 +2701,23 @@ function buildQuotePDFHTML(p, q, extraQuotes, includeIVA){
       </table>
     </div>
 
+    <!-- FOTO DE REFERENCIA -->
+    ${(()=>{
+      const refPhoto = q.refPhoto || "";
+      if(!refPhoto) return "";
+      return `<div style="margin:28px 0;page-break-inside:avoid;">
+        <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#94a3b8;margin-bottom:10px;">Imagen de referencia</div>
+        <div style="position:relative;border-radius:12px;overflow:hidden;box-shadow:0 2px 16px rgba(0,0,0,.13),0 1px 4px rgba(0,0,0,.08);background:#0f172a;line-height:0;">
+          <img src="${refPhoto}" style="width:100%;max-height:320px;object-fit:cover;display:block;filter:contrast(1.04) saturate(1.06);">
+          <div style="position:absolute;inset:0;background:linear-gradient(180deg,transparent 50%,rgba(15,23,42,.55));border-radius:12px;pointer-events:none;"></div>
+          <div style="position:absolute;bottom:0;left:0;right:0;padding:14px 18px;display:flex;align-items:flex-end;justify-content:space-between;">
+            <span style="color:rgba(255,255,255,.9);font-size:10px;font-weight:700;letter-spacing:1px;text-shadow:0 1px 4px rgba(0,0,0,.5);">REFERENCIA VISUAL</span>
+            <span style="color:rgba(255,255,255,.6);font-size:9px;text-shadow:0 1px 4px rgba(0,0,0,.5);">Folio: ${(q.code||q.id.slice(0,8)).toUpperCase()}</span>
+          </div>
+        </div>
+      </div>`;
+    })()}
+
     <!-- TERMS -->
     <div class="terms">
       <b>Condiciones de pago y entrega:</b><br>
@@ -3595,6 +3612,16 @@ function openQuoteEditorPage(q){
       </table></div>
     </div>
 
+    <div class="card" style="margin-bottom:10px;">
+      <div class="card-title" style="margin-bottom:12px;">📸 Foto de referencia</div>
+      <div id="qRefPhotoWrap" style="margin-bottom:10px;"></div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <button class="btn small" id="btnAddRefPhoto">＋ Agregar foto</button>
+        <button class="btn small danger" id="btnDelRefPhoto" style="display:none;">🗑 Quitar foto</button>
+        <input type="file" id="refPhotoInput" accept="image/*" style="display:none;">
+      </div>
+    </div>
+
     <div class="card">
       <div class="card-title" style="margin-bottom:12px;">Desglose</div>
       <div class="breakdown">
@@ -3613,6 +3640,41 @@ function openQuoteEditorPage(q){
   </div>`;
 
   document.getElementById("btnBackFromQuote").addEventListener("click",()=>{ currentProjectId=q.projectId; currentDetailTab="quotes"; showPage("project-detail"); renderProjectDetail(); });
+
+  // ── FOTO DE REFERENCIA ─────────────────────────────────────
+  function renderRefPhoto(){
+    const wrap = document.getElementById("qRefPhotoWrap");
+    const delBtn = document.getElementById("btnDelRefPhoto");
+    if(!wrap) return;
+    if(q.refPhoto){
+      wrap.innerHTML = `<div style="position:relative;border-radius:14px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.18),0 1px 4px rgba(0,0,0,.1);background:#111;max-height:280px;display:flex;align-items:center;justify-content:center;">
+        <img src="${q.refPhoto}" style="width:100%;max-height:280px;object-fit:cover;display:block;filter:contrast(1.04) saturate(1.08);">
+        <div style="position:absolute;inset:0;background:linear-gradient(180deg,transparent 55%,rgba(0,0,0,.45));pointer-events:none;border-radius:14px;"></div>
+        <div style="position:absolute;bottom:12px;left:14px;color:#fff;font-size:11px;font-weight:700;letter-spacing:.5px;opacity:.85;text-shadow:0 1px 4px rgba(0,0,0,.6);">FOTO DE REFERENCIA</div>
+      </div>`;
+      if(delBtn) delBtn.style.display="";
+    } else {
+      wrap.innerHTML = `<div style="border:2px dashed var(--border);border-radius:14px;padding:28px;text-align:center;color:var(--muted);font-size:13px;cursor:pointer;" id="refPhotoDropZone">
+        <div style="font-size:32px;margin-bottom:8px;">🖼️</div>
+        <div style="font-weight:600;">Arrastra una imagen o toca el botón</div>
+        <div style="font-size:11px;margin-top:4px;">JPG, PNG — Se mostrará en el PDF</div>
+      </div>`;
+      if(delBtn) delBtn.style.display="none";
+      const dz = document.getElementById("refPhotoDropZone");
+      if(dz) dz.addEventListener("click", ()=>document.getElementById("refPhotoInput").click());
+    }
+  }
+  renderRefPhoto();
+
+  document.getElementById("btnAddRefPhoto").addEventListener("click",()=>document.getElementById("refPhotoInput").click());
+  document.getElementById("btnDelRefPhoto").addEventListener("click",()=>{ q.refPhoto=""; save(); renderRefPhoto(); });
+  document.getElementById("refPhotoInput").addEventListener("change", function(){
+    const file = this.files?.[0]; if(!file) return;
+    const reader = new FileReader();
+    reader.onload = (e)=>{ q.refPhoto = e.target.result; save(); renderRefPhoto(); };
+    reader.readAsDataURL(file);
+    this.value="";
+  });
   document.getElementById("qNameInput").addEventListener("blur",()=>{ q.name=document.getElementById("qNameInput").value.trim()||"Cotizacion"; save(); });
   document.getElementById("btnToggleAuth").addEventListener("click",()=>{ q.status=q.status==="authorized"?"draft":"authorized"; save(); renderProjectsPage(); openQuoteEditorPage(q); });
   document.getElementById("btnQuotePDF2").addEventListener("click",()=>{
