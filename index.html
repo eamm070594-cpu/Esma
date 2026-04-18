@@ -1674,6 +1674,7 @@ function openQuoteEditor(q){
       <div class="right"></div>
       <button class="btn small" id="btnQuotePDF2">🖨 PDF / Imprimir</button>
       <button class="btn ${q.status==="authorized"?"danger":"primary"}" id="btnToggleAuth">${q.status==="authorized"?"Desautorizar":"Autorizar"}</button>
+      <button class="btn primary small" id="btnSaveQuoteOld">💾 Guardar</button>
       <button class="btn" id="btnBackQuotes">Volver</button>
     </div>
 
@@ -1854,7 +1855,8 @@ function openQuoteEditor(q){
   on($("qQtyInput"),"blur", ()=>{ q.qty=Math.max(1,Number($("qQtyInput").value||1)); save(); renderLines(); });
   on($("qQtyInput"),"keydown",(e)=>{ if(e.key==="Enter"){ e.preventDefault(); $("qQtyInput").blur(); }});
   on($("btnToggleAuth"),"click", ()=>{ q.status=(q.status==="authorized")?"draft":"authorized"; save(); renderProjectsList(); renderMain(); });
-  on($("btnBackQuotes"),"click", ()=>{ mainTab="quotes"; renderMain(); });
+  on($("btnBackQuotes"),"click", ()=>{ q.name=$("qNameInput").value.trim()||"Cotización"; save(); mainTab="quotes"; renderMain(); });
+  on($("btnSaveQuoteOld"),"click", ()=>{ q.name=$("qNameInput").value.trim()||"Cotización"; save(); const btn=$("btnSaveQuoteOld"); if(btn){ btn.textContent="✅ Guardado"; setTimeout(()=>{ if(btn) btn.textContent="💾 Guardar"; },1500); } });
   on($("btnQuotePDF2"),"click", ()=>{
     const proj = db.projects.find(x=>x.id===q.projectId)||{name:""};
     const sibling = db.quotes.filter(x=>x.projectId===q.projectId && x.id!==q.id);
@@ -3669,6 +3671,7 @@ function openQuoteEditorPage(q){
     <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
       <span class="badge ${q.status==="authorized"?"green":"amber"}">${q.status==="authorized"?"Autorizada":"Borrador"}</span>
       <span style="font-size:12px;color:var(--muted);align-self:center;">Folio: ${escapeHTML((q.code||q.id.slice(0,8)).toUpperCase())}</span>
+      <button class="btn small success" id="btnSaveQuote" style="">💾 Guardar</button>
       <button class="btn small" id="btnQuotePDF2" style="margin-left:auto;">\u{1F5A8} PDF</button>
     </div>
 
@@ -3713,11 +3716,13 @@ function openQuoteEditorPage(q){
     </div>
   </div>`;
 
-  document.getElementById("btnBackFromQuote").addEventListener("click",()=>{ currentProjectId=q.projectId; currentDetailTab="quotes"; showPage("project-detail"); renderProjectDetail(); });
+  document.getElementById("btnBackFromQuote").addEventListener("click",()=>{ q.name=document.getElementById("qNameInput").value.trim()||"Cotizacion"; save(); currentProjectId=q.projectId; currentDetailTab="quotes"; showPage("project-detail"); renderProjectDetail(); });
 
 
   document.getElementById("qNameInput").addEventListener("blur",()=>{ q.name=document.getElementById("qNameInput").value.trim()||"Cotizacion"; save(); });
+  document.getElementById("qNameInput").addEventListener("keydown",(e)=>{ if(e.key==="Enter"){ e.preventDefault(); q.name=document.getElementById("qNameInput").value.trim()||"Cotizacion"; save(); document.getElementById("qNameInput").blur(); } });
   document.getElementById("btnToggleAuth").addEventListener("click",()=>{ q.status=q.status==="authorized"?"draft":"authorized"; save(); renderProjectsPage(); openQuoteEditorPage(q); });
+  document.getElementById("btnSaveQuote").addEventListener("click",()=>{ q.name=document.getElementById("qNameInput").value.trim()||"Cotizacion"; save(); const btn=document.getElementById("btnSaveQuote"); btn.textContent="✅ Guardado"; setTimeout(()=>{ if(btn) btn.textContent="💾 Guardar"; },1500); });
   document.getElementById("btnQuotePDF2").addEventListener("click",()=>{
     openPDFSelector(q.projectId);
   });
