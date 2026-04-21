@@ -4544,7 +4544,6 @@ function renderBOMPage(){
 
   // State
   let selProjectIds = new Set(); // empty = todos los proyectos
-  let selQuoteIds = new Set();
   let groupMode = 'material'; // 'material' | 'project'
 
   // Helper: get segment of a project (auth | done | noauth)
@@ -4558,8 +4557,9 @@ function renderBOMPage(){
     // Collect all quotes to include
     const quotes = [];
     db.quotes.forEach(q => {
+      if(q.status !== 'authorized') return;
       if(selProjectIds.size > 0 && !selProjectIds.has(q.projectId)) return;
-      if(selQuoteIds.size === 0 || selQuoteIds.has(q.id)) quotes.push(q);
+      quotes.push(q);
     });
 
     // Consolidate materials: key = matPick || desc (normalized lowercase)
@@ -4603,10 +4603,11 @@ function renderBOMPage(){
   function render(){
     const projects = db.projects;
 
-    // All quotes visible = those belonging to selected projects (or all if none selected)
-    const quotesForFilter = selProjectIds.size > 0
-      ? db.quotes.filter(q => selProjectIds.has(q.projectId))
-      : db.quotes;
+    // All quotes visible = authorized only, filtered by selected projects
+    const quotesForFilter = db.quotes.filter(q =>
+      q.status === 'authorized' &&
+      (selProjectIds.size === 0 || selProjectIds.has(q.projectId))
+    );
 
     const bom = buildBOM();
     const totalCost = bom.reduce((s, r) => s + r.totalCost, 0);
@@ -4650,17 +4651,6 @@ function renderBOMPage(){
             }).join('')}
           </div>
         </div>`;
-    }).join('');
-
-    // Quote checkboxes (only for selected projects)
-    const quoteChecks = quotesForFilter.map(q => {
-      const t = quoteSellTotals(q);
-      const projName = escapeHTML((db.projects.find(p=>p.id===q.projectId)||{}).name||'');
-      return `<label style="display:flex;align-items:center;gap:8px;padding:7px 10px;border:1px solid var(--border);border-radius:10px;cursor:pointer;font-size:13px;background:var(--card);user-select:none;">
-        <input type="checkbox" class="bomQuoteChk" value="${q.id}" ${selQuoteIds.has(q.id)||selQuoteIds.size===0?'checked':''} style="accent-color:var(--accent);width:16px;height:16px;">
-        <span style="flex:1;min-width:0;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHTML(q.name||q.code||'—')} <span style="font-weight:400;color:var(--muted);">· ${projName}</span></span>
-        <span style="color:var(--muted);font-size:11px;flex-shrink:0;">${q.status==='authorized'?'✅':'📝'} $${money(t.venta)}</span>
-      </label>`;
     }).join('');
 
     // BOM table rows
@@ -4711,16 +4701,6 @@ function renderBOMPage(){
         </div>
         ${projectGroupsHtml}
 
-        ${quotesForFilter.length ? `
-          <div style="font-size:12px;font-weight:700;color:var(--muted);margin:12px 0 8px;">COTIZACIONES A INCLUIR <span style="font-weight:400;">(todas marcadas = incluye todas)</span></div>
-          <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px;" id="bomQuoteList">
-            ${quoteChecks}
-          </div>
-          <div style="display:flex;gap:8px;">
-            <button class="btn small" id="bomChkAll">Marcar todas</button>
-            <button class="btn small" id="bomUnchkAll">Desmarcar</button>
-          </div>
-        ` : '<div style="color:var(--muted);font-size:13px;margin-top:8px;">Sin cotizaciones para los proyectos seleccionados.</div>'}
       </div>
 
       <!-- KPIs -->
@@ -4730,8 +4710,8 @@ function renderBOMPage(){
           <div class="kv">${totalItems}</div>
         </div>
         <div class="kpi-box">
-          <div class="kl">Cotizaciones incluidas</div>
-          <div class="kv">${selQuoteIds.size || quotesForFilter.length}</div>
+          <div class="kl">Cotizaciones autorizadas</div>
+          <div class="kv">${quotesForFilter.length}</div>
         </div>
         <div class="kpi-box">
           <div class="kl">Costo total estimado</div>
@@ -4781,7 +4761,6 @@ function renderBOMPage(){
     const selAllBtn = document.getElementById('bomSelAll');
     if(selAllBtn) selAllBtn.addEventListener('click', () => {
       selProjectIds = new Set();
-      selQuoteIds = new Set();
       render();
     });
 
@@ -4803,7 +4782,6 @@ function renderBOMPage(){
         }
         // If all projects selected again → reset to "all" mode
         if(selProjectIds.size === db.projects.length) selProjectIds = new Set();
-        selQuoteIds = new Set();
         render();
       });
     });
@@ -4820,7 +4798,6 @@ function renderBOMPage(){
           selProjectIds.delete(chk.value);
         }
         if(selProjectIds.size === db.projects.length) selProjectIds = new Set();
-        selQuoteIds = new Set();
         render();
       });
     });
@@ -4835,22 +4812,6 @@ function renderBOMPage(){
     });
 
     // Bind quote checkboxes
-    document.querySelectorAll('.bomQuoteChk').forEach(chk => {
-      chk.addEventListener('change', () => {
-        const checked = [...document.querySelectorAll('.bomQuoteChk:checked')].map(c => c.value);
-        const all = [...document.querySelectorAll('.bomQuoteChk')].map(c => c.value);
-        selQuoteIds = checked.length === all.length ? new Set() : new Set(checked);
-        // Re-render only the BOM table part (re-render full for simplicity)
-        render();
-      });
-    });
-
-    // Mark all / unmark
-    const chkAllBtn = document.getElementById('bomChkAll');
-    const unchkBtn = document.getElementById('bomUnchkAll');
-    if(chkAllBtn) chkAllBtn.addEventListener('click', () => { selQuoteIds = new Set(); render(); });
-    if(unchkBtn) unchkBtn.addEventListener('click', () => { selQuoteIds = new Set(['__none__']); render(); });
-
     // Print BOM
     const printBtn = document.getElementById('bomPrintBtn');
     if(printBtn) printBtn.addEventListener('click', () => printBOM(bom, totalCost));
