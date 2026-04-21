@@ -601,6 +601,9 @@ tbody tr:hover td{background:rgba(0,0,0,.02);}
     <div class="s-divider"></div>
     <div class="s-section-label">Más</div>
 
+    <button class="s-nav-item" id="snav-bom" onclick="showPage('bom');sNavActive('bom')">
+      <span class="s-ico">📦</span>BOM / Materiales
+    </button>
     <button class="s-nav-item" id="snav-quotes" onclick="showSection('cotizaciones');sNavActive('quotes')">
       <span class="s-ico">🧾</span>Cotizaciones
     </button>
@@ -698,6 +701,14 @@ tbody tr:hover td{background:rgba(0,0,0,.02);}
       </div>
     </div>
 
+    <!-- PAGE: BOM / MATERIALES -->
+    <div class="page" id="page-bom">
+      <div style="padding:16px 0 10px;">
+        <div class="sec-head"><div><h2>📦 BOM — Lista de Materiales</h2><div class="sub">Consolida materiales de cotizaciones por proyecto</div></div></div>
+        <div id="bomContent"></div>
+      </div>
+    </div>
+
     <!-- PAGE: RESUMEN -->
     <div class="page" id="page-resumen">
       <div style="padding:16px 0 10px;">
@@ -748,6 +759,7 @@ tbody tr:hover td{background:rgba(0,0,0,.02);}
   <!-- DROPDOWN: Más -->
   <div class="nav-dropdown" id="dd-more">
     <div class="nav-dd-item" onclick="mNavGo('resumen')"><span class="dd-ico">📋</span>Resumen diario/semanal</div>
+    <div class="nav-dd-item" onclick="mNavGo('bom')"><span class="dd-ico">📦</span>BOM / Materiales</div>
     <div class="nav-dd-item" onclick="closeAllDropdowns();mShowSection('cotizaciones')"><span class="dd-ico">🧾</span>Cotizaciones</div>
     <div class="nav-dd-item" onclick="closeAllDropdowns();mShowSection('compras')"><span class="dd-ico">🛒</span>Compras</div>
     <div class="nav-dd-divider"></div>
@@ -986,6 +998,7 @@ function applyRemoteData(data){
     else if(currentPage==="sales") renderSalesPage();
     else if(currentPage==="calendar") renderCalendarPage();
     else if(currentPage==="settings") renderSettingsPage();
+    else if(currentPage==="bom") renderBOMPage();
   } catch(e){}
 }
 
@@ -3239,12 +3252,12 @@ function showPage(name){
   if(pg) pg.classList.add("active");
   // mobile bottom nav active
   document.querySelectorAll(".nav-item").forEach(n=>n.classList.remove("active"));
-  const mMap = {projects:"mnav-projects",calendar:"mnav-calendar",sales:"mnav-results",settings:"mnav-more"};
+  const mMap = {projects:"mnav-projects",calendar:"mnav-calendar",sales:"mnav-results",settings:"mnav-more",bom:"mnav-more"};
   const mBtn = document.getElementById(mMap[name]||"");
   if(mBtn) mBtn.classList.add("active");
   // sidebar active
   document.querySelectorAll(".s-nav-item,.s-sub-item").forEach(n=>n.classList.remove("active"));
-  const sMap = {projects:"snav-projects",calendar:"snav-calendar",sales:"snav-results",settings:"snav-settings"};
+  const sMap = {projects:"snav-projects",calendar:"snav-calendar",sales:"snav-results",settings:"snav-settings",bom:"snav-bom"};
   const sBtn = document.getElementById(sMap[name]||"");
   if(sBtn) sBtn.classList.add("active");
   if(name==="projects"){ const ss=document.getElementById("ssub-projects-list"); if(ss) ss.classList.add("active"); }
@@ -3257,6 +3270,7 @@ function showPage(name){
   if(name==="sales") renderSalesPage();
   if(name==="settings") renderSettingsPage();
   if(name==="resumen") renderResumenPage();
+  if(name==="bom") renderBOMPage();
 }
 
 function showHome(){
@@ -4410,7 +4424,7 @@ function mNavGo(page){
   const ap = document.getElementById('app');
   if(ap){ ap.style.cssText='display:flex;'; }
   document.querySelectorAll('.nav-item').forEach(el=>el.classList.remove('active'));
-  const mMap = {projects:'mnav-projects',calendar:'mnav-calendar',sales:'mnav-results',settings:'mnav-more',resumen:'mnav-more'};
+  const mMap = {projects:'mnav-projects',calendar:'mnav-calendar',sales:'mnav-results',settings:'mnav-more',resumen:'mnav-more',bom:'mnav-more'};
   const btn = document.getElementById(mMap[page]||'mnav-projects');
   if(btn) btn.classList.add('active');
   showPage(page);
@@ -4522,6 +4536,302 @@ function openPDFSelector(projectId){
       }, 300);
     }}
   ]);
+}
+
+// ── BOM — BILL OF MATERIALS ────────────────────────────────
+function renderBOMPage(){
+  const content = document.getElementById('bomContent'); if(!content) return;
+
+  // State
+  let selProjectId = '';
+  let selQuoteIds = new Set();
+  let groupMode = 'material'; // 'material' | 'project'
+
+  function buildBOM(){
+    // Collect all quotes to include
+    const quotes = [];
+    if(selProjectId){
+      // filter by selected project, then by selected quote IDs
+      db.quotes.filter(q => q.projectId === selProjectId).forEach(q => {
+        if(selQuoteIds.size === 0 || selQuoteIds.has(q.id)) quotes.push(q);
+      });
+    } else {
+      // All projects, all quotes
+      db.quotes.forEach(q => {
+        if(selQuoteIds.size === 0 || selQuoteIds.has(q.id)) quotes.push(q);
+      });
+    }
+
+    // Consolidate materials: key = matPick || desc (normalized lowercase)
+    const matMap = {};
+    quotes.forEach(q => {
+      const proj = db.projects.find(p => p.id === q.projectId);
+      const qQty = Number(q.qty || 1);
+      (q.products || []).forEach(r => {
+        const rawKey = (r.matPick || r.desc || r.material || '').trim();
+        if(!rawKey) return;
+        const key = rawKey.toLowerCase();
+        const matDef = db.settings.materialDB.find(m => (m.desc||'').toLowerCase() === key) || {};
+        const uom = matDef.uom || r.uom || '';
+        const unitCost = Number(r.unitPrice || matDef.cost || 0);
+        const qty = Number(r.qty || 0) * qQty;
+
+        if(!matMap[key]){
+          matMap[key] = {
+            desc: rawKey,
+            uom,
+            unitCost,
+            totalQty: 0,
+            totalCost: 0,
+            sources: []
+          };
+        }
+        matMap[key].totalQty += qty;
+        matMap[key].totalCost += qty * unitCost;
+        matMap[key].sources.push({
+          projectName: proj ? proj.name : '—',
+          quoteName: q.name || q.code || q.id.slice(0,6),
+          qty,
+          unitCost
+        });
+      });
+    });
+
+    return Object.values(matMap).sort((a,b) => b.totalCost - a.totalCost);
+  }
+
+  function render(){
+    const projects = db.projects;
+    const quotesForProject = selProjectId
+      ? db.quotes.filter(q => q.projectId === selProjectId)
+      : db.quotes;
+
+    const bom = buildBOM();
+    const totalCost = bom.reduce((s, r) => s + r.totalCost, 0);
+    const totalItems = bom.length;
+
+    // Project selector
+    const projOptions = projects.map(p =>
+      `<option value="${escapeAttr(p.id)}" ${selProjectId===p.id?'selected':''}>${escapeHTML(p.name)}</option>`
+    ).join('');
+
+    // Quote checkboxes
+    const quoteChecks = quotesForProject.map(q => {
+      const t = quoteSellTotals(q);
+      const proj = selProjectId ? '' : ` · ${escapeHTML((db.projects.find(p=>p.id===q.projectId)||{}).name||'')}`;
+      return `<label style="display:flex;align-items:center;gap:8px;padding:7px 10px;border:1px solid var(--border);border-radius:10px;cursor:pointer;font-size:13px;background:var(--card);user-select:none;">
+        <input type="checkbox" class="bomQuoteChk" value="${q.id}" ${selQuoteIds.has(q.id)||selQuoteIds.size===0?'checked':''} style="accent-color:var(--accent);width:16px;height:16px;">
+        <span style="flex:1;min-width:0;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHTML(q.name||q.code||'—')}${proj}</span>
+        <span style="color:var(--muted);font-size:11px;flex-shrink:0;">${q.status==='authorized'?'✅':'📝'} $${money(t.venta)}</span>
+      </label>`;
+    }).join('');
+
+    // BOM table rows
+    const bomRows = bom.map((row, i) => {
+      const sourceSummary = [...new Set(row.sources.map(s => s.projectName))].join(', ');
+      return `<tr>
+        <td style="font-weight:700;font-size:13px;">${escapeHTML(row.desc)}</td>
+        <td style="text-align:center;color:var(--muted);font-size:12px;">${escapeHTML(row.uom||'—')}</td>
+        <td style="text-align:right;font-weight:800;font-size:14px;">${money(row.totalQty)}</td>
+        <td style="text-align:right;font-size:12px;color:var(--muted);">$${money(row.unitCost)}</td>
+        <td style="text-align:right;font-weight:800;color:var(--accent);">$${money(row.totalCost)}</td>
+        <td style="font-size:11px;color:var(--muted);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeAttr(sourceSummary)}">${escapeHTML(sourceSummary)}</td>
+        <td>
+          <button class="btn small" style="font-size:11px;padding:5px 8px;" onclick="document.getElementById('bomDetail_${i}').style.display=document.getElementById('bomDetail_${i}').style.display==='table-row'?'none':'table-row'">Ver</button>
+        </td>
+      </tr>
+      <tr id="bomDetail_${i}" style="display:none;background:var(--bg3);">
+        <td colspan="7" style="padding:10px 16px;">
+          <div style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:6px;">Origen de este material:</div>
+          <table style="width:100%;font-size:12px;border-collapse:collapse;">
+            <thead><tr style="color:var(--muted);">
+              <th style="text-align:left;padding:4px 8px;">Proyecto</th>
+              <th style="text-align:left;padding:4px 8px;">Cotización</th>
+              <th style="text-align:right;padding:4px 8px;">Cantidad</th>
+              <th style="text-align:right;padding:4px 8px;">Costo unit.</th>
+              <th style="text-align:right;padding:4px 8px;">Subtotal</th>
+            </tr></thead>
+            <tbody>
+              ${row.sources.map(s => `<tr>
+                <td style="padding:4px 8px;">${escapeHTML(s.projectName)}</td>
+                <td style="padding:4px 8px;">${escapeHTML(s.quoteName)}</td>
+                <td style="padding:4px 8px;text-align:right;">${money(s.qty)}</td>
+                <td style="padding:4px 8px;text-align:right;">$${money(s.unitCost)}</td>
+                <td style="padding:4px 8px;text-align:right;font-weight:700;">$${money(s.qty*s.unitCost)}</td>
+              </tr>`).join('')}
+            </tbody>
+          </table>
+        </td>
+      </tr>`;
+    }).join('');
+
+    content.innerHTML = `
+      <!-- FILTROS -->
+      <div class="card" style="margin-bottom:12px;">
+        <div style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:8px;">FILTRAR POR PROYECTO</div>
+        <div class="field" style="margin-bottom:10px;">
+          <span class="ico">📁</span>
+          <select id="bomProjSel" style="flex:1;border:none;background:transparent;font-size:13px;font-weight:700;">
+            <option value="">— Todos los proyectos —</option>
+            ${projOptions}
+          </select>
+        </div>
+        ${quotesForProject.length ? `
+          <div style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:8px;">COTIZACIONES A INCLUIR <span style="font-weight:400;">(todas marcadas = incluye todas)</span></div>
+          <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px;" id="bomQuoteList">
+            ${quoteChecks}
+          </div>
+          <div style="display:flex;gap:8px;">
+            <button class="btn small" id="bomChkAll">Marcar todas</button>
+            <button class="btn small" id="bomUnchkAll">Desmarcar</button>
+          </div>
+        ` : '<div style="color:var(--muted);font-size:13px;">Sin cotizaciones en este proyecto.</div>'}
+      </div>
+
+      <!-- KPIs -->
+      <div class="kpi-grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:12px;">
+        <div class="kpi-box">
+          <div class="kl">Materiales distintos</div>
+          <div class="kv">${totalItems}</div>
+        </div>
+        <div class="kpi-box">
+          <div class="kl">Cotizaciones incluidas</div>
+          <div class="kv">${selQuoteIds.size || quotesForProject.length}</div>
+        </div>
+        <div class="kpi-box">
+          <div class="kl">Costo total estimado</div>
+          <div class="kv" style="font-size:18px;color:var(--accent);">$${money(totalCost)}</div>
+        </div>
+      </div>
+
+      <!-- BOM TABLE -->
+      ${bom.length ? `
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">📋 Bill of Materials (BOM)</div>
+            <button class="btn small primary" id="bomPrintBtn">🖨 Imprimir / PDF</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Material</th>
+                  <th style="text-align:center;">UOM</th>
+                  <th style="text-align:right;">Cantidad total</th>
+                  <th style="text-align:right;">Costo unit.</th>
+                  <th style="text-align:right;">Costo total</th>
+                  <th>Proyectos</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                ${bomRows}
+                <tr style="background:var(--accent-light);font-weight:900;">
+                  <td colspan="4" style="font-size:13px;font-weight:900;">TOTAL</td>
+                  <td style="text-align:right;color:var(--accent);font-size:15px;">$${money(totalCost)}</td>
+                  <td colspan="2"></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ` : `<div class="card"><div style="text-align:center;padding:32px;color:var(--muted);">
+        <div style="font-size:36px;margin-bottom:10px;">📦</div>
+        <b>Sin materiales</b>
+        <div style="font-size:13px;margin-top:6px;">Las cotizaciones seleccionadas no tienen productos/materiales cargados.</div>
+      </div></div>`}
+    `;
+
+    // Bind project selector
+    document.getElementById('bomProjSel').addEventListener('change', e => {
+      selProjectId = e.target.value;
+      selQuoteIds = new Set();
+      render();
+    });
+
+    // Bind quote checkboxes
+    document.querySelectorAll('.bomQuoteChk').forEach(chk => {
+      chk.addEventListener('change', () => {
+        const checked = [...document.querySelectorAll('.bomQuoteChk:checked')].map(c => c.value);
+        const all = [...document.querySelectorAll('.bomQuoteChk')].map(c => c.value);
+        selQuoteIds = checked.length === all.length ? new Set() : new Set(checked);
+        // Re-render only the BOM table part (re-render full for simplicity)
+        render();
+      });
+    });
+
+    // Mark all / unmark
+    const chkAllBtn = document.getElementById('bomChkAll');
+    const unchkBtn = document.getElementById('bomUnchkAll');
+    if(chkAllBtn) chkAllBtn.addEventListener('click', () => { selQuoteIds = new Set(); render(); });
+    if(unchkBtn) unchkBtn.addEventListener('click', () => { selQuoteIds = new Set(['__none__']); render(); });
+
+    // Print BOM
+    const printBtn = document.getElementById('bomPrintBtn');
+    if(printBtn) printBtn.addEventListener('click', () => printBOM(bom, totalCost));
+  }
+
+  render();
+}
+
+function printBOM(bom, totalCost){
+  const emp = (db.settings && db.settings.empresa) || {};
+  const rows = bom.map((r,i) => `
+    <tr>
+      <td>${i+1}</td>
+      <td><b>${escapeHTML(r.desc)}</b></td>
+      <td style="text-align:center;">${escapeHTML(r.uom||'—')}</td>
+      <td style="text-align:right;">${money(r.totalQty)}</td>
+      <td style="text-align:right;">$${money(r.unitCost)}</td>
+      <td style="text-align:right;"><b>$${money(r.totalCost)}</b></td>
+      <td style="font-size:11px;">${[...new Set(r.sources.map(s=>s.projectName))].join(', ')}</td>
+    </tr>`).join('');
+
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
+    <title>BOM — ${escapeHTML(emp.nombre||'ESMA INDUSTRIAL')}</title>
+    <style>
+      body{font-family:Arial,sans-serif;font-size:12px;color:#111;margin:0;padding:20px;}
+      h1{font-size:18px;margin:0 0 4px;} .sub{color:#555;font-size:12px;}
+      table{width:100%;border-collapse:collapse;margin-top:16px;}
+      th{background:#1a3a6b;color:#fff;padding:8px 10px;text-align:left;font-size:11px;}
+      td{padding:7px 10px;border-bottom:1px solid #e0e0e0;vertical-align:middle;}
+      tr:nth-child(even) td{background:#f7f9fc;}
+      .total-row td{background:#eff6ff;font-weight:900;font-size:13px;}
+      .header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;padding-bottom:12px;border-bottom:2px solid #1a3a6b;}
+      @media print{button{display:none;}}
+    </style></head><body>
+    <div class="header">
+      <div>
+        <h1>${escapeHTML(emp.nombre||'ESMA INDUSTRIAL')}</h1>
+        <div class="sub">Bill of Materials — BOM consolidado</div>
+        <div class="sub">Generado: ${new Date().toLocaleDateString('es-MX',{day:'numeric',month:'long',year:'numeric'})}</div>
+      </div>
+      <div style="text-align:right;">
+        ${emp.tel?`<div>Tel: ${escapeHTML(emp.tel)}</div>`:''}
+        ${emp.email?`<div>${escapeHTML(emp.email)}</div>`:''}
+      </div>
+    </div>
+    <table>
+      <thead><tr><th>#</th><th>Material</th><th>UOM</th><th style="text-align:right;">Cantidad</th><th style="text-align:right;">Costo unit.</th><th style="text-align:right;">Costo total</th><th>Proyectos</th></tr></thead>
+      <tbody>
+        ${rows}
+        <tr class="total-row">
+          <td colspan="5" style="text-align:right;">TOTAL ESTIMADO</td>
+          <td style="text-align:right;">$${money(totalCost)}</td>
+          <td></td>
+        </tr>
+      </tbody>
+    </table>
+    <div style="margin-top:20px;font-size:11px;color:#888;">Generado por ESMA Industrial · ${bom.length} materiales distintos</div>
+  </body></html>`;
+
+  const iframe = document.createElement('iframe');
+  iframe.style.cssText='position:fixed;right:0;bottom:0;width:0;height:0;border:0;';
+  document.body.appendChild(iframe);
+  const doc = iframe.contentWindow.document;
+  doc.open(); doc.write(html); doc.close();
+  iframe.onload = ()=>{ try{ iframe.contentWindow.focus(); iframe.contentWindow.print(); } finally { setTimeout(()=>iframe.remove(),1000); }};
+  setTimeout(()=>{ try{ iframe.contentWindow.focus(); iframe.contentWindow.print(); }catch(e){} }, 450);
 }
 
 // _popNav fixed directly in original function
