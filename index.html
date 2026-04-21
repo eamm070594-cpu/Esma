@@ -4543,24 +4543,24 @@ function renderBOMPage(){
   const content = document.getElementById('bomContent'); if(!content) return;
 
   // State
-  let selProjectId = '';
+  let selProjectIds = new Set(); // empty = todos los proyectos
   let selQuoteIds = new Set();
   let groupMode = 'material'; // 'material' | 'project'
+
+  // Helper: get segment of a project (auth | done | noauth)
+  function projSeg(p){
+    if(projectIsDone(p.id)) return 'done';
+    if(projectHasAuthorized(p.id)) return 'auth';
+    return 'noauth';
+  }
 
   function buildBOM(){
     // Collect all quotes to include
     const quotes = [];
-    if(selProjectId){
-      // filter by selected project, then by selected quote IDs
-      db.quotes.filter(q => q.projectId === selProjectId).forEach(q => {
-        if(selQuoteIds.size === 0 || selQuoteIds.has(q.id)) quotes.push(q);
-      });
-    } else {
-      // All projects, all quotes
-      db.quotes.forEach(q => {
-        if(selQuoteIds.size === 0 || selQuoteIds.has(q.id)) quotes.push(q);
-      });
-    }
+    db.quotes.forEach(q => {
+      if(selProjectIds.size > 0 && !selProjectIds.has(q.projectId)) return;
+      if(selQuoteIds.size === 0 || selQuoteIds.has(q.id)) quotes.push(q);
+    });
 
     // Consolidate materials: key = matPick || desc (normalized lowercase)
     const matMap = {};
@@ -4602,26 +4602,63 @@ function renderBOMPage(){
 
   function render(){
     const projects = db.projects;
-    const quotesForProject = selProjectId
-      ? db.quotes.filter(q => q.projectId === selProjectId)
+
+    // All quotes visible = those belonging to selected projects (or all if none selected)
+    const quotesForFilter = selProjectIds.size > 0
+      ? db.quotes.filter(q => selProjectIds.has(q.projectId))
       : db.quotes;
 
     const bom = buildBOM();
     const totalCost = bom.reduce((s, r) => s + r.totalCost, 0);
     const totalItems = bom.length;
 
-    // Project selector
-    const projOptions = projects.map(p =>
-      `<option value="${escapeAttr(p.id)}" ${selProjectId===p.id?'selected':''}>${escapeHTML(p.name)}</option>`
-    ).join('');
+    // ── Project groups ──
+    const segMeta = {
+      noauth: { label: 'En curso',    ico: '🔵', color: 'rgba(59,130,246,.12)',  border: 'rgba(59,130,246,.3)'  },
+      auth:   { label: 'Autorizado',  ico: '🟢', color: 'rgba(22,163,74,.10)',   border: 'rgba(22,163,74,.3)'   },
+    };
+    const groups = { noauth: [], auth: [] };
+    projects.forEach(p => { const s = projSeg(p); if(groups[s]) groups[s].push(p); });
 
-    // Quote checkboxes
-    const quoteChecks = quotesForProject.map(q => {
+    const projectGroupsHtml = ['noauth','auth'].map(seg => {
+      const grp = groups[seg];
+      if(!grp.length) return '';
+      const meta = segMeta[seg];
+      // check if ALL of this group are selected (or global "all" mode)
+      const allSel = selProjectIds.size === 0 || grp.every(p => selProjectIds.has(p.id));
+      const someSel = selProjectIds.size === 0 || grp.some(p => selProjectIds.has(p.id));
+      return `
+        <div style="margin-bottom:10px;border:1px solid ${meta.border};border-radius:12px;overflow:hidden;">
+          <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:${meta.color};cursor:pointer;" data-seg-toggle="${seg}">
+            <input type="checkbox" class="bomSegChk" data-seg="${seg}"
+              ${allSel?'checked':''} ${(!allSel&&someSel)?'data-indeterminate="1"':''}
+              style="accent-color:var(--accent);width:15px;height:15px;flex-shrink:0;" onclick="event.stopPropagation()">
+            <span style="font-size:13px;font-weight:800;flex:1;">${meta.ico} ${meta.label}</span>
+            <span style="font-size:11px;color:var(--muted);font-weight:600;">${grp.length} proy.</span>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:0;padding:4px 8px 6px;">
+            ${grp.map(p => {
+              const isSel = selProjectIds.size === 0 || selProjectIds.has(p.id);
+              const qCount = db.quotes.filter(q=>q.projectId===p.id).length;
+              return `<label style="display:flex;align-items:center;gap:8px;padding:6px 4px;border-bottom:1px solid var(--border);cursor:pointer;font-size:13px;user-select:none;">
+                <input type="checkbox" class="bomProjChk" value="${escapeAttr(p.id)}"
+                  ${isSel?'checked':''}
+                  style="accent-color:var(--accent);width:14px;height:14px;flex-shrink:0;">
+                <span style="flex:1;min-width:0;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHTML(p.name||'—')}</span>
+                <span style="color:var(--muted);font-size:11px;flex-shrink:0;">${qCount} cot.</span>
+              </label>`;
+            }).join('')}
+          </div>
+        </div>`;
+    }).join('');
+
+    // Quote checkboxes (only for selected projects)
+    const quoteChecks = quotesForFilter.map(q => {
       const t = quoteSellTotals(q);
-      const proj = selProjectId ? '' : ` · ${escapeHTML((db.projects.find(p=>p.id===q.projectId)||{}).name||'')}`;
+      const projName = escapeHTML((db.projects.find(p=>p.id===q.projectId)||{}).name||'');
       return `<label style="display:flex;align-items:center;gap:8px;padding:7px 10px;border:1px solid var(--border);border-radius:10px;cursor:pointer;font-size:13px;background:var(--card);user-select:none;">
         <input type="checkbox" class="bomQuoteChk" value="${q.id}" ${selQuoteIds.has(q.id)||selQuoteIds.size===0?'checked':''} style="accent-color:var(--accent);width:16px;height:16px;">
-        <span style="flex:1;min-width:0;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHTML(q.name||q.code||'—')}${proj}</span>
+        <span style="flex:1;min-width:0;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHTML(q.name||q.code||'—')} <span style="font-weight:400;color:var(--muted);">· ${projName}</span></span>
         <span style="color:var(--muted);font-size:11px;flex-shrink:0;">${q.status==='authorized'?'✅':'📝'} $${money(t.venta)}</span>
       </label>`;
     }).join('');
@@ -4668,16 +4705,14 @@ function renderBOMPage(){
     content.innerHTML = `
       <!-- FILTROS -->
       <div class="card" style="margin-bottom:12px;">
-        <div style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:8px;">FILTRAR POR PROYECTO</div>
-        <div class="field" style="margin-bottom:10px;">
-          <span class="ico">📁</span>
-          <select id="bomProjSel" style="flex:1;border:none;background:transparent;font-size:13px;font-weight:700;">
-            <option value="">— Todos los proyectos —</option>
-            ${projOptions}
-          </select>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+          <div style="font-size:12px;font-weight:700;color:var(--muted);">FILTRAR POR PROYECTO</div>
+          <button class="btn small" id="bomSelAll" style="font-size:11px;">Todos</button>
         </div>
-        ${quotesForProject.length ? `
-          <div style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:8px;">COTIZACIONES A INCLUIR <span style="font-weight:400;">(todas marcadas = incluye todas)</span></div>
+        ${projectGroupsHtml}
+
+        ${quotesForFilter.length ? `
+          <div style="font-size:12px;font-weight:700;color:var(--muted);margin:12px 0 8px;">COTIZACIONES A INCLUIR <span style="font-weight:400;">(todas marcadas = incluye todas)</span></div>
           <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px;" id="bomQuoteList">
             ${quoteChecks}
           </div>
@@ -4685,7 +4720,7 @@ function renderBOMPage(){
             <button class="btn small" id="bomChkAll">Marcar todas</button>
             <button class="btn small" id="bomUnchkAll">Desmarcar</button>
           </div>
-        ` : '<div style="color:var(--muted);font-size:13px;">Sin cotizaciones en este proyecto.</div>'}
+        ` : '<div style="color:var(--muted);font-size:13px;margin-top:8px;">Sin cotizaciones para los proyectos seleccionados.</div>'}
       </div>
 
       <!-- KPIs -->
@@ -4696,7 +4731,7 @@ function renderBOMPage(){
         </div>
         <div class="kpi-box">
           <div class="kl">Cotizaciones incluidas</div>
-          <div class="kv">${selQuoteIds.size || quotesForProject.length}</div>
+          <div class="kv">${selQuoteIds.size || quotesForFilter.length}</div>
         </div>
         <div class="kpi-box">
           <div class="kl">Costo total estimado</div>
@@ -4742,11 +4777,61 @@ function renderBOMPage(){
       </div></div>`}
     `;
 
-    // Bind project selector
-    document.getElementById('bomProjSel').addEventListener('change', e => {
-      selProjectId = e.target.value;
+    // ── "Todos" button ──
+    const selAllBtn = document.getElementById('bomSelAll');
+    if(selAllBtn) selAllBtn.addEventListener('click', () => {
+      selProjectIds = new Set();
       selQuoteIds = new Set();
       render();
+    });
+
+    // ── Segment checkbox (select/deselect whole group) ──
+    document.querySelectorAll('.bomSegChk').forEach(chk => {
+      // Set indeterminate visual
+      if(chk.dataset.indeterminate) chk.indeterminate = true;
+      chk.addEventListener('change', () => {
+        const seg = chk.dataset.seg;
+        const segProjects = db.projects.filter(p => projSeg(p) === seg).map(p => p.id);
+        // If global "all" mode, first materialize current state
+        if(selProjectIds.size === 0){
+          selProjectIds = new Set(db.projects.map(p => p.id));
+        }
+        if(chk.checked){
+          segProjects.forEach(id => selProjectIds.add(id));
+        } else {
+          segProjects.forEach(id => selProjectIds.delete(id));
+        }
+        // If all projects selected again → reset to "all" mode
+        if(selProjectIds.size === db.projects.length) selProjectIds = new Set();
+        selQuoteIds = new Set();
+        render();
+      });
+    });
+
+    // ── Individual project checkboxes ──
+    document.querySelectorAll('.bomProjChk').forEach(chk => {
+      chk.addEventListener('change', () => {
+        if(selProjectIds.size === 0){
+          selProjectIds = new Set(db.projects.map(p => p.id));
+        }
+        if(chk.checked){
+          selProjectIds.add(chk.value);
+        } else {
+          selProjectIds.delete(chk.value);
+        }
+        if(selProjectIds.size === db.projects.length) selProjectIds = new Set();
+        selQuoteIds = new Set();
+        render();
+      });
+    });
+
+    // ── Segment header click toggles its checkbox ──
+    document.querySelectorAll('[data-seg-toggle]').forEach(div => {
+      div.addEventListener('click', e => {
+        if(e.target.tagName === 'INPUT') return;
+        const chk = div.querySelector('.bomSegChk');
+        if(chk){ chk.checked = !chk.checked; chk.dispatchEvent(new Event('change')); }
+      });
     });
 
     // Bind quote checkboxes
