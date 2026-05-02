@@ -135,12 +135,14 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);overscroll-b
 
 /* ── DROPDOWN NAV (mobile submenus) ── */
 .nav-dropdown{
-  position:fixed;bottom:calc(var(--nav-h) + 6px);
+  position:fixed;bottom:calc(var(--nav-h) + env(safe-area-inset-bottom) + 6px);
   background:var(--card);border:1px solid var(--border);
   border-radius:14px;
   box-shadow:0 8px 40px rgba(0,0,0,.18);
   padding:6px;min-width:200px;z-index:60;
   display:none;animation:slideDown .12s ease;
+  max-height:calc(100dvh - var(--nav-h) - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 20px);
+  overflow-y:auto;-webkit-overflow-scrolling:touch;
 }
 .nav-dropdown.open{display:block;}
 .nav-dd-item{
@@ -3124,8 +3126,8 @@ let currentScreen = "home"; // "home" | "app"
 
 
 function hideAllScreens(){
-  document.getElementById("homeScreen").style.display = "none";
-  document.getElementById("sectionScreen").style.display = "none";
+  const hs=document.getElementById("homeScreen"); if(hs){ hs.style.display=""; hs.classList.remove("show"); }
+  const ss=document.getElementById("sectionScreen"); if(ss){ ss.style.display=""; ss.classList.remove("show"); }
 }
 
 
@@ -3551,7 +3553,10 @@ function refreshLogo(b64){
 function showSection(section){
   document.getElementById("homeScreen").classList.remove("show");
   document.getElementById("app").style.display = "";
-  document.getElementById("sectionScreen").classList.add("show");
+  // Clear any inline display:none that may override the CSS class
+  const ss = document.getElementById("sectionScreen");
+  ss.style.display = "";
+  ss.classList.add("show");
   currentSection = section;
   _renderSection(section);
   _pushNav("section", {section});
@@ -4358,7 +4363,7 @@ function renderSalesPage(){
   // - Con anticipo/pago registrado (ya entró dinero, aunque no estén terminados)
   const rows=[];
   let totalVentas=0, totalCostoVar=0;
-  let totalCobrado=0, totalPorCobrar=0, totalAnticipo=0;
+  let totalCobrado=0, totalPorCobrar=0, totalAnticipo=0, totalMP=0, totalRutas=0;
   db.projects.forEach(p=>{
     const pay = p.payStatus||"";
     const tienePago = pay==="pagado" || pay==="anticipo";
@@ -4371,9 +4376,9 @@ function renderSalesPage(){
     if(!inMonth) return;
     const aqs=db.quotes.filter(q=>q.projectId===p.id&&q.status==="authorized");
     if(!aqs.length) return;
-    let venta=0, costoVar=0;
-    aqs.forEach(q=>{ const qty=Number(q.qty)||1; const t=quoteSellTotals(q); venta+=t.venta*qty; costoVar+=(t.mp+t.ruta)*qty; });
-    totalVentas+=venta; totalCostoVar+=costoVar;
+    let venta=0, costoVar=0, costoMP=0, costoRutas=0;
+    aqs.forEach(q=>{ const qty=Number(q.qty)||1; const t=quoteSellTotals(q); venta+=t.venta*qty; costoMP+=t.mp*qty; costoRutas+=t.ruta*qty; costoVar+=(t.mp+t.ruta)*qty; });
+    totalVentas+=venta; totalCostoVar+=costoVar; totalMP+=costoMP; totalRutas+=costoRutas;
     // Split by payment status — anticipo = solo lo recibido entra al flujo
     const montoAnticipo = Number(p.anticipo||0);
     let cobrado=0, porCobrar=0, anticipo=0;
@@ -4388,7 +4393,7 @@ function renderSalesPage(){
     totalCobrado += cobrado;
     totalAnticipo += anticipo;
     totalPorCobrar += porCobrar;
-    rows.push({id:p.id, name:p.name, client:p.client||"---", venta, costoVar, payStatus:pay, anticipo:montoAnticipo, cobrado, porCobrar});
+    rows.push({id:p.id, name:p.name, client:p.client||"---", venta, costoVar, costoMP, costoRutas, payStatus:pay, anticipo:montoAnticipo, cobrado, porCobrar});
   });
 
   const gastos = _getGastosFijos(y, m);
@@ -4397,7 +4402,10 @@ function renderSalesPage(){
   const margenContribucion = totalVentas - totalCostoVar;
   const pctMC = totalVentas>0 ? (margenContribucion/totalVentas*100) : 0;
   // ER real = basado en lo que entró al flujo
-  const costoVarReal = totalVentas>0 ? (totalCostoVar * totalEnCaja / totalVentas) : 0;
+  const prop = totalVentas>0 ? totalEnCaja/totalVentas : 0;
+  const costoVarReal = totalCostoVar * prop;
+  const costoMPReal = totalMP * prop;
+  const costoRutasReal = totalRutas * prop;
   const margenReal = totalEnCaja - costoVarReal;
   const utilidadOperacion = margenReal - totalFijos;
   const pePesos = pctMC>0 ? (totalFijos / (pctMC/100)) : 0;
@@ -4423,6 +4431,8 @@ function renderSalesPage(){
       <div class="kpi-box" style="background:rgba(59,130,246,.07);border-color:rgba(59,130,246,.2);"><div class="kl">🔄 Anticipo recibido</div><div class="kv" style="font-size:15px;color:var(--accent);">$${money(totalAnticipo)}</div></div>
       <div class="kpi-box" style="background:rgba(220,38,38,.07);border-color:rgba(220,38,38,.2);"><div class="kl">💼 Por cobrar</div><div class="kv" style="font-size:15px;color:var(--red);">$${money(totalPorCobrar)}</div></div>
       <div class="kpi-box"><div class="kl">Utilidad operación</div><div class="kv" style="font-size:15px;color:${utilidadOperacion>=0?"var(--green)":"var(--red)"};">${utilidadOperacion>=0?"+":""}$${money(utilidadOperacion)}</div></div>
+      <div class="kpi-box" style="background:rgba(220,38,38,.05);border-color:rgba(220,38,38,.15);"><div class="kl">🧱 Materia prima</div><div class="kv" style="font-size:15px;color:var(--red);">$${money(costoMPReal)}</div><div class="ks">${totalVentas>0?(costoMPReal/totalEnCaja*100).toFixed(1)+"% de lo cobrado":""}</div></div>
+      <div class="kpi-box" style="background:rgba(220,38,38,.05);border-color:rgba(220,38,38,.15);"><div class="kl">⚙️ M.O. / Rutas</div><div class="kv" style="font-size:15px;color:var(--red);">$${money(costoRutasReal)}</div></div>
     </div>
 
     <!-- Estado de Resultados -->
@@ -4433,7 +4443,9 @@ function renderSalesPage(){
       ${totalAnticipo>0?erRow("  Anticipo recibido", totalAnticipo, false, "var(--muted)", true):""}
       ${totalPorCobrar>0?erRow("  Por cobrar (no suma)", totalPorCobrar, false, "var(--red)", true):""}
       <div style="height:4px;border-top:1px dashed var(--border);margin:4px 0;"></div>
-      ${erRow("(-) Costo proporcional de ventas", costoVarReal, false, "var(--red)", true)}
+      ${erRow("(-) Costo de ventas", costoVarReal, false, "var(--red)")}
+      ${erRow("Materia prima", costoMPReal, false, "var(--red)", true)}
+      ${erRow("Mano de obra / Rutas", costoRutasReal, false, "var(--red)", true)}
       ${erRow("= Margen bruto real", margenReal, true, margenReal>=0?"var(--green)":"var(--red)")}
       ${erRow("(-) Gastos fijos", totalFijos, false, "var(--red)", true)}
       <div style="height:4px;"></div>
@@ -4486,7 +4498,7 @@ function renderSalesPage(){
           : r.payStatus==="vencido"
           ? `<span style="color:var(--red);font-size:11px;">⚠️ Vencido — sin cobrar</span>`
           : `<span style="color:var(--muted);font-size:11px;">💼 Sin cobrar</span>`;
-        return `<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--border);font-size:13px;gap:10px;"><div style="flex:1;min-width:0;"><div style="font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHTML(r.name)}</div><div style="margin-top:2px;">${cajaTxt}</div></div><div style="text-align:right;flex-shrink:0;"><div style="font-weight:900;color:var(--accent2);">$${money(r.venta)}</div><div style="font-size:11px;color:var(--muted);">CV: $${money(r.costoVar)}</div></div></div>`;
+        return `<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--border);font-size:13px;gap:10px;"><div style="flex:1;min-width:0;"><div style="font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHTML(r.name)}</div><div style="margin-top:2px;">${cajaTxt}</div></div><div style="text-align:right;flex-shrink:0;"><div style="font-weight:900;color:var(--accent2);">$${money(r.venta)}</div><div style="font-size:11px;color:var(--muted);">MP: $${money(r.costoMP)} · MO: $${money(r.costoRutas)}</div></div></div>`;
       }).join("")}
     </div>`:
     `<div class="empty"><div class="ico">&#128202;</div><h3>Sin proyectos terminados</h3><p>Marca proyectos como terminados para verlos aqui.</p></div>`}
@@ -4685,7 +4697,7 @@ function _popNav(){
   if(ap) ap.style.display="";
   if(prev.page==="project-detail"){ openProjectDetail(prev.extra.pid, prev.extra.tab); }
   else if(prev.page==="quote-editor"){ const q=db.quotes.find(x=>x.id===prev.extra.qid); if(q) openQuoteEditorPage(q); else showPage("projects"); }
-  else if(prev.page==="section"){ showSection(prev.extra.section); }
+  else if(prev.page==="section"){ const ss=document.getElementById("sectionScreen"); if(ss) ss.style.display=""; showSection(prev.extra.section); }
   else showPage(prev.page);
 }
 function _updateBackBtn(){
@@ -4824,11 +4836,17 @@ document.addEventListener("DOMContentLoaded", bootNew);
 
 // Mobile-safe showSection: ensures app is visible first
 function mShowSection(section){
+  closeAllDropdowns();
   const hs=document.getElementById('homeScreen');
+  const ss=document.getElementById('sectionScreen');
   const ap=document.getElementById('app');
   if(hs) hs.classList.remove('show');
-  if(ap) ap.style.display='';
+  if(ap){ ap.style.display=''; ap.style.cssText='display:flex;'; }
+  // Make sure sectionScreen is in the DOM flow
+  if(ss){ ss.style.display=''; }
   showSection(section);
+  // Update float back button
+  _updateBackBtn();
 }
 
 function sNavActive(key){
