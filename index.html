@@ -4353,12 +4353,18 @@ function renderSalesPage(){
   const content=document.getElementById("salesContent"); if(!content) return;
   const y=_salesCursor.getFullYear(), m=_salesCursor.getMonth();
 
-  // Proyectos TERMINADOS en el mes
+  // Proyectos que entran a ventas:
+  // - Terminados en el mes, O
+  // - Con anticipo/pago registrado (ya entró dinero, aunque no estén terminados)
   const rows=[];
   let totalVentas=0, totalCostoVar=0;
   let totalCobrado=0, totalPorCobrar=0, totalAnticipo=0;
   db.projects.forEach(p=>{
-    if(!projectIsDone(p.id)) return;
+    const pay = p.payStatus||"";
+    const tienePago = pay==="pagado" || pay==="anticipo";
+    const terminado = projectIsDone(p.id);
+    // Incluir si: terminado O tiene pago/anticipo
+    if(!terminado && !tienePago) return;
     const fechaRef = p.deliveryDate||p.createdAt||"";
     const d = parseISO(fechaRef);
     const inMonth = d && d.getFullYear()===y && d.getMonth()===m;
@@ -4369,7 +4375,6 @@ function renderSalesPage(){
     aqs.forEach(q=>{ const qty=Number(q.qty)||1; const t=quoteSellTotals(q); venta+=t.venta*qty; costoVar+=(t.mp+t.ruta)*qty; });
     totalVentas+=venta; totalCostoVar+=costoVar;
     // Split by payment status — anticipo = solo lo recibido entra al flujo
-    const pay = p.payStatus||"";
     const montoAnticipo = Number(p.anticipo||0);
     let cobrado=0, porCobrar=0, anticipo=0;
     if(pay==="pagado"){
