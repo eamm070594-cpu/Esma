@@ -312,26 +312,26 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);overscroll-b
 .field-label{font-size:10.5px;font-weight:700;color:var(--muted);letter-spacing:.6px;text-transform:uppercase;margin-bottom:5px;margin-top:14px;}
 
 /* ── PROJECT CARD ── */
-/* móvil: lista 1 columna con thumb al lado */
-.proj-grid{display:flex;flex-direction:column;gap:8px;}
+/* 3 columnas en móvil, foto arriba completa */
+.proj-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
 .proj-card{
   background:var(--card);border:1px solid var(--border);
   border-radius:var(--radius);overflow:hidden;
   cursor:pointer;transition:all .15s;
-  box-shadow:var(--shadow);display:flex;flex-direction:row;align-items:stretch;
+  box-shadow:var(--shadow);display:flex;flex-direction:column;
 }
 .proj-card:hover{box-shadow:var(--shadow2);border-color:rgba(37,99,235,.2);}
-.proj-card:active{transform:scale(.99);}
+.proj-card:active{transform:scale(.98);}
 .proj-card .thumb{
-  width:80px;min-height:80px;flex-shrink:0;
+  width:100%;aspect-ratio:4/3;
   background:var(--bg3);overflow:hidden;
   display:grid;place-items:center;
 }
 .proj-card .thumb img{width:100%;height:100%;object-fit:cover;}
-.proj-card .info{flex:1;min-width:0;padding:10px 10px 8px;}
-.proj-card .name{font-size:14px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.proj-card .meta{font-size:11px;color:var(--muted);margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.proj-card .right{display:flex;flex-direction:column;align-items:flex-end;justify-content:center;padding:10px 10px;gap:5px;flex-shrink:0;}
+.proj-card .info{flex:1;min-width:0;padding:7px 8px 4px;}
+.proj-card .name{font-size:11px;font-weight:800;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;}
+.proj-card .meta{font-size:10px;color:var(--muted);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.proj-card .right{display:flex;align-items:center;justify-content:space-between;padding:4px 8px 7px;gap:4px;flex-wrap:wrap;}
 .badge.green{background:rgba(21,128,61,.12);color:var(--green);border:1px solid rgba(21,128,61,.2);}
 .badge.amber{background:rgba(180,83,9,.12);color:var(--amber);border:1px solid rgba(180,83,9,.2);}
 .badge.red{background:rgba(220,38,38,.1);color:var(--red);border:1px solid rgba(220,38,38,.2);}
@@ -541,8 +541,8 @@ tbody tr:hover td{background:rgba(37,99,235,.03);}
 .tools-label{font-size:9.5px;color:var(--muted);font-weight:700;letter-spacing:.7px;text-transform:uppercase;padding:6px 12px 2px;}
 
 /* ── PROJ CARD (mobile list) ── */
-/* desktop: 2 columnas con imagen arriba */
-.proj-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;}
+/* desktop: 3 columnas con imagen arriba */
+.proj-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;}
 .proj-card{
   background:var(--card);border:1px solid var(--border);
   border-radius:12px;overflow:hidden;
@@ -552,15 +552,15 @@ tbody tr:hover td{background:rgba(37,99,235,.03);}
 .proj-card:hover{box-shadow:var(--shadow2);border-color:rgba(37,99,235,.2);transform:translateY(-2px);}
 .proj-card:active{transform:scale(.99);}
 .proj-card .thumb{
-  width:100%;height:140px;flex-shrink:0;
+  width:100%;aspect-ratio:16/9;
   background:var(--bg3);overflow:hidden;
   display:grid;place-items:center;
 }
 .proj-card .thumb img{width:100%;height:100%;object-fit:cover;}
 .proj-card .info{flex:1;min-width:0;padding:10px 12px 6px;}
-.proj-card .name{font-size:14px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.proj-card .meta{font-size:11.5px;color:var(--muted);margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.proj-card .right{display:flex;align-items:center;justify-content:space-between;padding:6px 12px 10px;gap:6px;flex-shrink:0;}</style>
+.proj-card .name{font-size:13px;font-weight:800;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;}
+.proj-card .meta{font-size:11px;color:var(--muted);margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.proj-card .right{display:flex;align-items:center;justify-content:space-between;padding:5px 12px 10px;gap:6px;flex-shrink:0;}</style>
   <!-- Firebase SDK (compat) -->
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
@@ -1550,7 +1550,7 @@ function renderQuotes(p){
   $("mainContent").querySelectorAll("button[data-act]").forEach(b=>on(b,"click", ()=>{
     const q=db.quotes.find(x=>x.id===b.dataset.id); if(!q) return;
     if(b.dataset.act==="edit") openQuoteEditor(q);
-    if(b.dataset.act==="toggle"){ q.status=(q.status==="authorized")?"draft":"authorized"; save(); renderProjectsList(); renderMain(); }
+    if(b.dataset.act==="toggle"){ q.status=(q.status==="authorized")?"draft":"authorized"; if(q.status==="authorized") q.authorizedAt=todayISO(); else delete q.authorizedAt; save(); renderProjectsList(); renderMain(); }
     if(b.dataset.act==="duplicate"){
       const copy=JSON.parse(JSON.stringify(q));
       copy.id=uid(); copy.status="draft"; copy.createdAt=todayISO();
@@ -2044,7 +2044,7 @@ function openQuoteEditor(q){
   on($("qNameInput"),"blur", ()=>{ q.name=$("qNameInput").value.trim()||"Cotización"; save(); });
   on($("qQtyInput"),"blur", ()=>{ q.qty=Math.max(1,Number($("qQtyInput").value||1)); save(); renderLines(); });
   on($("qQtyInput"),"keydown",(e)=>{ if(e.key==="Enter"){ e.preventDefault(); $("qQtyInput").blur(); }});
-  on($("btnToggleAuth"),"click", ()=>{ q.status=(q.status==="authorized")?"draft":"authorized"; save(); renderProjectsList(); renderMain(); });
+  on($("btnToggleAuth"),"click", ()=>{ q.status=(q.status==="authorized")?"draft":"authorized"; if(q.status==="authorized") q.authorizedAt=todayISO(); else delete q.authorizedAt; save(); renderProjectsList(); renderMain(); });
   on($("btnBackQuotes"),"click", ()=>{ q.name=$("qNameInput").value.trim()||"Cotización"; save(); mainTab="quotes"; renderMain(); });
 
   // ── Guardar como plantilla ──
@@ -3708,20 +3708,79 @@ function renderProjectsPage(){
 
   const cnt=document.getElementById("projCount"); if(cnt) cnt.textContent=items.length+" proyecto"+(items.length!==1?"s":"");
 
-  if(!items.length){ box.innerHTML='<div class="empty"><div class="ico">\u{1F4C1}</div><h3>Sin proyectos</h3><p>Crea tu primer proyecto.</p></div>'; return; }
+  if(!items.length){ box.innerHTML='<div class="empty"><div class="ico">📁</div><h3>Sin proyectos</h3><p>Crea tu primer proyecto.</p></div>'; return; }
 
-  box.innerHTML='<div class="proj-grid">'+items.map(p=>{
+  // Orden: Autorizados → En curso → Terminados
+  // Dentro de Autorizados: más antigua autorización primero (lleva más tiempo)
+  // Dentro de otros: más reciente primero
+  const segOrder = {auth:0, noauth:1, done:2};
+
+  function projectAuthorizedAt(pid){
+    // Earliest authorizedAt among authorized quotes of this project
+    const dates = db.quotes
+      .filter(q=>q.projectId===pid && q.status==="authorized" && q.authorizedAt)
+      .map(q=>q.authorizedAt).sort();
+    return dates[0] || null;
+  }
+
+  items.sort((a,b)=>{
+    const so = (segOrder[a.__seg]||0) - (segOrder[b.__seg]||0);
+    if(so !== 0) return so;
+    if(a.__seg === "auth"){
+      // Older authorization first (needs attention sooner)
+      const da = projectAuthorizedAt(a.id) || a.createdAt || "9999";
+      const db2 = projectAuthorizedAt(b.id) || b.createdAt || "9999";
+      return da.localeCompare(db2);
+    }
+    // Others: by delivery date
+    return String(a.deliveryDate||"9999-12-31").localeCompare(String(b.deliveryDate||"9999-12-31"));
+  });
+
+  function makeCard(p){
     const photos=loadPhotos(p.id);
     const thumbSrc=photos.length?(photos[0].url||photos[0].data||""):"";
-    const thumb=thumbSrc?`<img src="${escapeAttr(thumbSrc)}" alt="">`:'<span style="font-size:36px;">📁</span>';
-    const sub=[p.client?("👤 "+p.client):null,p.deliveryDate?("📅 "+p.deliveryDate):null].filter(Boolean).join(" · ");
-    const badgeCls=p.__seg==="auth"?"green":p.__seg==="done"?"gray":"amber";
-    const badgeTxt=p.__seg==="auth"?"Autorizado":p.__seg==="done"?"Terminado":"En curso";
+    const thumb=thumbSrc?`<img src="${escapeAttr(thumbSrc)}" alt="">`:'<span style="font-size:28px;">📁</span>';
     const doneBtn = p.__seg==="done"
-      ? `<button class="btn small" data-toggle-done="${p.id}" style="font-size:10px;padding:2px 7px;color:var(--amber);border-color:rgba(180,83,9,.35);" title="Reabrir">↩</button>`
-      : `<button class="btn small" data-toggle-done="${p.id}" style="font-size:10px;padding:2px 7px;" title="Terminar">✅</button>`;
-    return `<div class="proj-card" data-id="${p.id}"><div class="thumb">${thumb}</div><div class="info"><div class="name">${escapeHTML(p.name||"Sin nombre")}</div><div class="meta">${escapeHTML(sub||"—")}</div></div><div class="right"><span class="badge ${badgeCls}" style="font-size:10px;">${badgeTxt}</span><div style="display:flex;align-items:center;gap:5px;"><span style="font-size:12px;font-weight:800;color:var(--accent2);">$${money(p.__authTotal)}</span>${doneBtn}</div></div></div>`;
-  }).join('')+'</div>';
+      ? `<button class="btn small" data-toggle-done="${p.id}" style="font-size:10px;padding:2px 5px;color:var(--amber);border-color:rgba(180,83,9,.3);" title="Reabrir">↩</button>`
+      : `<button class="btn small" data-toggle-done="${p.id}" style="font-size:9px;padding:2px 5px;" title="Terminar">✓</button>`;
+    // Show days since authorized for auth projects
+    const authAt = projectAuthorizedAt(p.id);
+    const daysSince = authAt ? Math.floor((Date.now()-new Date(authAt+"T00:00:00").getTime())/86400000) : null;
+    const ageTxt = p.__seg==="auth" && daysSince!==null
+      ? `<span style="font-size:9px;color:${daysSince>14?"var(--red)":daysSince>7?"var(--amber)":"var(--muted)"};">${daysSince}d</span>`
+      : "";
+    return `<div class="proj-card" data-id="${p.id}">
+      <div class="thumb">${thumb}</div>
+      <div class="info">
+        <div class="name">${escapeHTML(p.name||"Sin nombre")}</div>
+        ${p.client?`<div class="meta">${escapeHTML(p.client)}</div>`:""}
+      </div>
+      <div class="right">
+        <div style="display:flex;align-items:center;gap:3px;">
+          <span style="font-size:11px;font-weight:900;color:var(--accent2);">$${money(p.__authTotal)}</span>
+          ${ageTxt}
+        </div>
+        ${doneBtn}
+      </div>
+    </div>`;
+  }
+
+  const groups = [
+    {seg:"auth",   label:"✅ Autorizados"},
+    {seg:"noauth", label:"🔵 En curso"},
+    {seg:"done",   label:"🏁 Terminados"},
+  ];
+
+  let html = "";
+  groups.forEach(g => {
+    const grpItems = items.filter(p => p.__seg === g.seg);
+    if(!grpItems.length) return;
+    html += `<div style="margin-bottom:16px;">
+      <div style="font-size:10.5px;font-weight:800;color:var(--muted);letter-spacing:.7px;text-transform:uppercase;margin-bottom:8px;padding:0 2px;">${g.label} &nbsp;·&nbsp; ${grpItems.length}</div>
+      <div class="proj-grid">${grpItems.map(makeCard).join("")}</div>
+    </div>`;
+  });
+  box.innerHTML = html;
 
   box.querySelectorAll(".proj-card").forEach(el=>el.addEventListener("click",(e)=>{
     if(e.target.closest("[data-toggle-done]")) return;
@@ -3882,7 +3941,7 @@ function renderDetailQuotes(p, content){
   `;
   document.getElementById("btnAddQuote").addEventListener("click",()=>{ openQuoteEditorPage(createQuote(p.id)); renderProjectsPage(); });
   content.querySelectorAll("button[data-edit-q]").forEach(b=>b.addEventListener("click",()=>{ const q=db.quotes.find(x=>x.id===b.dataset.editQ); if(q) openQuoteEditorPage(q); }));
-  content.querySelectorAll("button[data-toggle-q]").forEach(b=>b.addEventListener("click",()=>{ const q=db.quotes.find(x=>x.id===b.dataset.toggleQ); if(!q) return; q.status=q.status==="authorized"?"draft":"authorized"; save(); renderProjectsPage(); renderDetailQuotes(p,content); }));
+  content.querySelectorAll("button[data-toggle-q]").forEach(b=>b.addEventListener("click",()=>{ const q=db.quotes.find(x=>x.id===b.dataset.toggleQ); if(!q) return; q.status=q.status==="authorized"?"draft":"authorized"; if(q.status==="authorized") q.authorizedAt=todayISO(); else delete q.authorizedAt; save(); renderProjectsPage(); renderDetailQuotes(p,content); }));
   content.querySelectorAll("button[data-del-q]").forEach(b=>b.addEventListener("click",()=>{ if(!confirm("\u00BFEliminar cotizacion?")) return; db.quotes=db.quotes.filter(x=>x.id!==b.dataset.delQ); save(); renderProjectsPage(); renderDetailQuotes(p,content); }));
   content.querySelectorAll("button[data-dup-q]").forEach(b=>b.addEventListener("click",()=>{ const q=db.quotes.find(x=>x.id===b.dataset.dupQ); if(!q) return; const copy=JSON.parse(JSON.stringify(q)); copy.id=uid(); copy.status="draft"; copy.createdAt=todayISO(); copy.name=(q.name||q.createdAt||"Cotizaci\u00F3n")+" (copia)"; copy.code=""; db.quotes.push(copy); save(); renderProjectsPage(); renderDetailQuotes(p,content); openQuoteEditorPage(copy); }));
 
@@ -4029,7 +4088,7 @@ function openQuoteEditorPage(q){
 
   document.getElementById("qNameInput").addEventListener("blur",()=>{ q.name=document.getElementById("qNameInput").value.trim()||"Cotizacion"; save(); });
   document.getElementById("qNameInput").addEventListener("keydown",(e)=>{ if(e.key==="Enter"){ e.preventDefault(); q.name=document.getElementById("qNameInput").value.trim()||"Cotizacion"; save(); document.getElementById("qNameInput").blur(); } });
-  document.getElementById("btnToggleAuth").addEventListener("click",()=>{ q.status=q.status==="authorized"?"draft":"authorized"; save(); renderProjectsPage(); openQuoteEditorPage(q); });
+  document.getElementById("btnToggleAuth").addEventListener("click",()=>{ q.status=q.status==="authorized"?"draft":"authorized"; if(q.status==="authorized") q.authorizedAt=todayISO(); else delete q.authorizedAt; save(); renderProjectsPage(); openQuoteEditorPage(q); });
   document.getElementById("btnSaveQuote").addEventListener("click",()=>{ q.name=document.getElementById("qNameInput").value.trim()||"Cotizacion"; save(); const btn=document.getElementById("btnSaveQuote"); btn.textContent="✅ Guardado"; setTimeout(()=>{ if(btn) btn.textContent="💾 Guardar"; },1500); });
   document.getElementById("btnQuotePDF2").addEventListener("click",()=>{
     openPDFSelector(q.projectId);
