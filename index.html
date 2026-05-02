@@ -74,6 +74,27 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);overscroll-b
 .topbar .sync-dot.syncing{background:var(--amber);animation:pulse 1s infinite;}
 .topbar .sync-dot.error{background:var(--red);}
 
+/* ── FLOATING BACK BUTTON (mobile) ── */
+#btnFloatBack{
+  display:none;
+  position:fixed;
+  bottom:calc(var(--nav-h) + 10px);
+  left:16px;
+  z-index:49;
+  width:52px;height:52px;
+  border-radius:50%;
+  background:var(--card);
+  border:1.5px solid var(--border);
+  box-shadow:0 4px 18px rgba(0,0,0,.18);
+  font-size:22px;
+  cursor:pointer;
+  align-items:center;justify-content:center;
+  color:var(--text);
+  transition:transform .12s;
+}
+#btnFloatBack.show{display:flex;}
+#btnFloatBack:active{transform:scale(.9);}
+
 /* ── BOTTOM NAV (mobile) ── */
 .bottomnav{
   position:fixed;bottom:0;left:0;right:0;
@@ -139,6 +160,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);overscroll-b
   #screen{padding-bottom:16px;}
   .bottomnav{display:none;}
   .topbar{display:none;}
+  #btnFloatBack{display:none!important;}
   .nav-dropdown{display:none!important;}
   .btn-fab{bottom:24px;}
 
@@ -290,32 +312,26 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);overscroll-b
 .field-label{font-size:10.5px;font-weight:700;color:var(--muted);letter-spacing:.6px;text-transform:uppercase;margin-bottom:5px;margin-top:14px;}
 
 /* ── PROJECT CARD ── */
+/* móvil: lista 1 columna con thumb al lado */
+.proj-grid{display:flex;flex-direction:column;gap:8px;}
 .proj-card{
   background:var(--card);border:1px solid var(--border);
-  border-radius:var(--radius);padding:14px;
-  display:flex;gap:12px;align-items:flex-start;
-  cursor:pointer;transition:all .15s;margin-bottom:10px;
-  box-shadow:var(--shadow);
+  border-radius:var(--radius);overflow:hidden;
+  cursor:pointer;transition:all .15s;
+  box-shadow:var(--shadow);display:flex;flex-direction:row;align-items:stretch;
 }
-.proj-card:hover{box-shadow:var(--shadow2);border-color:rgba(37,99,235,.2);transform:translateY(-1px);}
-.proj-card:active{transform:scale(.99);box-shadow:var(--shadow);}
+.proj-card:hover{box-shadow:var(--shadow2);border-color:rgba(37,99,235,.2);}
+.proj-card:active{transform:scale(.99);}
 .proj-card .thumb{
-  width:52px;height:52px;border-radius:12px;
-  flex-shrink:0;overflow:hidden;
-  background:var(--bg3);border:1px solid var(--border);
-  display:grid;place-items:center;font-size:22px;
+  width:80px;min-height:80px;flex-shrink:0;
+  background:var(--bg3);overflow:hidden;
+  display:grid;place-items:center;
 }
 .proj-card .thumb img{width:100%;height:100%;object-fit:cover;}
-.proj-card .info{flex:1;min-width:0;}
-.proj-card .name{font-size:15px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:-.2px;}
-.proj-card .meta{font-size:12px;color:var(--muted);margin-top:3px;}
-.proj-card .right{display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0;}
-
-/* ── BADGES ── */
-.badge{
-  display:inline-flex;align-items:center;gap:4px;
-  padding:3px 9px;border-radius:999px;font-size:11px;font-weight:700;
-}
+.proj-card .info{flex:1;min-width:0;padding:10px 10px 8px;}
+.proj-card .name{font-size:14px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.proj-card .meta{font-size:11px;color:var(--muted);margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.proj-card .right{display:flex;flex-direction:column;align-items:flex-end;justify-content:center;padding:10px 10px;gap:5px;flex-shrink:0;}
 .badge.green{background:rgba(21,128,61,.12);color:var(--green);border:1px solid rgba(21,128,61,.2);}
 .badge.amber{background:rgba(180,83,9,.12);color:var(--amber);border:1px solid rgba(180,83,9,.2);}
 .badge.red{background:rgba(220,38,38,.1);color:var(--red);border:1px solid rgba(220,38,38,.2);}
@@ -525,34 +541,26 @@ tbody tr:hover td{background:rgba(37,99,235,.03);}
 .tools-label{font-size:9.5px;color:var(--muted);font-weight:700;letter-spacing:.7px;text-transform:uppercase;padding:6px 12px 2px;}
 
 /* ── PROJ CARD (mobile list) ── */
+/* desktop: 2 columnas con imagen arriba */
+.proj-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;}
 .proj-card{
   background:var(--card);border:1px solid var(--border);
-  border-radius:12px;padding:13px;
-  display:flex;gap:11px;align-items:flex-start;
-  cursor:pointer;transition:all .12s;margin-bottom:8px;
-  box-shadow:var(--shadow);
+  border-radius:12px;overflow:hidden;
+  cursor:pointer;transition:all .15s;
+  box-shadow:var(--shadow);display:flex;flex-direction:column;
 }
-.proj-card:hover{box-shadow:var(--shadow2);border-color:rgba(37,99,235,.2);}
+.proj-card:hover{box-shadow:var(--shadow2);border-color:rgba(37,99,235,.2);transform:translateY(-2px);}
 .proj-card:active{transform:scale(.99);}
 .proj-card .thumb{
-  width:48px;height:48px;border-radius:11px;
-  flex-shrink:0;overflow:hidden;
-  background:var(--bg3);border:1px solid var(--border);
-  display:grid;place-items:center;font-size:20px;
+  width:100%;height:140px;flex-shrink:0;
+  background:var(--bg3);overflow:hidden;
+  display:grid;place-items:center;
 }
 .proj-card .thumb img{width:100%;height:100%;object-fit:cover;}
-.proj-card .info{flex:1;min-width:0;}
-.proj-card .name{font-size:14px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:-.1px;}
-.proj-card .meta{font-size:11.5px;color:var(--muted);margin-top:3px;}
-.proj-card .right{display:flex;flex-direction:column;align-items:flex-end;gap:5px;flex-shrink:0;}
-
-/* ── RESPONSIVE ── */
-@media(min-width:640px){
-  .home-grid{grid-template-columns:repeat(3,1fr);}
-  .kpi-grid{grid-template-columns:repeat(4,1fr);}
-  .photo-grid{grid-template-columns:repeat(auto-fill,minmax(150px,1fr));}
-}
-</style>
+.proj-card .info{flex:1;min-width:0;padding:10px 12px 6px;}
+.proj-card .name{font-size:14px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.proj-card .meta{font-size:11.5px;color:var(--muted);margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.proj-card .right{display:flex;align-items:center;justify-content:space-between;padding:6px 12px 10px;gap:6px;flex-shrink:0;}</style>
   <!-- Firebase SDK (compat) -->
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
@@ -796,6 +804,9 @@ tbody tr:hover td{background:rgba(37,99,235,.03);}
     </div>
 
   </div>
+
+  <!-- FLOATING BACK BUTTON (mobile only) -->
+  <button id="btnFloatBack" onclick="_popNav()" aria-label="Regresar">←</button>
 
   <!-- BOTTOM NAV (mobile) -->
   <nav class="bottomnav">
@@ -3699,18 +3710,18 @@ function renderProjectsPage(){
 
   if(!items.length){ box.innerHTML='<div class="empty"><div class="ico">\u{1F4C1}</div><h3>Sin proyectos</h3><p>Crea tu primer proyecto.</p></div>'; return; }
 
-  box.innerHTML=items.map(p=>{
+  box.innerHTML='<div class="proj-grid">'+items.map(p=>{
     const photos=loadPhotos(p.id);
     const thumbSrc=photos.length?(photos[0].url||photos[0].data||""):"";
-    const thumb=thumbSrc?`<img src="${escapeAttr(thumbSrc)}" alt="">`:'<span style="font-size:24px;">\u{1F4C1}</span>';
-    const sub=[p.client?("\u{1F464} "+p.client):null,p.deliveryDate?("\u{1F4C5} "+p.deliveryDate):null].filter(Boolean).join(" \u00b7 ");
+    const thumb=thumbSrc?`<img src="${escapeAttr(thumbSrc)}" alt="">`:'<span style="font-size:36px;">📁</span>';
+    const sub=[p.client?("👤 "+p.client):null,p.deliveryDate?("📅 "+p.deliveryDate):null].filter(Boolean).join(" · ");
     const badgeCls=p.__seg==="auth"?"green":p.__seg==="done"?"gray":"amber";
     const badgeTxt=p.__seg==="auth"?"Autorizado":p.__seg==="done"?"Terminado":"En curso";
     const doneBtn = p.__seg==="done"
-      ? `<button class="btn small" data-toggle-done="${p.id}" style="font-size:10px;padding:3px 8px;color:var(--amber);border-color:rgba(180,83,9,.35);" title="Reabrir proyecto">\u21A9 Reabrir</button>`
-      : `<button class="btn small" data-toggle-done="${p.id}" style="font-size:10px;padding:3px 8px;" title="Marcar como terminado">\u2705 Terminar</button>`;
-    return `<div class="proj-card" data-id="${p.id}"><div class="thumb">${thumb}</div><div class="info"><div class="name">${escapeHTML(p.name||"Sin nombre")}</div><div class="meta">${escapeHTML(sub||"Sin datos")}</div><div style="margin-top:5px;">${doneBtn}</div></div><div class="right"><span class="badge ${badgeCls}">${badgeTxt}</span><span style="font-size:13px;font-weight:800;color:var(--accent2);">$${money(p.__authTotal)}</span></div></div>`;
-  }).join("");
+      ? `<button class="btn small" data-toggle-done="${p.id}" style="font-size:10px;padding:2px 7px;color:var(--amber);border-color:rgba(180,83,9,.35);" title="Reabrir">↩</button>`
+      : `<button class="btn small" data-toggle-done="${p.id}" style="font-size:10px;padding:2px 7px;" title="Terminar">✅</button>`;
+    return `<div class="proj-card" data-id="${p.id}"><div class="thumb">${thumb}</div><div class="info"><div class="name">${escapeHTML(p.name||"Sin nombre")}</div><div class="meta">${escapeHTML(sub||"—")}</div></div><div class="right"><span class="badge ${badgeCls}" style="font-size:10px;">${badgeTxt}</span><div style="display:flex;align-items:center;gap:5px;"><span style="font-size:12px;font-weight:800;color:var(--accent2);">$${money(p.__authTotal)}</span>${doneBtn}</div></div></div>`;
+  }).join('')+'</div>';
 
   box.querySelectorAll(".proj-card").forEach(el=>el.addEventListener("click",(e)=>{
     if(e.target.closest("[data-toggle-done]")) return;
@@ -4531,6 +4542,9 @@ function _popNav(){
 function _updateBackBtn(){
   const btn=document.getElementById("btnGoBack");
   if(btn) btn.style.display=_navStack.length>1?"":"none";
+  // Float back button (mobile only — hidden on desktop via CSS)
+  const fb=document.getElementById("btnFloatBack");
+  if(fb){ if(_navStack.length>1) fb.classList.add("show"); else fb.classList.remove("show"); }
 }
 
 function buildTopbar(){
