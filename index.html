@@ -553,6 +553,9 @@ tbody tr:hover td{background:rgba(37,99,235,.03);}
   .photo-grid{grid-template-columns:repeat(auto-fill,minmax(150px,1fr));}
 }
 </style>
+  <!-- Firebase SDK (compat) -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
 </head>
 <body>
 
@@ -679,6 +682,9 @@ tbody tr:hover td{background:rgba(37,99,235,.03);}
     <button class="s-nav-item" id="ssub-results-be" onclick="showSection('costos');sSubActive('results','be')">
       <span class="s-ico">⚖️</span>Costos / PE
     </button>
+    <button class="s-nav-item" id="snav-materiales" onclick="showSection('materiales');sNavActive('materiales')">
+      <span class="s-ico">🗄</span>Materiales y Rutas
+    </button>
     <button class="s-nav-item" id="snav-resumen" onclick="sNavGo('resumen')">
       <span class="s-ico">📋</span>Resumen diario
     </button>
@@ -797,13 +803,13 @@ tbody tr:hover td{background:rgba(37,99,235,.03);}
       <div class="nav-ico-wrap"><span class="nav-ico">📁</span></div>
       <span class="nav-lbl">Proyectos</span>
     </button>
-    <button class="nav-item" id="mnav-calendar" onclick="mNavGo('calendar')">
-      <div class="nav-ico-wrap"><span class="nav-ico">📅</span></div>
-      <span class="nav-lbl">Calendario</span>
+    <button class="nav-item" id="mnav-cotizaciones" onclick="closeAllDropdowns();mShowSection('cotizaciones')">
+      <div class="nav-ico-wrap"><span class="nav-ico">🧾</span></div>
+      <span class="nav-lbl">Cotizaciones</span>
     </button>
-    <button class="nav-item" id="mnav-results" onclick="mNavGo('sales')">
-      <div class="nav-ico-wrap"><span class="nav-ico">📊</span></div>
-      <span class="nav-lbl">Resultados</span>
+    <button class="nav-item" id="mnav-bom" onclick="mNavGo('bom')">
+      <div class="nav-ico-wrap"><span class="nav-ico">📦</span></div>
+      <span class="nav-lbl">BOM</span>
     </button>
     <button class="nav-item" id="mnav-more" onclick="mNavToggle('more',event)">
       <div class="nav-ico-wrap"><span class="nav-ico">☰</span></div>
@@ -830,13 +836,16 @@ tbody tr:hover td{background:rgba(37,99,235,.03);}
 
   <!-- DROPDOWN: Más -->
   <div class="nav-dropdown" id="dd-more">
-    <div class="nav-dd-item" onclick="mNavGo('resumen')"><span class="dd-ico">📋</span>Resumen diario/semanal</div>
-    <div class="nav-dd-item" onclick="mNavGo('bom')"><span class="dd-ico">📦</span>BOM / Materiales</div>
-    <div class="nav-dd-item" onclick="closeAllDropdowns();mShowSection('cotizaciones')"><span class="dd-ico">🧾</span>Cotizaciones</div>
+    <div class="nav-dd-item" onclick="mNavGo('calendar')"><span class="dd-ico">📅</span>Calendario</div>
+    <div class="nav-dd-item" onclick="mNavGo('sales')"><span class="dd-ico">📈</span>Ventas</div>
+    <div class="nav-dd-item" onclick="mNavGo('resumen')"><span class="dd-ico">📋</span>Resumen diario</div>
     <div class="nav-dd-item" onclick="closeAllDropdowns();mShowSection('compras')"><span class="dd-ico">🛒</span>Compras</div>
+    <div class="nav-dd-item" onclick="closeAllDropdowns();mShowSection('instalaciones')"><span class="dd-ico">🛠️</span>Instalaciones</div>
+    <div class="nav-dd-item" onclick="closeAllDropdowns();mShowSection('tareas')"><span class="dd-ico">✅</span>Tareas</div>
     <div class="nav-dd-divider"></div>
+    <div class="nav-dd-item" onclick="closeAllDropdowns();mShowSection('materiales')"><span class="dd-ico">🗄</span>Materiales y Rutas</div>
+    <div class="nav-dd-item" onclick="closeAllDropdowns();mShowSection('costos')"><span class="dd-ico">⚖️</span>Costos / PE</div>
     <div class="nav-dd-item" onclick="mNavGo('settings')"><span class="dd-ico">⚙️</span>Ajustes</div>
-    <div class="nav-dd-item" onclick="closeAllDropdowns();gsPush()"><span class="dd-ico">⬆</span>Subir a Sheets</div>
     <div class="nav-dd-item" onclick="closeAllDropdowns();exportJSON()"><span class="dd-ico">💾</span>Respaldo</div>
     <div class="nav-dd-divider"></div>
     <div class="nav-dd-item" style="color:var(--red)" onclick="closeAllDropdowns();logout()"><span class="dd-ico">🚪</span>Cerrar sesión</div>
@@ -867,36 +876,67 @@ tbody tr:hover td{background:rgba(37,99,235,.03);}
 const STORAGE_KEY = "esma_app_b_v1";
 const IMGBB_API_KEY = "91c48536cbf1b271a1b7e7eedeea773e";
 
+// ── FIREBASE CONFIG ──────────────────────────────────────────
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyBpO_NEGOoxR8jClO7_6LlwZPxJn22tlTM",
+  authDomain: "esma-industrial.firebaseapp.com",
+  databaseURL: "https://esma-industrial-default-rtdb.firebaseio.com",
+  projectId: "esma-industrial",
+  storageBucket: "esma-industrial.firebasestorage.app",
+  messagingSenderId: "607647211153",
+  appId: "1:607647211153:web:9ec89d8e1b618d84c8a930"
+};
+const FB_PATH = "esma_db";  // ruta raíz en Realtime Database
+
+let _fbApp = null;
+let _fbDb  = null;
+let _fbReady = false;
+let _fbListener = null;
+
+function _initFirebase(){
+  if(_fbReady) return;
+  try {
+    // Use Firebase compat SDK loaded via CDN
+    if(typeof firebase === 'undefined'){
+      console.warn("Firebase SDK not loaded yet");
+      return;
+    }
+    if(!firebase.apps.length){
+      _fbApp = firebase.initializeApp(FIREBASE_CONFIG);
+    } else {
+      _fbApp = firebase.apps[0];
+    }
+    _fbDb = firebase.database();
+    _fbReady = true;
+    console.log("Firebase Realtime Database listo");
+  } catch(e){
+    console.error("Firebase init error:", e);
+  }
+}
+
+// ── IMAGE / PHOTOS (localStorage, unchanged) ──────────────────
 async function uploadToImgbb(base64data){
-  // Quitar el prefijo data:image/jpeg;base64,
   const b64 = base64data.split(",")[1] || base64data;
   const form = new FormData();
   form.append("key", IMGBB_API_KEY);
   form.append("image", b64);
   const res = await fetch("https://api.imgbb.com/1/upload", {method:"POST", body:form});
   const json = await res.json();
-  if(json.success) return json.data.url; // URL directa de la imagen
+  if(json.success) return json.data.url;
   throw new Error(json.error?.message || "Error al subir foto");
 }
-const PHOTOS_KEY_PREFIX = "esma_photos_"; // fotos por proyecto, separadas del DB
+const PHOTOS_KEY_PREFIX = "esma_photos_";
 
 function savePhotos(projectId, photos){
-  try {
-    localStorage.setItem(PHOTOS_KEY_PREFIX + projectId, JSON.stringify(photos||[]));
-  } catch(e) {
-    console.warn("No se pudieron guardar fotos (espacio lleno):", e);
-    alert("No hay espacio suficiente para guardar la foto. Intenta con una imagen más pequeña o elimina fotos antiguas.");
-  }
+  try { localStorage.setItem(PHOTOS_KEY_PREFIX + projectId, JSON.stringify(photos||[])); }
+  catch(e) { alert("No hay espacio para guardar la foto. Intenta con una imagen más pequeña."); }
 }
 function loadPhotos(projectId){
-  try {
-    const raw = localStorage.getItem(PHOTOS_KEY_PREFIX + projectId);
-    return raw ? JSON.parse(raw) : [];
-  } catch(e) { return []; }
+  try { const r = localStorage.getItem(PHOTOS_KEY_PREFIX + projectId); return r ? JSON.parse(r) : []; }
+  catch(e){ return []; }
 }
-function deleteProjectPhotos(projectId){
-  localStorage.removeItem(PHOTOS_KEY_PREFIX + projectId);
-}
+function deleteProjectPhotos(projectId){ localStorage.removeItem(PHOTOS_KEY_PREFIX + projectId); }
+
 const MONTHS = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
 const DOW = ["L","M","M","J","V","S","D"];
 const $ = (id)=>document.getElementById(id);
@@ -918,18 +958,18 @@ function defaultDB(){
       folioCounter: 0,
       breakEven: {
         month: (new Date().toISOString().slice(0,7)),
-        // Variables/Fijos manuales
-        varCosts: { thirdparty: 0, rawMaterial: 0, directLabor: 0, factoryIndirect: 0 },
-        salesVars: { commissions: 0, freight: 0, marketing: 0, serviceWarranty: 0, samples: 0, others: 0 },
-        opVars: { productWarranty: 0, prototypes: 0, liquidations: 0 },
-        fixedOp: { eng: 0, indirect: 0, logistics: 0, plantInst: 0, maintenance: 0, otherPlant: 0 },
-        fixedAdmin: { finance: 0, hr: 0, it: 0, adminInst: 0, otherAdmin: 0, direction: 0, depreciation: 0 }
+        varCosts: { thirdparty:0, rawMaterial:0, directLabor:0, factoryIndirect:0 },
+        salesVars: { commissions:0, freight:0, marketing:0, serviceWarranty:0, samples:0, others:0 },
+        opVars: { productWarranty:0, prototypes:0, liquidations:0 },
+        fixedOp: { eng:0, indirect:0, logistics:0, plantInst:0, maintenance:0, otherPlant:0 },
+        fixedAdmin: { finance:0, hr:0, it:0, adminInst:0, otherAdmin:0, direction:0, depreciation:0 }
       },
     },
     projects:[], quotes:[], installs:[], purchases:[], tasks:[]
   };
 }
-let db=null;
+let db = null;
+
 function normalizeDB(){
   db = db || defaultDB();
   db.settings = db.settings || {};
@@ -938,147 +978,172 @@ function normalizeDB(){
   db.settings.emails = Array.isArray(db.settings.emails)? db.settings.emails : [];
   db.settings.routeDB = Array.isArray(db.settings.routeDB)? db.settings.routeDB : [];
   db.settings.materialDB = Array.isArray(db.settings.materialDB)? db.settings.materialDB : [];
+  db.settings.quoteTemplates = Array.isArray(db.settings.quoteTemplates)? db.settings.quoteTemplates : [];
   db.settings.adminPercent = Number(db.settings.adminPercent ?? 12);
   db.settings.folioCounter = Number(db.settings.folioCounter ?? 0);
   db.settings.breakEven = db.settings.breakEven || defaultDB().settings.breakEven;
-  db.projects = Array.isArray(db.projects)? db.projects : [];
-  db.quotes = Array.isArray(db.quotes)? db.quotes : [];
+  db.projects  = Array.isArray(db.projects)?  db.projects  : [];
+  db.quotes    = Array.isArray(db.quotes)?    db.quotes    : [];
+  db.installs  = Array.isArray(db.installs)?  db.installs  : [];
+  db.purchases = Array.isArray(db.purchases)? db.purchases : [];
+  db.tasks     = Array.isArray(db.tasks)?     db.tasks     : [];
   if(!db.settings.empresa) db.settings.empresa = {nombre:"ESMA INDUSTRIAL", tel:"", email:"", web:"", redes:"", direccion:"", logoB64:"", titulo:"Propuesta de Servicios"};
   else { db.settings.empresa.titulo = db.settings.empresa.titulo || "Propuesta de Servicios"; }
-  // Logo stored separately to survive Sheets sync
   db.settings.empresa.logoB64 = localStorage.getItem("esma_logo_b64") || "";
-  db.installs = Array.isArray(db.installs)? db.installs : [];
-  db.purchases = Array.isArray(db.purchases)? db.purchases : [];
-  db.tasks = Array.isArray(db.tasks)? db.tasks : [];
   db.settings.routeDB.forEach(r=>{ r.costPerHour = Number(r.costPerHour||0); r.breakdown = r.breakdown || {renta:0, mod:0, moi:0, indirectos:0, luz:0, otros:0}; });
   db.projects.forEach(p=>{
-    const local = loadPhotos(p.id); // fotos guardadas localmente (pueden ser base64 o url)
-    const remote = (p.photos||[]).filter(ph=>ph.url); // urls de imgbb que vinieron de Sheets
-    // Combinar: primero las remotas (url), luego las locales que no estén ya
+    const local = loadPhotos(p.id);
+    const remote = (p.photos||[]).filter(ph=>ph.url);
     const remoteUrls = new Set(remote.map(ph=>ph.url));
     const localExtra = local.filter(ph=>!ph.url || !remoteUrls.has(ph.url));
     p.photos = [...remote, ...localExtra];
-    // Guardar el resultado completo en localStorage
     if(p.photos.length) savePhotos(p.id, p.photos);
   });
   db.settings.materialDB.forEach(m=>{ m.cost = Number(m.cost||0); });
 }
+
+// ── LOAD: local first, then Firebase ────────────────────────
 function load(){
-  try{
+  try {
     const raw = localStorage.getItem(STORAGE_KEY);
     db = raw ? JSON.parse(raw) : defaultDB();
-  }catch(e){ db=defaultDB(); }
+  } catch(e){ db = defaultDB(); }
   normalizeDB();
 }
-// ============================================================
-//  GOOGLE SHEETS SYNC — sin race conditions, guardado siempre local
-// ============================================================
-const GS_KEY = "esma_gs_url";
-const DEFAULT_GS_URL = "https://script.google.com/macros/s/AKfycbyn9__H4FS_tp1lUKrdPTuKGhIwats7M3iNT33raDR1M0qCZqwUaKYCJTtFGpX6M7jmTQ/exec";
-(function(){
-  const OLD_URL = "https://script.google.com/macros/s/AKfycbzydhalj4D_X_R0XYp6K7eUxdtgWYrWVQruw5NlHMQCqyn4cDf-IkOwXj8eqU-dXf-S9g/exec";
-  const s = localStorage.getItem(GS_KEY);
-  if(!s || s.replace(/['"]/g,'') === OLD_URL) localStorage.setItem(GS_KEY, DEFAULT_GS_URL);
-  else localStorage.setItem(GS_KEY, s.replace(/['"]/g,''));
-})();
-let GS_URL = (localStorage.getItem(GS_KEY) || DEFAULT_GS_URL).replace(/['"]/g,'');
 
-// ── Un solo flag de operación en curso ──
-let _syncBusy = false;
-let _pendingPush = false;   // hay cambios que subir
-let _lastSaveTime = 0;
-let _bootPullDone = false;  // solo bloquea push en los primeros 3 segundos del boot
-// compat aliases
-const _syncInProgress = false; // ya no se usa para nada crítico
+// ── SAVE: local + Firebase debounced ────────────────────────
+let _fbSaveTimer = null;
+let _fbSavePending = false;
 
-// ── save(): SIEMPRE guarda local. Encola push independientemente del estado de red ──
 function save(){
+  // 1. Strip base64 photos before saving (only keep URLs)
   db.projects.forEach(p=>{ if(p.photos && p.photos.length) savePhotos(p.id, p.photos); });
-  const dbSin = JSON.parse(JSON.stringify(db));
-  dbSin.projects.forEach(p=>{ p.photos = (p.photos||[]).filter(ph=>ph.url && !ph.data); });
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(dbSin)); } catch(e) { console.error("localStorage lleno:", e); }
-  _lastSaveTime = Date.now();
-  if(GS_URL){ _pendingPush = true; clearTimeout(save._t); save._t = setTimeout(_flushPush, 900); }
+  const dbClean = JSON.parse(JSON.stringify(db));
+  dbClean.projects.forEach(p=>{ p.photos = (p.photos||[]).filter(ph=>ph.url && !ph.data); });
+  // Strip session so it's not stored in Firebase
+  const dbForFb = JSON.parse(JSON.stringify(dbClean));
+  if(dbForFb.settings) dbForFb.settings.session = {userId:""};
+
+  // 2. Save locally always
+  _lastLocalSave = Date.now();
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(dbClean)); } catch(e){}
+
+  // 3. Push to Firebase debounced (900ms)
+  _fbSavePending = true;
+  clearTimeout(_fbSaveTimer);
+  _fbSaveTimer = setTimeout(()=>_fbPush(dbForFb), 900);
 }
 
-async function _flushPush(){
-  if(!_pendingPush || _syncBusy) return;
-  _pendingPush = false;
-  _syncBusy = true;
+async function _fbPush(data){
+  if(!_fbSavePending) return;
+  _fbSavePending = false;
+  if(!_fbReady){ syncStatusUpdate("⚠ Firebase no disponible", "orange"); return; }
   syncStatusUpdate("Guardando...", "orange");
   try {
-    const dbToSync = JSON.parse(JSON.stringify(db));
-    if(dbToSync.settings?.empresa) dbToSync.settings.empresa.logoB64 = localStorage.getItem("esma_logo_b64")||"";
-    dbToSync.projects.forEach(p=>{ p.photos = (p.photos||[]).filter(ph=>ph.url && !ph.data); });
-    const res = await fetch(GS_URL, {method:"POST", headers:{"Content-Type":"text/plain"}, body:JSON.stringify({action:"save", data:dbToSync})});
-    const result = await res.json();
-    if(!result.ok) throw new Error(result.error||"Error");
+    await _fbDb.ref(FB_PATH).set(data);
     syncStatusUpdate("✓ " + new Date().toLocaleTimeString("es-MX",{hour:"2-digit",minute:"2-digit"}), "green");
-  } catch(e) {
-    syncStatusUpdate("⚠ Sin conexión", "orange");
-    _pendingPush = true; // reintentar
-    setTimeout(_flushPush, 15000);
-  } finally { _syncBusy = false; }
+  } catch(e){
+    console.error("Firebase save error:", e);
+    syncStatusUpdate("⚠ Error al guardar", "red");
+    // Retry in 15s
+    _fbSavePending = true;
+    setTimeout(()=>_fbPush(data), 15000);
+  }
 }
 
-// ── alias para compatibilidad con botones existentes ──
-const gsPush = _flushPush;
+// ── PULL: load from Firebase on boot ────────────────────────
+async function gsPullOnBoot(){
+  _initFirebase();
+  if(!_fbReady){ syncStatusUpdate("⚠ Firebase no disponible", "orange"); return; }
+  syncStatusUpdate("Conectando...", "orange");
+  try {
+    const snap = await _fbDb.ref(FB_PATH).once('value');
+    const data = snap.val();
+    if(data && data.projects){
+      applyRemoteData(data);
+      syncStatusUpdate("↓ Sincronizado", "green");
+    } else {
+      // Nothing in Firebase yet — push local data up
+      syncStatusUpdate("Subiendo datos iniciales...", "orange");
+      const dbClean = JSON.parse(JSON.stringify(db));
+      dbClean.projects.forEach(p=>{ p.photos = (p.photos||[]).filter(ph=>ph.url && !ph.data); });
+      if(dbClean.settings) dbClean.settings.session = {userId:""};
+      await _fbDb.ref(FB_PATH).set(dbClean);
+      syncStatusUpdate("✓ Datos subidos", "green");
+    }
+    // Start real-time listener for changes from other devices
+    _startRealtimeListener();
+  } catch(e){
+    console.error("Firebase pull error:", e);
+    syncStatusUpdate("⚠ Sin conexión", "orange");
+  }
+}
+
+// ── REAL-TIME LISTENER: sync changes from other devices ─────
+function _startRealtimeListener(){
+  if(_fbListener || !_fbReady) return;
+  _fbListener = _fbDb.ref(FB_PATH).on('value', snap => {
+    const data = snap.val();
+    if(!data || !data.projects) return;
+    // Only apply if data is newer than our last save (avoid echo)
+    const timeSinceLastSave = Date.now() - (_lastLocalSave||0);
+    if(timeSinceLastSave > 2000){
+      // Remote change from another device
+      applyRemoteData(data);
+      syncStatusUpdate("↓ Actualizado", "green");
+      try { renderProjectsPage(); } catch(e){}
+      try { buildTopbar(); } catch(e){}
+    }
+  });
+}
+let _lastLocalSave = 0;
+
+// ── MANUAL PUSH (button in settings) ─────────────────────────
+async function gsPush(){
+  if(!_fbReady){ _initFirebase(); }
+  const dbClean = JSON.parse(JSON.stringify(db));
+  dbClean.projects.forEach(p=>{ p.photos = (p.photos||[]).filter(ph=>ph.url && !ph.data); });
+  if(dbClean.settings) dbClean.settings.session = {userId:""};
+  await _fbPush(dbClean);
+}
+
+// ── COMPAT: keep Google Sheets stubs so existing buttons don't break ──
+const GS_KEY = "esma_gs_url_legacy";
+let GS_URL = "";
+const _syncBusy = false;
+const _pendingPush = false;
+const _bootPullDone = true;
 
 function syncStatusUpdate(msg, color){
   document.querySelectorAll("#syncStatusBar,#syncStatus,#sidebarSyncText").forEach(el=>{
     if(el){ el.textContent=msg; if(el.id==="syncStatus") el.style.color=color||"var(--muted)"; }
   });
-  document.querySelectorAll("#syncDot,#sidebarSyncDot,.sync-dot").forEach(dot=>{
-    if(!dot.closest(".topbar") && dot.id!=="syncDot" && !dot.id) return; // skip generic .sync-dot in other contexts
-    dot.className="sync-dot";
-    if(color==="orange") dot.classList.add("syncing");
-    else if(color==="red") dot.classList.add("error");
-  });
-  // topbar sync dot specifically
   const td=document.getElementById("syncDot");
   if(td){ td.className="sync-dot"; if(color==="orange") td.classList.add("syncing"); else if(color==="red") td.classList.add("error"); }
   const sd=document.getElementById("sidebarSyncDot");
   if(sd){ sd.className="sync-dot"; if(color==="orange") sd.classList.add("syncing"); else if(color==="red") sd.classList.add("error"); }
 }
 
-async function gsPullOnBoot(){
-  if(!GS_URL || _syncBusy) return;
-  _syncBusy = true;
-  syncStatusUpdate("Descargando...", "orange");
-  try {
-    const res = await fetch(GS_URL + "?action=load");
-    const json = await res.json();
-    const data = (json.ok && json.data) ? json.data : (!json.error && json.projects) ? json : null;
-    if(data?.projects){
-      applyRemoteData(data);
-      syncStatusUpdate("↓ Sincronizado", "green");
-    } else if(json.ok && !json.data){
-      syncStatusUpdate("Sheets vacío, subiendo...", "orange");
-      _syncBusy = false; _bootPullDone = true;
-      _pendingPush = true; await _flushPush(); return;
-    } else { throw new Error(json.error||"Error"); }
-  } catch(e) {
-    syncStatusUpdate("⚠ Sin conexión", "orange");
-  } finally { _syncBusy = false; _bootPullDone = true; }
-}
-
 function applyRemoteData(data){
-  if(data.settings && data.settings.empresa && data.settings.empresa.logoB64){
+  if(data.settings?.empresa?.logoB64){
     localStorage.setItem("esma_logo_b64", data.settings.empresa.logoB64);
   }
+  // Preserve local session
+  const session = db?.settings?.session || {userId:""};
   db = data;
+  if(db.settings) db.settings.session = session;
   normalizeDB();
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
-  try{ buildTopbar(); }catch(e){}
-  try{ renderProjectsPage(); }catch(e){}
-  try{
-    if(currentPage==="project-detail") renderProjectDetail();
-    else if(currentPage==="sales") renderSalesPage();
-    else if(currentPage==="calendar") renderCalendarPage();
-    else if(currentPage==="settings") renderSettingsPage();
-    else if(currentPage==="bom") renderBOMPage();
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(db)); } catch(e){}
+  try { buildTopbar(); } catch(e){}
+  try { renderProjectsPage(); } catch(e){}
+  try {
+    if(typeof currentPage !== "undefined"){
+      if(currentPage==="settings") renderSettingsPage();
+      else if(currentPage==="bom") renderBOMPage();
+    }
   } catch(e){}
 }
+
 
 // Auto-pull cada 60s si no hubo cambios locales recientes y no hay sync en curso
 setInterval(()=>{ if(GS_URL && !_syncBusy && (Date.now()-(_lastSaveTime||0))>90000) gsPullOnBoot(); }, 60000);
@@ -1156,6 +1221,7 @@ function renderQuoteBreakdown(q){
   if(!$("qMarginPct")) return;
   $("qMarginPct").value = Number(q.marginPct ?? 25);
   const t = quoteSellTotals(q);
+  const qty = Math.max(1, Number(q.qty||1));
   $("bdCosto").textContent = "$"+money(t.mp + t.ruta);
   $("bdMP").textContent = "$"+money(t.mp);
   $("bdRuta").textContent = "$"+money(t.ruta);
@@ -1166,6 +1232,22 @@ function renderQuoteBreakdown(q){
   $("bdExtra").textContent = "$"+money(t.extra);
   $("bdVenta").textContent = "$"+money(t.venta);
   $("bdRetorno").textContent = "$"+money(t.retorno);
+  // Show total × qty row (works for both table-row and div versions)
+  const totalVal = document.getElementById("bdTotalQty");
+  const totalLabel = document.getElementById("bdTotalQtyLabel");
+  const totalContainer = document.getElementById("bdTotalQtyRow");
+  if(totalVal){
+    if(qty > 1){
+      totalVal.textContent = "$"+money(t.venta * qty);
+      if(totalLabel) totalLabel.textContent = "Total × "+qty+" unidades";
+      // Could be a <tr> or a <div>
+      if(totalContainer){ totalContainer.style.display="flex"; }
+      else { const tr = totalVal.closest("tr"); if(tr) tr.style.display=""; }
+    } else {
+      if(totalContainer){ totalContainer.style.display="none"; }
+      else { const tr = totalVal.closest("tr"); if(tr) tr.style.display="none"; }
+    }
+  }
 }
 
 
@@ -1175,9 +1257,13 @@ function projectAuthorizedTotal(pid){
 function projectHasAuthorized(pid){ return db.quotes.some(q=>q.projectId===pid && q.status==="authorized"); }
 function projectIsDone(pid){
   const p = db.projects.find(x=>x.id===pid);
+  if(!p) return false;
+  // manualDone siempre termina el proyecto sin requisitos
+  if(p.manualDone) return true;
+  // auto-terminado: tiene cotización autorizada Y todas las tareas completas
   const tasks=db.tasks.filter(t=>t.projectId===pid);
   const allDone = tasks.length>0 && tasks.every(t=>!!t.done);
-  return projectHasAuthorized(pid) && (allDone || !!p?.manualDone);
+  return projectHasAuthorized(pid) && allDone;
 }
 
 function escapeHTML(s){ return String(s??"").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;"); }
@@ -1435,7 +1521,7 @@ function renderQuotes(p){
               <tr>
                 <td>${escapeHTML(q.name||q.createdAt||"")}</td>
                 <td>${q.status==="authorized"?"<b>Autorizada</b>":"Borrador"}</td>
-                <td style="text-align:right;"><b>$${money(quoteSellTotals(q).venta)}</b></td>
+                <td style="text-align:right;"><b>$${money(quoteSellTotals(q).venta*(Number(q.qty)||1))}</b></td>
                 <td style="text-align:right;">
                   <button class="btn small" data-act="edit" data-id="${q.id}">Editar</button>
                   <button class="btn small" data-act="duplicate" data-id="${q.id}">📋 Duplicar</button>
@@ -1473,7 +1559,7 @@ function renderOps(p){
 
   const quotes=db.quotes.filter(q=>q.projectId===p.id).sort((a,b)=>String(b.createdAt||"").localeCompare(String(a.createdAt||"")));
   const quoteCards = quotes.map(q=>{
-    const t=quoteSellTotals(q);
+    const t=quoteSellTotals(q); const _qty=Math.max(1,Number(q.qty||1));
     const folio = (q.code||q.id.slice(0,8)).toUpperCase();
     const desc = [
       ...(q.products||[]).map(r=>r.desc||r.material||r.matPick).filter(Boolean),
@@ -1485,7 +1571,7 @@ function renderOps(p){
         <span class="pill">Folio: <b>${escapeHTML(folio)}</b></span>
         <span class="pill">${q.status==="authorized"?"Autorizada":"Borrador"}</span>
         <span class="right"></span>
-        <b>$${money(t.venta)}</b>
+        <b>$${money(t.venta*_qty)}${_qty>1?" <span style=\"font-size:11px;color:var(--muted);\">(×"+_qty+")</span>":""}</b>
       </summary>
       <div class="muted" style="font-size:12px; margin-top:8px;">${escapeHTML(desc||"—")}</div>
       <div style="height:8px;"></div>
@@ -1763,6 +1849,8 @@ function openQuoteEditor(q){
       </label>
       <span class="pill">Estado: <b>${q.status==="authorized"?"Autorizada":"Borrador"}</b></span>
       <div class="right"></div>
+      <button class="btn small" id="btnLoadTemplate">📂 Usar plantilla</button>
+      <button class="btn small" id="btnSaveTemplate">⭐ Guardar plantilla</button>
       <button class="btn small" id="btnQuotePDF2">🖨 PDF / Imprimir</button>
       <button class="btn ${q.status==="authorized"?"danger":"primary"}" id="btnToggleAuth">${q.status==="authorized"?"Desautorizar":"Autorizar"}</button>
       <button class="btn primary small" id="btnSaveQuoteOld">💾 Guardar</button>
@@ -1947,6 +2035,46 @@ function openQuoteEditor(q){
   on($("qQtyInput"),"keydown",(e)=>{ if(e.key==="Enter"){ e.preventDefault(); $("qQtyInput").blur(); }});
   on($("btnToggleAuth"),"click", ()=>{ q.status=(q.status==="authorized")?"draft":"authorized"; save(); renderProjectsList(); renderMain(); });
   on($("btnBackQuotes"),"click", ()=>{ q.name=$("qNameInput").value.trim()||"Cotización"; save(); mainTab="quotes"; renderMain(); });
+
+  // ── Guardar como plantilla ──
+  on($("btnSaveTemplate"),"click", ()=>{
+    const name = prompt("Nombre para esta plantilla:", q.name||"Plantilla");
+    if(!name) return;
+    const tpl = {
+      id: uid(),
+      name: name.trim(),
+      createdAt: todayISO(),
+      products: JSON.parse(JSON.stringify(q.products||[])),
+      routes: JSON.parse(JSON.stringify(q.routes||[])),
+      extras: JSON.parse(JSON.stringify(q.extras||[])),
+      marginPct: q.marginPct ?? 25,
+      saleType: q.saleType || "manufactured"
+    };
+    db.settings.quoteTemplates = db.settings.quoteTemplates || [];
+    db.settings.quoteTemplates.unshift(tpl);
+    save();
+    const btn = $("btnSaveTemplate");
+    if(btn){ btn.textContent="✅ Plantilla guardada"; setTimeout(()=>{ if(btn) btn.textContent="⭐ Guardar plantilla"; },2000); }
+  });
+
+  // ── Cargar desde plantilla ──
+  on($("btnLoadTemplate"),"click", ()=>{
+    const tpls = db.settings.quoteTemplates || [];
+    if(!tpls.length){ alert("No tienes plantillas guardadas. Primero guarda una cotización como plantilla con ⭐ Guardar plantilla."); return; }
+    openTemplatePickerModal(tpl => {
+      if(!tpl) return;
+      if(!confirm("¿Reemplazar el contenido de esta cotización con la plantilla \"" + tpl.name + "\"? Se sobreescribirán productos, rutas y extras.")) return;
+      // Deep copy template contents into current quote
+      q.products = JSON.parse(JSON.stringify(tpl.products||[])).map(r=>({...r, id:uid()}));
+      q.routes   = JSON.parse(JSON.stringify(tpl.routes||[])).map(r=>({...r, id:uid()}));
+      q.extras   = JSON.parse(JSON.stringify(tpl.extras||[])).map(r=>({...r, id:uid()}));
+      q.marginPct = tpl.marginPct ?? q.marginPct ?? 25;
+      save();
+      renderLines();
+      const btn = $("btnLoadTemplate");
+      if(btn){ btn.textContent="✅ Plantilla cargada"; setTimeout(()=>{ if(btn) btn.textContent="📂 Usar plantilla"; },2000); }
+    });
+  });
   on($("btnSaveQuoteOld"),"click", ()=>{ q.name=$("qNameInput").value.trim()||"Cotización"; save(); const btn=$("btnSaveQuoteOld"); if(btn){ btn.textContent="✅ Guardado"; setTimeout(()=>{ if(btn) btn.textContent="💾 Guardar"; },1500); } });
   on($("btnQuotePDF2"),"click", ()=>{
     const proj = db.projects.find(x=>x.id===q.projectId)||{name:""};
@@ -3119,7 +3247,7 @@ function renderSecCotizaciones(filtersEl, contentEl, addBtn){
           <div class="si-meta">📁 ${escapeHTML(pname)} · ${isAuth?"<b style='color:#14532d;'>Autorizada</b>":"Borrador"} · 📅 ${q.createdAt||"—"}</div>
         </div>
         <div class="si-right">
-          <b style="font-size:14px;">$${money(t.venta)}</b>
+          <b style="font-size:14px;">$${money(t.venta*(Number(q.qty)||1))}</b>
           <button class="btn small" data-qid="${q.id}" data-pid="${q.projectId}">Abrir</button>
         </div>
       </div>`;
@@ -3311,6 +3439,7 @@ function downloadQuotePDF(){ alert('Función PDF no encontrada en esta versión.
 // ========================================================
 
 let currentPage = "projects";
+let currentSection = "";
 let _calSelectedDay = "";
 let _calFilter = {delivery:true, install:true, purchase:true, task:true};
 let _calCursor = new Date(); _calCursor.setDate(1);
@@ -3403,6 +3532,7 @@ function showSection(section){
   document.getElementById("sectionScreen").classList.add("show");
   currentSection = section;
   _renderSection(section);
+  _pushNav("section", {section});
   // Update sidebar active state — flat nav
   document.querySelectorAll(".s-nav-item,.s-sub-item").forEach(n=>n.classList.remove("active"));
   const sMap = {
@@ -3417,7 +3547,7 @@ function showSection(section){
 }
 
 function _renderSection(section){
-  const titles = {compras:"\u{1F6D2} Compras", instalaciones:"\u{1F6E0}\uFE0F Instalaciones", cotizaciones:"\u{1F9FE} Cotizaciones", tareas:"\u2705 Tareas"};
+  const titles = {compras:"\u{1F6D2} Compras", instalaciones:"\u{1F6E0}\uFE0F Instalaciones", cotizaciones:"\u{1F9FE} Cotizaciones", tareas:"\u2705 Tareas", costos:"\u2696\uFE0F Costos / PE", materiales:"\u{1F5C4} Materiales y Rutas"};
   const st = document.getElementById("secTitle"); if(st) st.textContent = titles[section]||section;
   const filtersEl = document.getElementById("secFilters");
   const contentEl = document.getElementById("secContent");
@@ -3427,6 +3557,8 @@ function _renderSection(section){
   else if(section==="instalaciones") _renderSecInstalaciones(filtersEl, contentEl);
   else if(section==="cotizaciones") _renderSecCotizaciones(filtersEl, contentEl);
   else if(section==="tareas") _renderSecTareas(filtersEl, contentEl);
+  else if(section==="costos") _renderSecCostos(filtersEl, contentEl);
+  else if(section==="materiales") _renderSecMateriales(filtersEl, contentEl);
 }
 
 function _goToProject(pid, tab){
@@ -3475,7 +3607,7 @@ function _renderSecCotizaciones(filtersEl, contentEl){
           <div class="si-meta">📁 ${escapeHTML(projectName(q.projectId))} · ${isAuth?'<span style="color:var(--green)">Autorizada</span>':"Borrador"}</div>
         </div>
         <div class="si-right" style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;">
-          <span style="font-size:14px;font-weight:900;">$${money(t.venta)}</span>
+          <span style="font-size:14px;font-weight:900;">$${money(t.venta*(Number(q.qty)||1))}</span>
           ${!selectMode ? `<button class="btn small" data-open-qid="${q.id}" data-open-pid="${q.projectId}">Abrir</button>` : ""}
         </div>
       </div>`;
@@ -3574,10 +3706,37 @@ function renderProjectsPage(){
     const sub=[p.client?("\u{1F464} "+p.client):null,p.deliveryDate?("\u{1F4C5} "+p.deliveryDate):null].filter(Boolean).join(" \u00b7 ");
     const badgeCls=p.__seg==="auth"?"green":p.__seg==="done"?"gray":"amber";
     const badgeTxt=p.__seg==="auth"?"Autorizado":p.__seg==="done"?"Terminado":"En curso";
-    return `<div class="proj-card" data-id="${p.id}"><div class="thumb">${thumb}</div><div class="info"><div class="name">${escapeHTML(p.name||"Sin nombre")}</div><div class="meta">${escapeHTML(sub||"Sin datos")}</div></div><div class="right"><span class="badge ${badgeCls}">${badgeTxt}</span><span style="font-size:13px;font-weight:800;color:var(--accent2);">$${money(p.__authTotal)}</span></div></div>`;
+    const doneBtn = p.__seg==="done"
+      ? `<button class="btn small" data-toggle-done="${p.id}" style="font-size:10px;padding:3px 8px;color:var(--amber);border-color:rgba(180,83,9,.35);" title="Reabrir proyecto">\u21A9 Reabrir</button>`
+      : `<button class="btn small" data-toggle-done="${p.id}" style="font-size:10px;padding:3px 8px;" title="Marcar como terminado">\u2705 Terminar</button>`;
+    return `<div class="proj-card" data-id="${p.id}"><div class="thumb">${thumb}</div><div class="info"><div class="name">${escapeHTML(p.name||"Sin nombre")}</div><div class="meta">${escapeHTML(sub||"Sin datos")}</div><div style="margin-top:5px;">${doneBtn}</div></div><div class="right"><span class="badge ${badgeCls}">${badgeTxt}</span><span style="font-size:13px;font-weight:800;color:var(--accent2);">$${money(p.__authTotal)}</span></div></div>`;
   }).join("");
 
-  box.querySelectorAll(".proj-card").forEach(el=>el.addEventListener("click",()=>openProjectDetail(el.dataset.id,"overview")));
+  box.querySelectorAll(".proj-card").forEach(el=>el.addEventListener("click",(e)=>{
+    if(e.target.closest("[data-toggle-done]")) return;
+    openProjectDetail(el.dataset.id,"overview");
+  }));
+
+  box.querySelectorAll("[data-toggle-done]").forEach(btn=>{
+    btn.addEventListener("click",(e)=>{
+      e.stopPropagation();
+      const pid=btn.dataset.toggleDone;
+      const proj=db.projects.find(x=>x.id===pid); if(!proj) return;
+      const isDoneNow=projectIsDone(pid);
+      if(isDoneNow){
+        proj.manualDone=false;
+        db.tasks=db.tasks.filter(x=>!(x.projectId===pid && x.title==="Cierre de proyecto"));
+        save(); renderProjectsPage();
+      } else {
+        if(!confirm('\xbfMarcar "'+escapeHTML(proj.name)+'" como terminado?')) return;
+        const t=db.tasks.filter(x=>x.projectId===pid);
+        if(!t.length) db.tasks.push({id:uid(),projectId:pid,date:todayISO(),title:"Cierre de proyecto",done:true});
+        db.tasks.filter(x=>x.projectId===pid).forEach(x=>x.done=true);
+        proj.manualDone=true;
+        save(); renderProjectsPage();
+      }
+    });
+  });
 }
 
 // ---- Project Detail ----
@@ -3611,12 +3770,28 @@ function renderDetailOverview(p, content){
   const doneCount=tasks.filter(t=>t.done).length;
   const photos=loadPhotos(p.id);
 
+  const isDone = projectIsDone(p.id);
   content.innerHTML=`
+    ${photos.length>0?`<div class="card" style="margin-bottom:10px;padding:0;overflow:hidden;border-radius:var(--radius);">
+      <div style="display:flex;overflow-x:auto;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;">
+        ${photos.map((ph,i)=>{ const src=ph.url||ph.data||""; return `<div style="flex-shrink:0;width:100%;scroll-snap-align:start;position:relative;"><img src="${escapeAttr(src)}" data-photo-src="${escapeAttr(src)}" style="width:100%;height:220px;object-fit:cover;display:block;cursor:pointer;"><button class="del-btn" data-del-photo="${i}" style="position:absolute;top:8px;right:8px;background:rgba(15,23,42,.55);color:#fff;border:none;border-radius:50%;width:26px;height:26px;cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center;">\u2715</button></div>`; }).join('')}
+      </div>
+      <div style="padding:8px 10px;display:flex;align-items:center;justify-content:space-between;">
+        <span style="font-size:11px;color:var(--muted);">${photos.length} foto${photos.length!==1?'s':''}</span>
+        <label class="btn small" style="cursor:pointer;font-size:11px;">\uFF0B Agregar<input type="file" id="photoInput" accept="image/*" multiple style="display:none"></label>
+      </div>
+    </div>`:`<div class="card" style="margin-bottom:10px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;">
+        <span style="font-size:13px;color:var(--muted);">\u{1F4F7} Sin fotos a\xfan</span>
+        <label class="btn small" style="cursor:pointer;">\uFF0B Foto<input type="file" id="photoInput" accept="image/*" multiple style="display:none"></label>
+      </div>
+    </div>`}
+    <div id="photoUploading" style="display:none;font-size:12px;color:var(--muted);padding:4px 8px;">\u2B06 Subiendo fotos...</div>
     <div class="kpi-grid">
       <div class="kpi-box"><div class="kl">Total autorizado</div><div class="kv" style="font-size:18px;color:var(--accent2);">$${money(authTotal)}</div></div>
       <div class="kpi-box"><div class="kl">Cotizaciones</div><div class="kv">${quotes.length}</div></div>
       <div class="kpi-box"><div class="kl">Tareas</div><div class="kv">${doneCount}/${tasks.length}</div></div>
-      <div class="kpi-box"><div class="kl">Estado</div><div class="kv" style="font-size:13px;">${projectIsDone(p.id)?"\u2705 Listo":projectHasAuthorized(p.id)?"\u2B50 Autorizado":"\u{1F504} En curso"}</div></div>
+      <div class="kpi-box"><div class="kl">Estado</div><div class="kv" style="font-size:13px;">${isDone?'\u2705 Terminado':projectHasAuthorized(p.id)?'\u2B50 Autorizado':'\u{1F504} En curso'}</div></div>
     </div>
     <div class="card">
       <div class="card-header"><div class="card-title">Datos del proyecto</div></div>
@@ -3630,29 +3805,33 @@ function renderDetailOverview(p, content){
         <button class="btn danger" id="btnDelP">\u{1F5D1}</button>
       </div>
     </div>
-    <div class="card" style="margin-top:10px;">
-      <div class="card-header">
-        <div class="card-title">\u{1F4F7} Fotos</div>
-        <label class="btn small" style="cursor:pointer;">\uFF0B Agregar<input type="file" id="photoInput" accept="image/*" multiple style="display:none"></label>
-      </div>
-      <div id="photoUploading" style="display:none;font-size:12px;color:var(--muted);padding:4px 0;">\u2B06 Subiendo fotos...</div>
-      <div class="photo-grid" id="photosGrid">
-        ${photos.length===0?'<div style="font-size:12px;color:var(--muted);">Sin fotos aun.</div>':photos.map((ph,i)=>{
-          const src=ph.url||ph.data||"";
-          return `<div class="photo-item"><img src="${escapeAttr(src)}" data-photo-src="${escapeAttr(src)}"><button class="del-btn" data-del-photo="${i}">\u2715</button></div>`;
-        }).join('')}
-      </div>
-    </div>
     <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
-      <button class="btn" id="btnMarkDone">\u2705 Marcar terminado</button>
-      <button class="btn primary" id="btnQuickQuote" style="flex:1;justify-content:center;">\uFF0B Cotizacion</button>
+      ${isDone
+        ? `<button class="btn" id="btnMarkDone" style="color:var(--amber);border-color:rgba(180,83,9,.4);">\u21A9 Reabrir proyecto</button>`
+        : `<button class="btn" id="btnMarkDone">\u2705 Marcar terminado</button>`}
+      <button class="btn primary" id="btnQuickQuote" style="flex:1;justify-content:center;">\uFF0B Cotizaci\xf3n</button>
     </div>
   `;
 
   document.getElementById("btnSaveP").addEventListener("click",()=>{ p.name=document.getElementById("pName").value.trim()||p.name; p.client=document.getElementById("pClient").value.trim(); p.deliveryDate=document.getElementById("pDelivery").value||""; p.notes=document.getElementById("pNotes").value.trim(); save(); renderProjectsPage(); renderProjectDetail(); });
   document.getElementById("btnDelP").addEventListener("click",()=>{ if(!confirm("\u00BFEliminar el proyecto y todos sus datos?")) return; deleteProjectPhotos(p.id); db.projects=db.projects.filter(x=>x.id!==p.id); db.quotes=db.quotes.filter(x=>x.projectId!==p.id); db.tasks=db.tasks.filter(x=>x.projectId!==p.id); db.installs=db.installs.filter(x=>x.projectId!==p.id); db.purchases=db.purchases.filter(x=>x.projectId!==p.id); save(); showPage("projects"); });
   document.getElementById("btnQuickQuote").addEventListener("click",()=>{ openQuoteEditorPage(createQuote(p.id)); renderProjectsPage(); });
-  document.getElementById("btnMarkDone").addEventListener("click",()=>{ const t=db.tasks.filter(x=>x.projectId===p.id); if(!t.length) db.tasks.push({id:uid(),projectId:p.id,date:todayISO(),title:"Cierre de proyecto",done:true}); db.tasks.filter(x=>x.projectId===p.id).forEach(x=>x.done=true); p.manualDone=true; save(); renderProjectDetail(); });
+  document.getElementById("btnMarkDone").addEventListener("click",()=>{
+    const isDoneNow = projectIsDone(p.id);
+    if(isDoneNow){
+      // Reabrir: quitar manualDone y desmarcar tareas de cierre
+      p.manualDone = false;
+      db.tasks = db.tasks.filter(x=>!(x.projectId===p.id && x.title==="Cierre de proyecto"));
+      save(); renderProjectsPage(); renderProjectDetail();
+    } else {
+      if(!confirm('¿Marcar este proyecto como terminado?')) return;
+      const t=db.tasks.filter(x=>x.projectId===p.id);
+      if(!t.length) db.tasks.push({id:uid(),projectId:p.id,date:todayISO(),title:"Cierre de proyecto",done:true});
+      db.tasks.filter(x=>x.projectId===p.id).forEach(x=>x.done=true);
+      p.manualDone=true;
+      save(); renderProjectsPage(); renderProjectDetail();
+    }
+  });
 
   // Photo upload
   const photoInput=document.getElementById("photoInput");
@@ -3685,7 +3864,7 @@ function renderDetailQuotes(p, content){
     </div>
     ${quotes.length?quotes.map(q=>{
       const t=quoteSellTotals(q); const isAuth=q.status==="authorized";
-      return `<div class="card" style="margin-bottom:10px;"><div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;"><div style="flex:1;min-width:0;"><div style="font-size:15px;font-weight:800;">${escapeHTML(q.name||"Cotizacion")}</div><div style="font-size:12px;color:var(--muted);margin-top:3px;">Folio: ${escapeHTML((q.code||q.id.slice(0,8)).toUpperCase())} \u00b7 ${q.createdAt||"---"}</div></div><div style="text-align:right;"><div style="font-size:16px;font-weight:900;color:var(--accent2);">$${money(t.venta)}</div><span class="badge ${isAuth?"green":"amber"}" style="margin-top:4px;">${isAuth?"Autorizada":"Borrador"}</span></div></div><div style="display:flex;gap:8px;margin-top:12px;"><button class="btn small" data-edit-q="${q.id}" style="flex:1;justify-content:center;">\u270F\uFE0F Editar</button><button class="btn small" data-dup-q="${q.id}">📋 Duplicar</button><button class="btn small ${isAuth?"danger":""}" data-toggle-q="${q.id}">${isAuth?"Desautorizar":"Autorizar"}</button><button class="btn small danger" data-del-q="${q.id}">\u{1F5D1}</button></div>
+      return `<div class="card" style="margin-bottom:10px;"><div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;"><div style="flex:1;min-width:0;"><div style="font-size:15px;font-weight:800;">${escapeHTML(q.name||"Cotizacion")}</div><div style="font-size:12px;color:var(--muted);margin-top:3px;">Folio: ${escapeHTML((q.code||q.id.slice(0,8)).toUpperCase())} \u00b7 ${q.createdAt||"---"}</div></div><div style="text-align:right;"><div style="font-size:16px;font-weight:900;color:var(--accent2);">$${money(t.venta*(Number(q.qty)||1))}${Number(q.qty||1)>1?'<span style="font-size:11px;font-weight:600;color:var(--muted);margin-left:4px;">(×'+Number(q.qty)+')</span>':''}</div><span class="badge ${isAuth?"green":"amber"}" style="margin-top:4px;">${isAuth?"Autorizada":"Borrador"}</span></div></div><div style="display:flex;gap:8px;margin-top:12px;"><button class="btn small" data-edit-q="${q.id}" style="flex:1;justify-content:center;">\u270F\uFE0F Editar</button><button class="btn small" data-dup-q="${q.id}">📋 Duplicar</button><button class="btn small ${isAuth?"danger":""}" data-toggle-q="${q.id}">${isAuth?"Desautorizar":"Autorizar"}</button><button class="btn small danger" data-del-q="${q.id}">\u{1F5D1}</button></div>
       ${q.refPhoto?`<div style="margin-top:10px;position:relative;border-radius:10px;overflow:hidden;line-height:0;box-shadow:0 2px 10px rgba(0,0,0,.12);"><img src="${q.refPhoto}" style="width:100%;max-height:200px;object-fit:contain;display:block;background:#f0f4ff;"><div style="position:absolute;inset:0;background:linear-gradient(180deg,transparent 50%,rgba(0,0,0,.5));"></div><div style="position:absolute;bottom:8px;left:10px;right:10px;display:flex;justify-content:space-between;align-items:center;"><span style="color:#fff;font-size:10px;font-weight:700;">📸 Foto de referencia</span><button class="btn small danger" data-del-ref-q="${q.id}" style="font-size:10px;padding:3px 8px;">Quitar</button></div></div>`:`<button class="btn small" data-ref-photo-q="${q.id}" style="width:100%;justify-content:center;margin-top:8px;border-style:dashed;">📸 Agregar foto de referencia</button>`}
     </div></div>`;
     }).join(""):'<div class="empty"><div class="ico">\u{1F9FE}</div><h3>Sin cotizaciones</h3><p>Crea la primera cotizacion.</p></div>'}
@@ -3769,9 +3948,22 @@ function openQuoteEditorPage(q){
       <input id="qNameInput" value="${escapeAttr(q.name||"Cotizacion")}" style="flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:9px 12px;color:var(--text);font-family:inherit;font-size:15px;font-weight:800;">
       <button class="btn small ${q.status==="authorized"?"danger":"primary"}" id="btnToggleAuth">${q.status==="authorized"?"Desautorizar":"Autorizar"}</button>
     </div>
-    <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
-      <span class="badge ${q.status==="authorized"?"green":"amber"}">${q.status==="authorized"?"Autorizada":"Borrador"}</span>
+    <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center;">
+      <span class="badge ${q.status==='authorized'?'green':'amber'}">${q.status==='authorized'?'Autorizada':'Borrador'}</span>
       <span style="font-size:12px;color:var(--muted);align-self:center;">Folio: ${escapeHTML((q.code||q.id.slice(0,8)).toUpperCase())}</span>
+      ${q.status!=='authorized'?`<select id="qPipelineStatus" style="background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:4px 8px;font-family:inherit;font-size:12px;font-weight:700;" title="Estado de seguimiento">
+        <option value="">📋 Sin enviar</option>
+        <option value="sent" ${q.pipelineStatus==='sent'?'selected':''}>📤 Enviada</option>
+        <option value="negotiating" ${q.pipelineStatus==='negotiating'?'selected':''}>🤝 En negociación</option>
+        <option value="no_response" ${q.pipelineStatus==='no_response'?'selected':''}>⏳ Sin respuesta</option>
+      </select>`:''}
+      <label style="display:flex;align-items:center;gap:5px;font-size:13px;background:var(--accent-light);border:1.5px solid var(--accent);border-radius:8px;padding:4px 10px;font-weight:700;color:var(--accent);" title="Cantidad a producir — multiplica el total y el BOM">
+        <span>×</span>
+        <input id="qQtyInput" type="number" min="1" value="${Number(q.qty||1)}" style="width:55px;background:transparent;border:none;color:var(--accent);font-family:inherit;font-size:14px;font-weight:900;text-align:center;">
+        <span style="font-size:11px;font-weight:600;">unid.</span>
+      </label>
+      <button class="btn small" id="btnLoadTemplate">📂 Plantilla</button>
+      <button class="btn small" id="btnSaveTemplate">⭐ Guardar plantilla</button>
       <button class="btn small success" id="btnSaveQuote" style="">💾 Guardar</button>
       <button class="btn small" id="btnQuotePDF2" style="margin-left:auto;">\u{1F5A8} PDF</button>
     </div>
@@ -3813,6 +4005,10 @@ function openQuoteEditorPage(q){
         <div class="breakdown-row"><span class="label">+ Extras (suma directa)</span><span id="bdExtra">$0.00</span></div>
         <div class="breakdown-row total"><span class="label">Precio de venta</span><span id="bdVenta" style="color:var(--green);">$0.00</span></div>
         <div class="breakdown-row"><span class="label" style="color:var(--muted);font-size:12px;">Retorno neto (sin ruta/extras)</span><span id="bdRetorno" style="font-size:12px;">$0.00</span></div>
+        <div id="bdTotalQtyRow" style="display:none;background:var(--accent-light);border-radius:8px;padding:10px 12px;margin-top:6px;justify-content:space-between;align-items:center;">
+          <span id="bdTotalQtyLabel" style="font-weight:800;color:var(--accent);">Total × N unidades</span>
+          <span id="bdTotalQty" style="font-size:17px;font-weight:900;color:var(--accent);">$0.00</span>
+        </div>
       </div>
     </div>
   </div>`;
@@ -3889,6 +4085,57 @@ function openQuoteEditorPage(q){
   document.getElementById("addExtra").addEventListener("click",()=>{ q.extras=q.extras||[]; q.extras.push({id:uid(),label:"",amount:0}); save(); renderLines(); });
   document.getElementById("qMarginPct").addEventListener("blur",()=>{ q.marginPct=Number(document.getElementById("qMarginPct").value||0); save(); renderQuoteBreakdown(q); });
   document.getElementById("adminPctInput").addEventListener("blur",()=>{ db.settings.adminPercent=Number(document.getElementById("adminPctInput").value||0); save(); renderQuoteBreakdown(q); });
+
+  // ── Pipeline status ──
+  const pipelineEl = document.getElementById("qPipelineStatus");
+  if(pipelineEl){
+    pipelineEl.addEventListener("change", () => {
+      q.pipelineStatus = pipelineEl.value || null;
+      save();
+    });
+  }
+
+  // ── Qty multiplier ──
+  const qQtyEl = document.getElementById("qQtyInput");
+  if(qQtyEl){
+    const commitQty = () => { q.qty = Math.max(1, Number(qQtyEl.value||1)); save(); renderQuoteBreakdown(q); };
+    qQtyEl.addEventListener("blur", commitQty);
+    qQtyEl.addEventListener("change", commitQty);
+    qQtyEl.addEventListener("keydown",(e)=>{ if(e.key==="Enter"){ e.preventDefault(); qQtyEl.blur(); }});
+  }
+
+  // ── Guardar plantilla ──
+  document.getElementById("btnSaveTemplate").addEventListener("click",()=>{
+    const name = prompt("Nombre para esta plantilla:", q.name||"Plantilla");
+    if(!name) return;
+    const tpl = { id:uid(), name:name.trim(), createdAt:todayISO(),
+      products:JSON.parse(JSON.stringify(q.products||[])),
+      routes:JSON.parse(JSON.stringify(q.routes||[])),
+      extras:JSON.parse(JSON.stringify(q.extras||[])),
+      marginPct:q.marginPct??25, saleType:q.saleType||"manufactured" };
+    db.settings.quoteTemplates = db.settings.quoteTemplates||[];
+    db.settings.quoteTemplates.unshift(tpl);
+    save();
+    const btn=document.getElementById("btnSaveTemplate");
+    if(btn){ btn.textContent="✅ Guardada"; setTimeout(()=>{ if(btn) btn.textContent="⭐ Guardar plantilla"; },2000); }
+  });
+
+  // ── Cargar plantilla ──
+  document.getElementById("btnLoadTemplate").addEventListener("click",()=>{
+    const tpls = db.settings.quoteTemplates||[];
+    if(!tpls.length){ alert("No tienes plantillas. Primero guarda una cotización como plantilla con ⭐."); return; }
+    openTemplatePickerModal(tpl => {
+      if(!tpl) return;
+      if(!confirm('¿Reemplazar contenido con la plantilla "'+tpl.name+'"?')) return;
+      q.products = JSON.parse(JSON.stringify(tpl.products||[])).map(r=>({...r,id:uid()}));
+      q.routes   = JSON.parse(JSON.stringify(tpl.routes||[])).map(r=>({...r,id:uid()}));
+      q.extras   = JSON.parse(JSON.stringify(tpl.extras||[])).map(r=>({...r,id:uid()}));
+      q.marginPct = tpl.marginPct ?? q.marginPct ?? 25;
+      save(); renderLines();
+      const btn=document.getElementById("btnLoadTemplate");
+      if(btn){ btn.textContent="✅ Cargada"; setTimeout(()=>{ if(btn) btn.textContent="📂 Plantilla"; },2000); }
+    });
+  });
 
   renderLines();
   renderQuoteBreakdown(q);
@@ -4163,14 +4410,7 @@ function renderSettingsPage(){
         <input type="file" id="restoreFile" accept="application/json" style="display:none">
       </div>
     </div>
-    <div class="card" style="margin-bottom:10px;">
-      <div class="card-header"><div class="card-title">\u{1F5C4} Materiales</div><button class="btn small primary" id="btnAddMat">\uFF0B</button></div>
-      <div id="matList"></div>
-    </div>
-    <div class="card">
-      <div class="card-header"><div class="card-title">\u2699\uFE0F Rutas / M.O.</div><button class="btn small primary" id="btnAddRoute2">\uFF0B</button></div>
-      <div id="routeList"></div>
-    </div>
+
   `;
 
   document.getElementById("btnSaveEmp").addEventListener("click",()=>{ db.settings.empresa={...emp,nombre:document.getElementById("empNombre").value.trim()||"ESMA INDUSTRIAL",tel:document.getElementById("empTel").value.trim(),email:document.getElementById("empEmail").value.trim(),direccion:document.getElementById("empDir").value.trim(),titulo:document.getElementById("empTitulo").value.trim()||"Propuesta de Servicios",logoB64:db.settings.empresa?.logoB64||""}; save(); refreshLogo(db.settings.empresa.logoB64); const ht=document.getElementById("homeTitle"); if(ht) ht.textContent=db.settings.empresa.nombre; buildTopbar(); alert("\u2705 Guardado"); });
@@ -4182,9 +4422,7 @@ function renderSettingsPage(){
   document.getElementById("btnBackup").addEventListener("click",exportJSON);
   document.getElementById("btnRestore").addEventListener("click",()=>document.getElementById("restoreFile").click());
   document.getElementById("restoreFile").addEventListener("change",()=>{ const f=document.getElementById("restoreFile").files?.[0]; if(f) restoreJSON(f); });
-  document.getElementById("btnAddMat").addEventListener("click",()=>showAddMaterialModal("",()=>renderMatList()));
-  document.getElementById("btnAddRoute2").addEventListener("click",showAddRouteSheet);
-  renderMatList(); renderRouteList();
+  // Materiales y Rutas moved to their own section
 
   // Migrate local photos to ImgBB
   const migrateBtn = document.getElementById("btnMigratePhotos");
@@ -4273,12 +4511,12 @@ function _pushNav(page, extra){
   _updateBackBtn();
 }
 function _popNav(){
-  if(_navStack.length <= 1){ showPage("projects"); return; }
-  _navStack.pop();
-  const prev = _navStack[_navStack.length-1];
-  _navStack.pop(); // will be re-pushed by showPage/openProjectDetail
+  // Pop current, then navigate to the one before
+  if(_navStack.length > 1) _navStack.pop();
+  const prev = _navStack[_navStack.length - 1];
   if(!prev){ showPage("projects"); return; }
-  // Make sure app is visible
+  // Remove so target function re-pushes it cleanly
+  _navStack.pop();
   const hs=document.getElementById("homeScreen");
   const ss=document.getElementById("sectionScreen");
   const ap=document.getElementById("app");
@@ -4287,6 +4525,7 @@ function _popNav(){
   if(ap) ap.style.display="";
   if(prev.page==="project-detail"){ openProjectDetail(prev.extra.pid, prev.extra.tab); }
   else if(prev.page==="quote-editor"){ const q=db.quotes.find(x=>x.id===prev.extra.qid); if(q) openQuoteEditorPage(q); else showPage("projects"); }
+  else if(prev.page==="section"){ showSection(prev.extra.section); }
   else showPage(prev.page);
 }
 function _updateBackBtn(){
@@ -4344,6 +4583,7 @@ function openToolsMenu(){
 
 function bootNew(){
   load();
+  _initFirebase();
   gsPullOnBoot();
 
   const u=currentUser();
@@ -4394,7 +4634,7 @@ function bootNew(){
   document.getElementById("homeBtnLogout").addEventListener("click",logout);
 
   // Section back
-  document.getElementById("secBack").addEventListener("click",()=>{ document.getElementById("sectionScreen").classList.remove("show"); document.getElementById("homeScreen").classList.add("show"); });
+  document.getElementById("secBack").addEventListener("click",()=>{ _popNav(); });
 
   // Home logo
   const logoBox=document.getElementById("homeLogoBox"); const logoFile=document.getElementById("homeLogoFile");
@@ -4459,11 +4699,16 @@ function closeAllDropdowns(){
   const ov = document.getElementById('navDdOverlay');
   if(ov) ov.classList.remove('open');
   document.querySelectorAll('.nav-item').forEach(el=>el.classList.remove('active'));
-  // Restore active based on current page
-  const mMap = {projects:'mnav-projects',calendar:'mnav-calendar',sales:'mnav-results',settings:'mnav-more'};
+  // Restore active based on current page / section
+  const mMap = {projects:'mnav-projects',calendar:'mnav-more',sales:'mnav-more',settings:'mnav-more',bom:'mnav-bom','project-detail':'mnav-projects'};
   const cur = mMap[currentPage||'projects'];
   const btn = cur && document.getElementById(cur);
   if(btn) btn.classList.add('active');
+  // Also mark cotizaciones if current section
+  if(currentSection==='cotizaciones'){
+    const cotBtn = document.getElementById('mnav-cotizaciones');
+    if(cotBtn){ document.querySelectorAll('.nav-item').forEach(el=>el.classList.remove('active')); cotBtn.classList.add('active'); }
+  }
 }
 function mNavToggle(key, e){
   e && e.stopPropagation();
@@ -4498,7 +4743,7 @@ function mNavGo(page){
   const ap = document.getElementById('app');
   if(ap){ ap.style.cssText='display:flex;'; }
   document.querySelectorAll('.nav-item').forEach(el=>el.classList.remove('active'));
-  const mMap = {projects:'mnav-projects',calendar:'mnav-calendar',sales:'mnav-results',settings:'mnav-more',resumen:'mnav-more',bom:'mnav-more'};
+  const mMap = {projects:'mnav-projects',calendar:'mnav-more',sales:'mnav-more',settings:'mnav-more',resumen:'mnav-more',bom:'mnav-bom'};
   const btn = document.getElementById(mMap[page]||'mnav-projects');
   if(btn) btn.classList.add('active');
   showPage(page);
@@ -4545,7 +4790,7 @@ function openPDFSelector(projectId){
       <input type="checkbox" data-pdf-q="${q.id}" checked style="width:18px;height:18px;accent-color:var(--accent);flex-shrink:0;">
       <div style="flex:1;min-width:0;">
         <div style="font-size:13px;font-weight:700;">${escapeHTML(q.name||"Cotización")}</div>
-        <div style="font-size:11px;color:var(--muted);">${q.status==="authorized"?'✅ Autorizada':'📝 Borrador'} · $${money(t.venta)}</div>
+        <div style="font-size:11px;color:var(--muted);">${q.status==="authorized"?'✅ Autorizada':'📝 Borrador'} · $${money(t.venta*(Number(q.qty)||1))}${Number(q.qty||1)>1?' (×'+Number(q.qty)+')':''}</div>
       </div>
       <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
         <span style="font-size:11px;color:var(--muted);">Cant.</span>
@@ -4603,116 +4848,459 @@ function openPDFSelector(projectId){
 }
 
 // ── BOM — BILL OF MATERIALS ────────────────────────────────
+
+function _buildPipelineHTML(){
+  const STATES = {
+    '':             { label: '📋 Sin enviar',      color: 'rgba(100,116,139,.12)', text: 'var(--muted)' },
+    'sent':         { label: '📤 Enviada',          color: 'rgba(59,130,246,.12)',  text: 'var(--accent)' },
+    'negotiating':  { label: '🤝 En negociación',  color: 'rgba(22,163,74,.12)',   text: 'var(--green)' },
+    'no_response':  { label: '⏳ Sin respuesta',    color: 'rgba(217,119,6,.12)',   text: 'var(--amber)' },
+  };
+
+  // Collect all draft (non-authorized) quotes
+  const drafts = db.quotes.filter(q => q.status !== 'authorized');
+  if(!drafts.length){
+    return '<div style="color:var(--muted);font-size:13px;padding:8px 0;">No hay cotizaciones en curso.</div>';
+  }
+
+  // Group by pipeline status
+  const groups = { sent: [], negotiating: [], no_response: [], '': [] };
+  drafts.forEach(q => {
+    const key = q.pipelineStatus || '';
+    if(!groups[key]) groups[key] = [];
+    groups[key].push(q);
+  });
+
+  // Totals per group
+  const totals = {};
+  let grandTotal = 0;
+  Object.keys(groups).forEach(k => {
+    totals[k] = groups[k].reduce((s,q) => s + quoteSellTotals(q).venta*(Number(q.qty)||1), 0);
+    grandTotal += totals[k];
+  });
+
+  // Summary chips
+  const chips = ['sent','negotiating','no_response',''].map(k => {
+    const st = STATES[k];
+    const cnt = groups[k].length;
+    if(!cnt) return '';
+    return `<div style="background:${st.color};border-radius:10px;padding:8px 12px;flex:1;min-width:120px;">
+      <div style="font-size:11px;font-weight:700;color:${st.text};margin-bottom:2px;">${st.label}</div>
+      <div style="font-size:15px;font-weight:900;color:${st.text};">$${money(totals[k])}</div>
+      <div style="font-size:11px;color:var(--muted);">${cnt} cotización${cnt!==1?'es':''}</div>
+    </div>`;
+  }).join('');
+
+  // Rows — sorted: no_response first (needs action), then negotiating, sent, unsent
+  const ORDER = ['no_response','negotiating','sent',''];
+  const rows = ORDER.flatMap(k => groups[k]).map(q => {
+    const proj = db.projects.find(p => p.id === q.projectId);
+    const t = quoteSellTotals(q);
+    const total = t.venta * (Number(q.qty)||1);
+    const st = STATES[q.pipelineStatus||''];
+    const dias = q.createdAt ? Math.floor((Date.now() - new Date(q.createdAt+'T00:00:00').getTime()) / 86400000) : null;
+    const diasTxt = dias!==null ? (dias===0?'hoy':dias===1?'ayer':`hace ${dias}d`) : '';
+    const alert = (q.pipelineStatus==='no_response' && dias!==null && dias>=3) ||
+                  (q.pipelineStatus==='sent' && dias!==null && dias>=5);
+    return `<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border);${alert?'background:rgba(217,119,6,.04);border-radius:6px;padding:9px 6px;':''}">
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:13px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHTML(q.name||'Cotización')}</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:2px;">${escapeHTML(proj?proj.name:'—')}${proj?.client?' · '+escapeHTML(proj.client):''}${diasTxt?' · '+diasTxt:''}</div>
+      </div>
+      <div style="text-align:right;flex-shrink:0;">
+        <div style="font-size:13px;font-weight:900;color:var(--accent2);">$${money(total)}</div>
+        <span style="font-size:10px;font-weight:700;color:${st.text};background:${st.color};padding:2px 6px;border-radius:6px;">${st.label}</span>
+      </div>
+      ${alert?`<div style="font-size:16px;" title="Requiere seguimiento">⚠️</div>`:''}
+    </div>`;
+  }).join('');
+
+  return `
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;">${chips}</div>
+    <div style="display:flex;justify-content:space-between;padding:6px 0;font-size:12px;font-weight:700;color:var(--muted);border-bottom:2px solid var(--border);margin-bottom:4px;">
+      <span>TOTAL PIPELINE</span><span style="color:var(--text);">$${money(grandTotal)}</span>
+    </div>
+    ${rows}`;
+}
+
+
+// ── SECCIÓN: COSTOS / PUNTO DE EQUILIBRIO ─────────────────
+function _renderSecCostos(filtersEl, contentEl){
+  if(!contentEl) return;
+  contentEl.innerHTML = '<div id="beInlineContent"></div>';
+  const wrap = document.getElementById("beInlineContent");
+  if(!wrap) return;
+  _renderBEInline(wrap);
+}
+
+function _renderBEInline(wrap){
+  // Costos / PE = herramienta de PLANEACIÓN del mes
+  // Comparte los gastos fijos con la pantalla de Ventas (_getGastosFijos)
+  // Ventas = lo que ya pasó (proyectos terminados)
+  // Costos/PE = proyección del mes (cotizaciones autorizadas, aunque no estén terminadas)
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = now.getMonth();
+  const mesLabel = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"][m] + " " + y;
+
+  // Proyección: todas las cotizaciones autorizadas con deliveryDate en este mes
+  let proyVentas = 0, proyCV = 0;
+  let proyRows = [];
+  db.projects.forEach(p => {
+    const d = parseISO(p.deliveryDate||"");
+    if(!d || d.getFullYear()!==y || d.getMonth()!==m) return;
+    const aqs = db.quotes.filter(q => q.projectId===p.id && q.status==="authorized");
+    if(!aqs.length) return;
+    let venta=0, cv=0;
+    aqs.forEach(q=>{ const qty=Number(q.qty)||1; const t=quoteSellTotals(q); venta+=t.venta*qty; cv+=(t.mp+t.ruta)*qty; });
+    proyVentas+=venta; proyCV+=cv;
+    proyRows.push({name:p.name, client:p.client||"", venta, cv, done:projectIsDone(p.id)});
+  });
+
+  // Gastos fijos — mismo dato que usa Ventas
+  const gastos = _getGastosFijos(y, m);
+  const totalFijos = gastos.reduce((s,g)=>s+Number(g.monto||0), 0);
+  const margenBruto = proyVentas - proyCV;
+  const pctMC = proyVentas > 0 ? (margenBruto / proyVentas * 100) : 0;
+  const pePesos = pctMC > 0 ? (totalFijos / (pctMC/100)) : 0;
+  const utilProyectada = margenBruto - totalFijos;
+  const faltaParaPE = Math.max(0, pePesos - proyVentas);
+
+  const gastosRows = gastos.map((g,i) =>
+    `<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--border);font-size:13px;">
+      <span>${escapeHTML(g.nombre)}</span>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <b>$${money(g.monto)}</b>
+        <button class="btn small danger" data-del-gasto="${i}">✕</button>
+      </div>
+    </div>`
+  ).join("");
+
+  const proyRowsHtml = proyRows.length ? proyRows.map(r =>
+    `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px;gap:8px;">
+      <div style="flex:1;min-width:0;">
+        <div style="font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHTML(r.name)}</div>
+        <div style="font-size:11px;color:var(--muted);">${escapeHTML(r.client)}${r.done?' · <span style="color:var(--green)">✅ Terminado</span>':' · <span style="color:var(--amber)">En curso</span>'}</div>
+      </div>
+      <div style="text-align:right;flex-shrink:0;">
+        <div style="font-weight:900;color:var(--accent2);">$${money(r.venta)}</div>
+        <div style="font-size:11px;color:var(--muted);">CV: $${money(r.cv)}</div>
+      </div>
+    </div>`
+  ).join("") : `<div style="color:var(--muted);font-size:13px;padding:8px 0;">Sin proyectos con entrega este mes.</div>`;
+
+  wrap.innerHTML = `
+    <div style="background:var(--accent-light);border:1px solid rgba(37,99,235,.2);border-radius:12px;padding:12px 14px;margin-bottom:14px;">
+      <div style="font-size:12px;font-weight:700;color:var(--accent);margin-bottom:2px;">📅 Proyección — ${mesLabel}</div>
+      <div style="font-size:12px;color:var(--muted);">Cotizaciones autorizadas con entrega este mes (terminadas o en curso)</div>
+    </div>
+
+    <div class="kpi-grid" style="margin-bottom:14px;">
+      <div class="kpi-box"><div class="kl">Ventas proyectadas</div><div class="kv" style="color:var(--accent2);">$${money(proyVentas)}</div></div>
+      <div class="kpi-box"><div class="kl">Costo de ventas</div><div class="kv">$${money(proyCV)}</div></div>
+      <div class="kpi-box"><div class="kl">Margen bruto</div><div class="kv" style="color:${margenBruto>=0?'var(--green)':'var(--red)'};">$${money(margenBruto)}<div style="font-size:11px;font-weight:400;">${pctMC.toFixed(1)}%</div></div></div>
+      <div class="kpi-box"><div class="kl">Utilidad proyectada</div><div class="kv" style="color:${utilProyectada>=0?'var(--green)':'var(--red)'};">${utilProyectada>=0?'+':''}$${money(utilProyectada)}</div></div>
+    </div>
+
+    ${pePesos>0 ? `<div class="card" style="margin-bottom:12px;">
+      <div class="card-title" style="margin-bottom:8px;">⚡ Punto de Equilibrio — ${mesLabel}</div>
+      <div style="display:flex;gap:10px;margin-bottom:10px;">
+        <div style="flex:1;background:var(--bg3);border-radius:10px;padding:12px;text-align:center;">
+          <div style="font-size:11px;color:var(--muted);font-weight:700;">NECESITAS VENDER</div>
+          <div style="font-size:20px;font-weight:900;color:var(--amber);margin-top:4px;">$${money(pePesos)}</div>
+        </div>
+        <div style="flex:1;background:var(--bg3);border-radius:10px;padding:12px;text-align:center;">
+          <div style="font-size:11px;color:var(--muted);font-weight:700;">TIENES PROYECTADO</div>
+          <div style="font-size:20px;font-weight:900;color:${proyVentas>=pePesos?'var(--green)':'var(--accent2)'};margin-top:4px;">$${money(proyVentas)}</div>
+        </div>
+      </div>
+      <div style="background:var(--bg3);border-radius:8px;overflow:hidden;height:12px;margin-bottom:6px;">
+        <div style="height:100%;background:${proyVentas>=pePesos?'var(--green)':'var(--accent)'};border-radius:8px;width:${Math.min(100,pePesos>0?proyVentas/pePesos*100:0).toFixed(1)}%;transition:width .4s;"></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--muted);">
+        <span>${(pePesos>0?Math.min(100,proyVentas/pePesos*100):0).toFixed(1)}% alcanzado</span>
+        ${faltaParaPE>0?`<span style="color:var(--amber);">Faltan $${money(faltaParaPE)}</span>`:'<span style="color:var(--green);">✅ PE superado</span>'}
+      </div>
+    </div>` : totalFijos===0 ? `<div class="card" style="margin-bottom:12px;background:rgba(217,119,6,.05);border-color:rgba(217,119,6,.25);">
+      <div style="font-size:13px;color:var(--muted);padding:4px 0;">⚠️ Agrega tus gastos fijos para calcular el punto de equilibrio.</div>
+    </div>` : ''}
+
+    <div class="card" style="margin-bottom:12px;">
+      <div class="card-header">
+        <div class="card-title">📌 Gastos fijos del mes</div>
+        <button class="btn small primary" id="beAddFixed">＋</button>
+      </div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:8px;">Mismos gastos que aparecen en Ventas. Se comparten entre ambas pantallas.</div>
+      <div id="beFixedList">
+        ${gastosRows || '<div style="color:var(--muted);font-size:13px;padding:8px 0;">Sin gastos fijos. Agrega renta, nómina, servicios...</div>'}
+        ${gastos.length?`<div style="display:flex;justify-content:space-between;padding:8px 0;font-size:13px;font-weight:800;"><span>Total</span><span>$${money(totalFijos)}</span></div>`:''}
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><div class="card-title">📋 Proyectos en este mes</div></div>
+      ${proyRowsHtml}
+    </div>
+
+    <div class="card" style="margin-top:12px;">
+      <div class="card-header">
+        <div class="card-title">📊 Pipeline — Cotizaciones en curso</div>
+      </div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:12px;">Borradores pendientes de autorizar. Actualiza el estado en cada cotización.</div>
+      ${_buildPipelineHTML()}
+    </div>`;
+
+  // Add gasto fijo
+  document.getElementById("beAddFixed").onclick = () => {
+    openSheet("Agregar gasto fijo",`
+      <div class="field-label">Concepto</div><div class="field"><input id="gasto_nombre" placeholder="Renta, nómina, luz..."></div>
+      <div class="field-label">Monto mensual</div><div class="field"><input id="gasto_monto" type="number" step="0.01" placeholder="0.00"></div>
+    `,[
+      {label:"Cancelar",cls:"btn",action:closeSheet},
+      {label:"Agregar",cls:"btn primary",action:()=>{
+        const nombre=document.getElementById("gasto_nombre").value.trim();
+        const monto=Number(document.getElementById("gasto_monto").value||0);
+        if(!nombre){ alert("Escribe el concepto"); return; }
+        const arr=_getGastosFijos(y,m);
+        arr.push({id:uid(),nombre,monto});
+        _saveGastosFijos(y,m,arr);
+        closeSheet(); _renderBEInline(wrap);
+      }}
+    ]);
+  };
+
+  wrap.querySelectorAll("[data-del-gasto]").forEach(btn => {
+    btn.onclick = () => {
+      const arr=_getGastosFijos(y,m);
+      arr.splice(Number(btn.dataset.delGasto),1);
+      _saveGastosFijos(y,m,arr); _renderBEInline(wrap);
+    };
+  });
+}
+
+
+// ── SECCIÓN: MATERIALES Y RUTAS ────────────────────────────
+function _renderSecMateriales(filtersEl, contentEl){
+  if(!contentEl) return;
+  function render(){
+    const mats = db.settings.materialDB||[];
+    const routes = db.settings.routeDB||[];
+    const matRows = mats.length===0
+      ? '<div style="color:var(--muted);font-size:13px;padding:8px 0;">Sin materiales. Agrégalos para usarlos en cotizaciones.</div>'
+      : mats.map((m,i)=>`<div class="sec-item" style="padding:9px 0;"><div class="si-body"><div class="si-title">${escapeHTML(m.desc)}</div><div class="si-meta">$${money(m.cost||0)} / ${escapeHTML(m.uom||"pza")}${m.vendor?" · "+escapeHTML(m.vendor):""}</div></div><div class="si-right"><button class="btn small danger" data-del-mat="${i}">✕</button></div></div>`).join('');
+    const routeRows = routes.length===0
+      ? '<div style="color:var(--muted);font-size:13px;padding:8px 0;">Sin rutas.</div>'
+      : routes.map((r,i)=>`<div class="sec-item" style="padding:9px 0;"><div class="si-body"><div class="si-title">${escapeHTML(r.name)}</div><div class="si-meta">${escapeHTML(r.type||"---")} · $${money(r.costPerHour||0)}/hora</div></div><div class="si-right"><button class="btn small danger" data-del-route="${i}">✕</button></div></div>`).join('');
+
+    contentEl.innerHTML = `
+      <div class="card" style="margin-bottom:12px;">
+        <div class="card-header"><div class="card-title">🗄 Materiales</div><button class="btn small primary" id="smBtnAddMat">＋ Agregar</button></div>
+        <div class="field" style="margin-bottom:8px;"><span class="ico">🔎</span><input id="smMatSearch" placeholder="Buscar material..."></div>
+        <div id="smMatList">${matRows}</div>
+      </div>
+      <div class="card">
+        <div class="card-header"><div class="card-title">⚙️ Rutas / M.O.</div><button class="btn small primary" id="smBtnAddRoute">＋ Agregar</button></div>
+        <div id="smRouteList">${routeRows}</div>
+      </div>`;
+
+    document.getElementById("smBtnAddMat").onclick = () => showAddMaterialModal("", () => render());
+    document.getElementById("smBtnAddRoute").onclick = () => showAddRouteSheet();
+    contentEl.querySelectorAll("[data-del-mat]").forEach(b=>b.addEventListener("click",()=>{ db.settings.materialDB.splice(Number(b.dataset.delMat),1); save(); render(); }));
+    contentEl.querySelectorAll("[data-del-route]").forEach(b=>b.addEventListener("click",()=>{ db.settings.routeDB.splice(Number(b.dataset.delRoute),1); save(); render(); }));
+    const srch=document.getElementById("smMatSearch");
+    if(srch) srch.addEventListener("input",()=>{ const t=srch.value.toLowerCase(); contentEl.querySelectorAll("#smMatList .sec-item").forEach(r=>{ r.style.display=r.textContent.toLowerCase().includes(t)?"":"none"; }); });
+  }
+  render();
+}
+
+
+// ── PLANTILLAS DE COTIZACIÓN ─────────────────────────────────
+function openTemplatePickerModal(onPick){
+  const old = document.getElementById("_tplModal"); if(old) old.remove();
+  const tpls = db.settings.quoteTemplates || [];
+
+  const overlay = document.createElement("div");
+  overlay.id = "_tplModal";
+  overlay.style.cssText = "position:fixed;inset:0;background:rgba(2,6,23,.6);display:flex;align-items:center;justify-content:center;z-index:9999;";
+
+  function renderTpls(){
+    const list = tpls.map((t,i) => {
+      const matCount = (t.products||[]).length;
+      const routeCount = (t.routes||[]).length;
+      return `<div style="display:flex;align-items:center;gap:10px;padding:12px;border-bottom:1px solid var(--border);cursor:pointer;border-radius:10px;transition:background .1s;" class="_tplRow" data-idx="${i}">
+        <div style="font-size:24px;">📋</div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:14px;font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHTML(t.name)}</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px;">${matCount} material${matCount!==1?"es":""} · ${routeCount} ruta${routeCount!==1?"s":""} · creada ${t.createdAt||"—"}</div>
+        </div>
+        <div style="display:flex;gap:6px;">
+          <button class="btn small primary _tplUse" data-idx="${i}" style="font-size:11px;">Usar</button>
+          <button class="btn small danger _tplDel" data-idx="${i}" style="font-size:11px;">✕</button>
+        </div>
+      </div>`;
+    }).join("") || '<div style="padding:24px;text-align:center;color:var(--muted);">Sin plantillas guardadas.</div>';
+
+    overlay.innerHTML = `
+      <div style="background:var(--card);border-radius:18px;padding:0;width:520px;max-width:94vw;max-height:80vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.25);">
+        <div style="display:flex;align-items:center;gap:10px;padding:18px 20px 14px;border-bottom:1px solid var(--border);">
+          <div style="font-size:16px;font-weight:900;flex:1;">📋 Plantillas de cotización</div>
+          <button id="_tplClose" class="btn icon" style="font-size:16px;">✕</button>
+        </div>
+        <div style="overflow-y:auto;padding:8px 12px;flex:1;">${list}</div>
+      </div>`;
+
+    document.getElementById("_tplClose").onclick = () => { overlay.remove(); onPick(null); };
+    overlay.querySelectorAll("._tplUse").forEach(btn => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const tpl = tpls[Number(btn.dataset.idx)];
+        overlay.remove();
+        onPick(tpl);
+      });
+    });
+    overlay.querySelectorAll("._tplDel").forEach(btn => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const idx = Number(btn.dataset.idx);
+        if(!confirm('¿Eliminar la plantilla "'+tpls[idx].name+'"?')) return;
+        tpls.splice(idx, 1);
+        db.settings.quoteTemplates = tpls;
+        save();
+        renderTpls();
+      });
+    });
+    overlay.querySelectorAll("._tplRow").forEach(row => {
+      row.addEventListener("mouseenter", () => row.style.background = "var(--bg3)");
+      row.addEventListener("mouseleave", () => row.style.background = "");
+    });
+    overlay.addEventListener("click", (e) => { if(e.target === overlay){ overlay.remove(); onPick(null); } });
+  }
+
+  document.body.appendChild(overlay);
+  renderTpls();
+}
+
 function renderBOMPage(){
   const content = document.getElementById('bomContent'); if(!content) return;
 
-  // State
-  let selProjectIds = new Set(); // empty = todos los proyectos
-  let groupMode = 'material'; // 'material' | 'project'
+  // State: selQuoteIds = set of authorized quote IDs to include. Empty = nada seleccionado.
+  let selQuoteIds = new Set();
+  // Track expanded projects for quote-level selection
+  let expandedProjects = new Set();
 
-  // Helper: get segment of a project (auth | done | noauth)
+  // Helper: get segment of a project
   function projSeg(p){
     if(projectIsDone(p.id)) return 'done';
     if(projectHasAuthorized(p.id)) return 'auth';
     return 'noauth';
   }
 
+  // Authorized quotes for a project
+  function authQuotesOf(pid){
+    return db.quotes.filter(q => q.projectId === pid && q.status === 'authorized');
+  }
+
   function buildBOM(){
-    // Collect all quotes to include
-    const quotes = [];
+    const matMap = {};
     db.quotes.forEach(q => {
       if(q.status !== 'authorized') return;
-      if(selProjectIds.size > 0 && !selProjectIds.has(q.projectId)) return;
-      quotes.push(q);
-    });
-
-    // Consolidate materials: key = matPick || desc (normalized lowercase)
-    const matMap = {};
-    quotes.forEach(q => {
+      if(!selQuoteIds.has(q.id)) return;
       const proj = db.projects.find(p => p.id === q.projectId);
       const qQty = Number(q.qty || 1);
       (q.products || []).forEach(r => {
         const rawKey = (r.matPick || r.desc || r.material || '').trim();
         if(!rawKey) return;
         const key = rawKey.toLowerCase();
-        const matDef = db.settings.materialDB.find(m => (m.desc||'').toLowerCase() === key) || {};
+        const matDef = (db.settings.materialDB||[]).find(m => (m.desc||'').toLowerCase() === key) || {};
         const uom = matDef.uom || r.uom || '';
         const unitCost = Number(r.unitPrice || matDef.cost || 0);
         const qty = Number(r.qty || 0) * qQty;
-
         if(!matMap[key]){
-          matMap[key] = {
-            desc: rawKey,
-            uom,
-            unitCost,
-            totalQty: 0,
-            totalCost: 0,
-            sources: []
-          };
+          matMap[key] = { desc: rawKey, uom, unitCost, totalQty: 0, totalCost: 0, sources: [] };
         }
         matMap[key].totalQty += qty;
         matMap[key].totalCost += qty * unitCost;
         matMap[key].sources.push({
           projectName: proj ? proj.name : '—',
           quoteName: q.name || q.code || q.id.slice(0,6),
-          qty,
-          unitCost
+          qty, unitCost
         });
       });
     });
-
     return Object.values(matMap).sort((a,b) => b.totalCost - a.totalCost);
   }
 
   function render(){
     const projects = db.projects;
-
-    // All quotes visible = authorized only, filtered by selected projects
-    const quotesForFilter = db.quotes.filter(q =>
-      q.status === 'authorized' &&
-      (selProjectIds.size === 0 || selProjectIds.has(q.projectId))
-    );
-
     const bom = buildBOM();
     const totalCost = bom.reduce((s, r) => s + r.totalCost, 0);
     const totalItems = bom.length;
+    const totalSelQuotes = selQuoteIds.size;
 
     // ── Project groups ──
     const segMeta = {
-      noauth: { label: 'En curso',    ico: '🔵', color: 'rgba(59,130,246,.12)',  border: 'rgba(59,130,246,.3)'  },
-      auth:   { label: 'Autorizado',  ico: '🟢', color: 'rgba(22,163,74,.10)',   border: 'rgba(22,163,74,.3)'   },
+      auth:   { label: 'Autorizados',  ico: '🟢', color: 'rgba(22,163,74,.10)',   border: 'rgba(22,163,74,.3)'   },
+      noauth: { label: 'En curso',     ico: '🔵', color: 'rgba(59,130,246,.12)',  border: 'rgba(59,130,246,.3)'  },
+      done:   { label: 'Terminados',   ico: '✅', color: 'rgba(100,116,139,.10)', border: 'rgba(100,116,139,.3)' },
     };
-    const groups = { noauth: [], auth: [] };
+    const groups = { auth: [], noauth: [], done: [] };
     projects.forEach(p => { const s = projSeg(p); if(groups[s]) groups[s].push(p); });
 
-    const projectGroupsHtml = ['noauth','auth'].map(seg => {
+    const projectGroupsHtml = ['auth','noauth','done'].map(seg => {
       const grp = groups[seg];
-      if(!grp.length) return '';
+      // Only show groups that have at least one authorized quote
+      const grpWithQuotes = grp.filter(p => authQuotesOf(p.id).length > 0);
+      if(!grpWithQuotes.length) return '';
       const meta = segMeta[seg];
-      // check if ALL of this group are selected (or global "all" mode)
-      const allSel = selProjectIds.size === 0 || grp.every(p => selProjectIds.has(p.id));
-      const someSel = selProjectIds.size === 0 || grp.some(p => selProjectIds.has(p.id));
+
+      const projectRows = grpWithQuotes.map(p => {
+        const qs = authQuotesOf(p.id);
+        const allQSel = qs.length > 0 && qs.every(q => selQuoteIds.has(q.id));
+        const someQSel = qs.some(q => selQuoteIds.has(q.id));
+        const isExpanded = expandedProjects.has(p.id);
+
+        const quoteRows = qs.map(q => {
+          const isSel = selQuoteIds.has(q.id);
+          const qTotal = quoteTotal(q);
+          return `<label style="display:flex;align-items:center;gap:8px;padding:5px 4px 5px 28px;cursor:pointer;font-size:12px;user-select:none;background:${isSel?'rgba(37,99,235,.06)':'transparent'};">
+            <input type="checkbox" class="bomQuoteChk" value="${escapeAttr(q.id)}"
+              ${isSel?'checked':''}
+              style="accent-color:var(--accent);width:13px;height:13px;flex-shrink:0;">
+            <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text);">${escapeHTML(q.name||q.id.slice(0,8))}</span>
+            <span style="color:var(--accent);font-size:11px;font-weight:700;flex-shrink:0;">$${money(qTotal)}</span>
+          </label>`;
+        }).join('');
+
+        return `
+          <div style="border-bottom:1px solid var(--border);">
+            <div style="display:flex;align-items:center;gap:8px;padding:7px 8px 7px 12px;cursor:pointer;" data-proj-toggle="${escapeAttr(p.id)}">
+              <input type="checkbox" class="bomProjChk" value="${escapeAttr(p.id)}"
+                ${allQSel?'checked':''} ${(!allQSel&&someQSel)?'data-indeterminate="1"':''}
+                style="accent-color:var(--accent);width:14px;height:14px;flex-shrink:0;" onclick="event.stopPropagation()">
+              <span style="flex:1;min-width:0;font-weight:700;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHTML(p.name||'—')}</span>
+              <span style="color:var(--muted);font-size:11px;flex-shrink:0;margin-right:4px;">${qs.length} cot.</span>
+              <span style="font-size:10px;color:var(--muted);">${isExpanded?'▲':'▼'}</span>
+            </div>
+            <div class="bomQuoteList" data-proj="${escapeAttr(p.id)}" style="display:${isExpanded?'block':'none'};background:var(--bg3);border-top:1px solid var(--border);">
+              ${quoteRows}
+            </div>
+          </div>`;
+      }).join('');
+
+      const grpAllSel = grpWithQuotes.every(p => authQuotesOf(p.id).every(q => selQuoteIds.has(q.id)));
+      const grpSomeSel = grpWithQuotes.some(p => authQuotesOf(p.id).some(q => selQuoteIds.has(q.id)));
+
       return `
         <div style="margin-bottom:10px;border:1px solid ${meta.border};border-radius:12px;overflow:hidden;">
           <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:${meta.color};cursor:pointer;" data-seg-toggle="${seg}">
             <input type="checkbox" class="bomSegChk" data-seg="${seg}"
-              ${allSel?'checked':''} ${(!allSel&&someSel)?'data-indeterminate="1"':''}
+              ${grpAllSel?'checked':''} ${(!grpAllSel&&grpSomeSel)?'data-indeterminate="1"':''}
               style="accent-color:var(--accent);width:15px;height:15px;flex-shrink:0;" onclick="event.stopPropagation()">
             <span style="font-size:13px;font-weight:800;flex:1;">${meta.ico} ${meta.label}</span>
-            <span style="font-size:11px;color:var(--muted);font-weight:600;">${grp.length} proy.</span>
+            <span style="font-size:11px;color:var(--muted);font-weight:600;">${grpWithQuotes.length} proy.</span>
           </div>
-          <div style="display:flex;flex-direction:column;gap:0;padding:4px 8px 6px;">
-            ${grp.map(p => {
-              const isSel = selProjectIds.size === 0 || selProjectIds.has(p.id);
-              const qCount = db.quotes.filter(q=>q.projectId===p.id).length;
-              return `<label style="display:flex;align-items:center;gap:8px;padding:6px 4px;border-bottom:1px solid var(--border);cursor:pointer;font-size:13px;user-select:none;">
-                <input type="checkbox" class="bomProjChk" value="${escapeAttr(p.id)}"
-                  ${isSel?'checked':''}
-                  style="accent-color:var(--accent);width:14px;height:14px;flex-shrink:0;">
-                <span style="flex:1;min-width:0;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHTML(p.name||'—')}</span>
-                <span style="color:var(--muted);font-size:11px;flex-shrink:0;">${qCount} cot.</span>
-              </label>`;
-            }).join('')}
+          <div style="display:flex;flex-direction:column;gap:0;padding:0 8px 4px;">
+            ${projectRows}
           </div>
         </div>`;
     }).join('');
@@ -4720,8 +5308,10 @@ function renderBOMPage(){
     // BOM table rows
     const bomRows = bom.map((row, i) => {
       const sourceSummary = [...new Set(row.sources.map(s => s.projectName))].join(', ');
+      const matDef = (db.settings.materialDB||[]).find(m=>(m.desc||'').toLowerCase()===row.desc.toLowerCase());
+      const hasNote = !!(matDef?.notes);
       return `<tr>
-        <td style="font-weight:700;font-size:13px;">${escapeHTML(row.desc)}</td>
+        <td style="font-weight:700;font-size:13px;">${escapeHTML(row.desc)}${hasNote?` <span title="${escapeAttr(matDef.notes)}" style="font-size:10px;background:rgba(59,130,246,.15);color:var(--accent);border-radius:4px;padding:1px 5px;font-weight:700;cursor:default;">📝</span>`:''}  </td>
         <td style="text-align:center;color:var(--muted);font-size:12px;">${escapeHTML(row.uom||'—')}</td>
         <td style="text-align:right;font-weight:800;font-size:14px;">${money(row.totalQty)}</td>
         <td style="text-align:right;font-size:12px;color:var(--muted);">$${money(row.unitCost)}</td>
@@ -4733,6 +5323,10 @@ function renderBOMPage(){
       </tr>
       <tr id="bomDetail_${i}" style="display:none;background:var(--bg3);">
         <td colspan="7" style="padding:10px 16px;">
+          <div style="margin-bottom:10px;">
+            <div style="font-size:11px;font-weight:700;color:var(--muted);margin-bottom:4px;">📝 NOTAS DE COMPRA</div>
+            <textarea data-bom-note="${escapeAttr(row.desc)}" placeholder="Especificaciones, proveedor sugerido, medidas, instrucciones..." style="width:100%;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-family:inherit;font-size:13px;color:var(--text);resize:vertical;min-height:52px;box-sizing:border-box;">${escapeHTML((db.settings.materialDB||[]).find(m=>(m.desc||'').toLowerCase()===row.desc.toLowerCase())?.notes||'')}</textarea>
+          </div>
           <div style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:6px;">Origen de este material:</div>
           <table style="width:100%;font-size:12px;border-collapse:collapse;">
             <thead><tr style="color:var(--muted);">
@@ -4756,35 +5350,46 @@ function renderBOMPage(){
       </tr>`;
     }).join('');
 
+    const noSelectionHtml = `<div class="card"><div style="text-align:center;padding:36px 20px;color:var(--muted);">
+      <div style="font-size:40px;margin-bottom:12px;">📦</div>
+      <b style="font-size:15px;color:var(--text);">Selecciona las cotizaciones a incluir</b>
+      <div style="font-size:13px;margin-top:8px;">Marca las cotizaciones autorizadas en el panel de filtros.<br>Solo aparecerán en el BOM las que selecciones.</div>
+    </div></div>`;
+
     content.innerHTML = `
       <!-- FILTROS -->
       <div class="card" style="margin-bottom:12px;">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-          <div style="font-size:12px;font-weight:700;color:var(--muted);">FILTRAR POR PROYECTO</div>
-          <button class="btn small" id="bomSelAll" style="font-size:11px;">Todos</button>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+          <div>
+            <div style="font-size:12px;font-weight:700;color:var(--muted);">COTIZACIONES AUTORIZADAS</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:2px;">Selecciona qué cotizaciones incluir en el BOM</div>
+          </div>
+          <div style="display:flex;gap:6px;">
+            <button class="btn small" id="bomSelNone" style="font-size:11px;">Limpiar</button>
+            <button class="btn small primary" id="bomSelAll" style="font-size:11px;">Todas ✓</button>
+          </div>
         </div>
-        ${projectGroupsHtml}
-
+        ${projectGroupsHtml || `<div style="color:var(--muted);font-size:13px;padding:8px 0;">No hay cotizaciones autorizadas.</div>`}
       </div>
 
       <!-- KPIs -->
       <div class="kpi-grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:12px;">
         <div class="kpi-box">
+          <div class="kl">Cotizaciones incluidas</div>
+          <div class="kv">${totalSelQuotes}</div>
+        </div>
+        <div class="kpi-box">
           <div class="kl">Materiales distintos</div>
           <div class="kv">${totalItems}</div>
         </div>
         <div class="kpi-box">
-          <div class="kl">Cotizaciones autorizadas</div>
-          <div class="kv">${quotesForFilter.length}</div>
-        </div>
-        <div class="kpi-box">
           <div class="kl">Costo total estimado</div>
-          <div class="kv" style="font-size:18px;color:var(--accent);">$${money(totalCost)}</div>
+          <div class="kv" style="font-size:18px;color:var(--accent);">${totalSelQuotes > 0 ? '$'+money(totalCost) : '—'}</div>
         </div>
       </div>
 
       <!-- BOM TABLE -->
-      ${bom.length ? `
+      ${totalSelQuotes === 0 ? noSelectionHtml : bom.length ? `
         <div class="card">
           <div class="card-header">
             <div class="card-title">📋 Bill of Materials (BOM)</div>
@@ -4817,51 +5422,67 @@ function renderBOMPage(){
       ` : `<div class="card"><div style="text-align:center;padding:32px;color:var(--muted);">
         <div style="font-size:36px;margin-bottom:10px;">📦</div>
         <b>Sin materiales</b>
-        <div style="font-size:13px;margin-top:6px;">Las cotizaciones seleccionadas no tienen productos/materiales cargados.</div>
+        <div style="font-size:13px;margin-top:6px;">Las cotizaciones seleccionadas no tienen materiales cargados.</div>
       </div></div>`}
     `;
 
-    // ── "Todos" button ──
-    const selAllBtn = document.getElementById('bomSelAll');
-    if(selAllBtn) selAllBtn.addEventListener('click', () => {
-      selProjectIds = new Set();
+    // ── "Todas" button ──
+    document.getElementById('bomSelAll')?.addEventListener('click', () => {
+      selQuoteIds = new Set(db.quotes.filter(q=>q.status==='authorized').map(q=>q.id));
+      render();
+    });
+
+    // ── "Limpiar" button ──
+    document.getElementById('bomSelNone')?.addEventListener('click', () => {
+      selQuoteIds = new Set();
       render();
     });
 
     // ── Segment checkbox (select/deselect whole group) ──
     document.querySelectorAll('.bomSegChk').forEach(chk => {
-      // Set indeterminate visual
       if(chk.dataset.indeterminate) chk.indeterminate = true;
       chk.addEventListener('change', () => {
         const seg = chk.dataset.seg;
-        const segProjects = db.projects.filter(p => projSeg(p) === seg).map(p => p.id);
-        // If global "all" mode, first materialize current state
-        if(selProjectIds.size === 0){
-          selProjectIds = new Set(db.projects.map(p => p.id));
-        }
-        if(chk.checked){
-          segProjects.forEach(id => selProjectIds.add(id));
-        } else {
-          segProjects.forEach(id => selProjectIds.delete(id));
-        }
-        // If all projects selected again → reset to "all" mode
-        if(selProjectIds.size === db.projects.length) selProjectIds = new Set();
+        const segProjects = db.projects.filter(p => projSeg(p) === seg);
+        segProjects.forEach(p => {
+          authQuotesOf(p.id).forEach(q => {
+            if(chk.checked) selQuoteIds.add(q.id);
+            else selQuoteIds.delete(q.id);
+          });
+        });
         render();
       });
     });
 
-    // ── Individual project checkboxes ──
+    // ── Project checkbox (select/deselect all quotes of a project) ──
     document.querySelectorAll('.bomProjChk').forEach(chk => {
+      if(chk.dataset.indeterminate) chk.indeterminate = true;
+      chk.addEventListener('change', e => {
+        e.stopPropagation();
+        authQuotesOf(chk.value).forEach(q => {
+          if(chk.checked) selQuoteIds.add(q.id);
+          else selQuoteIds.delete(q.id);
+        });
+        render();
+      });
+    });
+
+    // ── Individual quote checkboxes ──
+    document.querySelectorAll('.bomQuoteChk').forEach(chk => {
       chk.addEventListener('change', () => {
-        if(selProjectIds.size === 0){
-          selProjectIds = new Set(db.projects.map(p => p.id));
-        }
-        if(chk.checked){
-          selProjectIds.add(chk.value);
-        } else {
-          selProjectIds.delete(chk.value);
-        }
-        if(selProjectIds.size === db.projects.length) selProjectIds = new Set();
+        if(chk.checked) selQuoteIds.add(chk.value);
+        else selQuoteIds.delete(chk.value);
+        render();
+      });
+    });
+
+    // ── Project row toggle (expand/collapse quote list) ──
+    document.querySelectorAll('[data-proj-toggle]').forEach(div => {
+      div.addEventListener('click', e => {
+        if(e.target.tagName === 'INPUT') return;
+        const pid = div.dataset.projToggle;
+        if(expandedProjects.has(pid)) expandedProjects.delete(pid);
+        else expandedProjects.add(pid);
         render();
       });
     });
@@ -4875,7 +5496,44 @@ function renderBOMPage(){
       });
     });
 
-    // Bind quote checkboxes
+    // ── Notes save on blur ──
+    content.querySelectorAll('textarea[data-bom-note]').forEach(ta => {
+      ta.addEventListener('blur', () => {
+        const desc = ta.dataset.bomNote;
+        db.settings.materialDB = db.settings.materialDB || [];
+        let mat = db.settings.materialDB.find(m => (m.desc||'').toLowerCase() === desc.toLowerCase());
+        if(!mat){
+          // Material exists in BOM but not in DB yet — add it
+          mat = {id:uid(), desc, cost:0, uom:'', vendor:''};
+          db.settings.materialDB.push(mat);
+        }
+        mat.notes = ta.value.trim();
+        save();
+        // Refresh note indicator on the row without full re-render
+        const tr = ta.closest('tr');
+        if(tr){
+          const prevTr = tr.previousElementSibling;
+          if(prevTr){
+            const td = prevTr.querySelector('td:first-child');
+            if(td){
+              const existing = td.querySelector('span[title]');
+              if(mat.notes && !existing){
+                td.innerHTML += ` <span title="${escapeAttr(mat.notes)}" style="font-size:10px;background:rgba(59,130,246,.15);color:var(--accent);border-radius:4px;padding:1px 5px;font-weight:700;cursor:default;">📝</span>`;
+              } else if(!mat.notes && existing){
+                existing.remove();
+              } else if(mat.notes && existing){
+                existing.title = mat.notes;
+              }
+            }
+          }
+        }
+      });
+      // Also save on Enter (Ctrl+Enter to newline)
+      ta.addEventListener('keydown', e => {
+        if(e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); ta.blur(); }
+      });
+    });
+
     // Print BOM
     const printBtn = document.getElementById('bomPrintBtn');
     if(printBtn) printBtn.addEventListener('click', () => printBOM(bom, totalCost));
@@ -4886,16 +5544,20 @@ function renderBOMPage(){
 
 function printBOM(bom, totalCost){
   const emp = (db.settings && db.settings.empresa) || {};
-  const rows = bom.map((r,i) => `
+  const rows = bom.map((r,i) => {
+    const matDef = (db.settings.materialDB||[]).find(m=>(m.desc||'').toLowerCase()===r.desc.toLowerCase());
+    const note = matDef?.notes || '';
+    return `
     <tr>
       <td>${i+1}</td>
-      <td><b>${escapeHTML(r.desc)}</b></td>
+      <td><b>${escapeHTML(r.desc)}</b>${note?`<div style="font-size:10px;color:#666;margin-top:2px;">${escapeHTML(note)}</div>`:''}  </td>
       <td style="text-align:center;">${escapeHTML(r.uom||'—')}</td>
       <td style="text-align:right;">${money(r.totalQty)}</td>
       <td style="text-align:right;">$${money(r.unitCost)}</td>
       <td style="text-align:right;"><b>$${money(r.totalCost)}</b></td>
       <td style="font-size:11px;">${[...new Set(r.sources.map(s=>s.projectName))].join(', ')}</td>
-    </tr>`).join('');
+    </tr>`;
+  }).join('');
 
   const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
     <title>BOM — ${escapeHTML(emp.nombre||'ESMA INDUSTRIAL')}</title>
