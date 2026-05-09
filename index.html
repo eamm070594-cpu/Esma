@@ -1025,18 +1025,54 @@ function normalizeDB(){
   db.settings.materialDB.forEach(m=>{ m.cost = Number(m.cost||0); });
 }
 
+// ── TOAST DE ALERTA DE GUARDADO ──────────────────────────────
+function _showSaveToast(msg, type){
+  // type: 'error' | 'warning' | 'success'
+  let toast = document.getElementById('_saveToast');
+  if(!toast){
+    toast = document.createElement('div');
+    toast.id = '_saveToast';
+    toast.style.cssText = [
+      'position:fixed','top:max(14px,env(safe-area-inset-top))','left:50%',
+      'transform:translateX(-50%) translateY(-80px)',
+      'z-index:9999','padding:11px 18px','border-radius:12px',
+      'font-family:var(--font)','font-size:13px','font-weight:700',
+      'box-shadow:0 4px 24px rgba(0,0,0,.22)','transition:transform .28s cubic-bezier(.34,1.56,.64,1)',
+      'white-space:nowrap','max-width:calc(100vw - 32px)','text-align:center'
+    ].join(';');
+    document.body.appendChild(toast);
+  }
+  clearTimeout(toast._hideTimer);
+  const colors = {
+    error:   {bg:'#dc2626', color:'#fff'},
+    warning: {bg:'#d97706', color:'#fff'},
+    success: {bg:'#15803d', color:'#fff'},
+  };
+  const c = colors[type] || colors.warning;
+  toast.style.background = c.bg;
+  toast.style.color = c.color;
+  toast.textContent = msg;
+  toast.style.transform = 'translateX(-50%) translateY(0)';
+  toast._hideTimer = setTimeout(()=>{ toast.style.transform = 'translateX(-50%) translateY(-80px)'; }, type==='error' ? 6000 : 3500);
+}
+
 // ── LOAD: local first, then Firebase ────────────────────────
 function load(){
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     db = raw ? JSON.parse(raw) : defaultDB();
-  } catch(e){ db = defaultDB(); }
+  } catch(e){
+    console.error("Error leyendo localStorage:", e);
+    db = defaultDB();
+  }
   normalizeDB();
 }
 
 // ── SAVE: local + Firebase debounced ────────────────────────
 let _fbSaveTimer = null;
 let _fbSavePending = false;
+let _lastLocalSave = 0;
+let _localSaveFailed = false;
 
 function save(){
   // 1. Strip base64 photos before saving (only keep URLs)
@@ -1047,9 +1083,19 @@ function save(){
   const dbForFb = JSON.parse(JSON.stringify(dbClean));
   if(dbForFb.settings) dbForFb.settings.session = {userId:""};
 
-  // 2. Save locally always
+  // 2. Save locally — with visible error if it fails
   _lastLocalSave = Date.now();
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(dbClean)); } catch(e){}
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(dbClean));
+    if(_localSaveFailed){
+      // Recovered from a previous local failure
+      _localSaveFailed = false;
+    }
+  } catch(e){
+    _localSaveFailed = true;
+    console.error("localStorage save error:", e);
+    _showSaveToast("⚠️ Sin espacio local — solo se guardará en la nube", "warning");
+  }
 
   // 3. Push to Firebase debounced (900ms)
   _fbSavePending = true;
@@ -1057,27 +1103,57 @@ function save(){
   _fbSaveTimer = setTimeout(()=>_fbPush(dbForFb), 900);
 }
 
+let _fbRetryCount = 0;
+const _fbMaxRetries = 5;
+
 async function _fbPush(data){
   if(!_fbSavePending) return;
   _fbSavePending = false;
-  if(!_fbReady){ syncStatusUpdate("⚠ Firebase no disponible", "orange"); return; }
+
+  // If Firebase not ready, try to init and retry once
+  if(!_fbReady){
+    _initFirebase();
+    if(!_fbReady){
+      syncStatusUpdate("⚠ Sin conexión a la nube", "orange");
+      _showSaveToast("⚠️ Sin conexión — dato guardado solo localmente", "warning");
+      // Queue a retry when online
+      window.addEventListener('online', ()=>{ _fbSavePending=true; _fbPush(data); }, {once:true});
+      return;
+    }
+  }
+
   syncStatusUpdate("Guardando...", "orange");
   try {
     await _fbDb.ref(FB_PATH).set(data);
+    _fbRetryCount = 0;
     syncStatusUpdate("✓ " + new Date().toLocaleTimeString("es-MX",{hour:"2-digit",minute:"2-digit"}), "green");
   } catch(e){
+    _fbRetryCount++;
     console.error("Firebase save error:", e);
-    syncStatusUpdate("⚠ Error al guardar", "red");
-    // Retry in 15s
-    _fbSavePending = true;
-    setTimeout(()=>_fbPush(data), 15000);
+    if(_fbRetryCount <= _fbMaxRetries){
+      const wait = Math.min(5000 * _fbRetryCount, 30000);
+      syncStatusUpdate("⚠ Reintentando...", "orange");
+      _showSaveToast(`⚠️ Error al guardar en la nube. Reintentando en ${wait/1000}s...`, "warning");
+      _fbSavePending = true;
+      setTimeout(()=>_fbPush(data), wait);
+    } else {
+      _fbRetryCount = 0;
+      syncStatusUpdate("⚠ Error al guardar", "red");
+      _showSaveToast("❌ No se pudo guardar en la nube. Verifica tu conexión.", "error");
+    }
   }
 }
 
 // ── PULL: load from Firebase on boot ────────────────────────
 async function gsPullOnBoot(){
   _initFirebase();
-  if(!_fbReady){ syncStatusUpdate("⚠ Firebase no disponible", "orange"); return; }
+  if(!_fbReady){
+    syncStatusUpdate("⚠ Firebase no disponible", "orange");
+    _showSaveToast("⚠️ Sin conexión a la nube — usando datos locales", "warning");
+    // Wait for connection and retry
+    window.addEventListener('online', ()=>{ _initFirebase(); gsPullOnBoot(); }, {once:true});
+    return;
+  }
   syncStatusUpdate("Conectando...", "orange");
   try {
     const snap = await _fbDb.ref(FB_PATH).once('value');
@@ -1099,6 +1175,9 @@ async function gsPullOnBoot(){
   } catch(e){
     console.error("Firebase pull error:", e);
     syncStatusUpdate("⚠ Sin conexión", "orange");
+    _showSaveToast("⚠️ No se pudo sincronizar — usando datos locales", "warning");
+    // Retry when back online
+    window.addEventListener('online', ()=>{ syncStatusUpdate("Reconectando...", "orange"); gsPullOnBoot(); }, {once:true});
   }
 }
 
@@ -1118,16 +1197,39 @@ function _startRealtimeListener(){
       try { buildTopbar(); } catch(e){}
     }
   });
+
+  // Monitor connection state visually
+  _fbDb.ref('.info/connected').on('value', snap => {
+    if(snap.val() === true){
+      // Just reconnected — force a push if there's pending data
+      if(_fbSavePending){ _fbPush((() => {
+        const d = JSON.parse(JSON.stringify(db));
+        d.projects.forEach(p=>{ p.photos=(p.photos||[]).filter(ph=>ph.url&&!ph.data); });
+        if(d.settings) d.settings.session={userId:""};
+        return d;
+      })()); }
+    } else {
+      syncStatusUpdate("⚠ Sin conexión", "orange");
+    }
+  });
 }
-let _lastLocalSave = 0;
 
 // ── MANUAL PUSH (button in settings) ─────────────────────────
 async function gsPush(){
   if(!_fbReady){ _initFirebase(); }
+  if(!_fbReady){ _showSaveToast("❌ Sin conexión a la nube", "error"); return; }
   const dbClean = JSON.parse(JSON.stringify(db));
   dbClean.projects.forEach(p=>{ p.photos = (p.photos||[]).filter(ph=>ph.url && !ph.data); });
   if(dbClean.settings) dbClean.settings.session = {userId:""};
-  await _fbPush(dbClean);
+  try {
+    syncStatusUpdate("Guardando...", "orange");
+    await _fbDb.ref(FB_PATH).set(dbClean);
+    syncStatusUpdate("✓ " + new Date().toLocaleTimeString("es-MX",{hour:"2-digit",minute:"2-digit"}), "green");
+    _showSaveToast("✅ Datos guardados en la nube", "success");
+  } catch(e){
+    console.error("Manual push error:", e);
+    _showSaveToast("❌ Error al guardar. Verifica tu conexión.", "error");
+  }
 }
 
 // ── COMPAT: keep Google Sheets stubs so existing buttons don't break ──
