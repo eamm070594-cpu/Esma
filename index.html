@@ -572,7 +572,93 @@ tbody tr:hover td{background:rgba(37,99,235,.03);}
 .proj-card .info{flex:1;min-width:0;padding:10px 12px 6px;}
 .proj-card .name{font-size:13px;font-weight:800;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;}
 .proj-card .meta{font-size:11px;color:var(--muted);margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.proj-card .right{display:flex;align-items:center;justify-content:space-between;padding:5px 12px 10px;gap:6px;flex-shrink:0;}</style>
+.proj-card .right{display:flex;align-items:center;justify-content:space-between;padding:5px 12px 10px;gap:6px;flex-shrink:0;}
+
+
+/* ── PERSONAL / STOCK ── */
+.team-chip{display:inline-flex;align-items:center;gap:6px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:7px 12px;font-size:13px;font-weight:700;margin:3px;}
+.team-chip .del-x{background:none;border:none;cursor:pointer;color:var(--muted);font-size:14px;padding:0 2px;font-family:var(--font);}
+.team-chip .del-x:hover{color:var(--red);}
+.bom-stock-badge{display:inline-block;background:rgba(21,128,61,.12);color:var(--green);border:1px solid rgba(21,128,61,.25);border-radius:6px;font-size:10px;font-weight:800;padding:2px 7px;margin-left:6px;cursor:pointer;vertical-align:middle;}
+.bom-stock-badge.no-stock{background:var(--bg3);color:var(--muted);border-color:var(--border);}
+.bom-row-stock{background:rgba(21,128,61,.04)!important;}
+.bom-row-excluded{opacity:.45;}
+
+/* ── FLUJO DE PRODUCCIÓN ── */
+.flujo-stage{border-radius:10px;padding:0;margin-bottom:6px;border:1.5px solid var(--border);background:var(--card);overflow:hidden;transition:box-shadow .15s;}
+.flujo-stage:hover{box-shadow:var(--shadow);}
+.flujo-stage-hdr{display:flex;align-items:center;gap:10px;padding:11px 14px;cursor:pointer;user-select:none;}
+.flujo-stage-hdr .fs-num{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font-size:10px;font-weight:900;flex-shrink:0;color:#fff;}
+.flujo-stage-hdr .fs-title{flex:1;font-size:13px;font-weight:800;letter-spacing:-.1px;}
+.flujo-stage-hdr .fs-status{font-size:10px;font-weight:700;padding:3px 8px;border-radius:99px;}
+.flujo-stage-hdr .fs-chevron{font-size:11px;color:var(--muted);transition:transform .2s;}
+.flujo-stage.open .fs-chevron{transform:rotate(180deg);}
+.flujo-stage-body{display:none;padding:12px 14px;border-top:1px solid var(--border);background:var(--card2);}
+.flujo-stage.open .flujo-stage-body{display:block;}
+.flujo-stage.st-pending .flujo-stage-hdr{background:var(--card);}
+.flujo-stage.st-active .flujo-stage-hdr{background:rgba(37,99,235,.06);}
+.flujo-stage.st-done .flujo-stage-hdr{background:rgba(21,128,61,.05);}
+.flujo-stage.st-skip .flujo-stage-hdr{opacity:.5;}
+
+/* Pipeline / tabla maestra */
+.pipe-table{width:100%;border-collapse:collapse;font-size:12px;}
+.pipe-table th{background:var(--bg3);padding:8px 10px;text-align:left;font-size:10px;font-weight:700;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;border-bottom:1px solid var(--border);white-space:nowrap;}
+.pipe-table td{padding:9px 10px;border-bottom:1px solid rgba(0,0,0,.04);vertical-align:middle;}
+.pipe-table tr:hover td{background:rgba(37,99,235,.03);}
+.pipe-stage-dot{display:inline-block;width:28px;height:28px;border-radius:6px;display:grid;place-items:center;font-size:13px;cursor:pointer;transition:transform .1s;}
+.pipe-stage-dot:active{transform:scale(.85);}
+.pipe-stage-dot.s-done{background:rgba(21,128,61,.15);}
+.pipe-stage-dot.s-active{background:rgba(37,99,235,.15);}
+.pipe-stage-dot.s-pending{background:var(--bg3);}
+.pipe-stage-dot.s-skip{background:var(--bg3);opacity:.35;}
+.pipe-proj-name{font-weight:800;font-size:13px;cursor:pointer;color:var(--text);}
+.pipe-proj-name:hover{color:var(--accent);}
+.pipe-progress-bar{height:4px;border-radius:2px;background:var(--bg3);overflow:hidden;margin-top:4px;min-width:60px;}
+.pipe-progress-fill{height:100%;border-radius:2px;background:var(--accent);transition:width .3s;}
+
+/* Stage status badge */
+.st-badge-pending{background:var(--bg3);color:var(--muted);}
+.st-badge-active{background:rgba(37,99,235,.12);color:var(--accent);}
+.st-badge-done{background:rgba(21,128,61,.12);color:var(--green);}
+.st-badge-skip{background:var(--bg3);color:var(--muted);}
+
+/* Stage colors */
+.sn-0{background:#6366f1;}.sn-1{background:#8b5cf6;}.sn-2{background:#f59e0b;}.sn-3{background:#ef4444;}.sn-4{background:#06b6d4;}.sn-5{background:#10b981;}.sn-6{background:#0f172a;}
+
+/* ── PLAN DE PRODUCCIÓN ── */
+.plan-week-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-top:10px;}
+.plan-day-col{background:var(--card);border:1px solid var(--border);border-radius:10px;min-height:80px;padding:6px 5px;}
+.plan-day-col.today{border-color:var(--accent);background:var(--accent-light);}
+.plan-day-hdr{font-size:9px;font-weight:800;text-transform:uppercase;color:var(--muted);text-align:center;margin-bottom:5px;letter-spacing:.5px;}
+.plan-day-col.today .plan-day-hdr{color:var(--accent);}
+.plan-day-num{font-size:14px;font-weight:900;text-align:center;margin-bottom:6px;}
+.plan-day-col.today .plan-day-num{color:var(--accent);}
+.plan-chip{border-radius:6px;padding:4px 6px;font-size:10px;font-weight:700;margin-bottom:3px;cursor:pointer;line-height:1.3;transition:opacity .1s;border:none;width:100%;text-align:left;font-family:var(--font);}
+.plan-chip:active{opacity:.7;}
+.plan-chip.area-prod{background:rgba(239,68,68,.15);color:#b91c1c;}
+.plan-chip.area-compras{background:rgba(217,119,6,.15);color:#92400e;}
+.plan-chip.area-ing{background:rgba(99,102,241,.15);color:#4338ca;}
+.plan-chip.area-inst{background:rgba(16,185,129,.15);color:#065f46;}
+.plan-chip.area-tarea{background:rgba(100,116,139,.12);color:var(--muted);}
+.plan-chip.done-chip{opacity:.45;text-decoration:line-through;}
+.plan-area-filters{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px;}
+.plan-area-pill{padding:5px 11px;border-radius:99px;font-size:11px;font-weight:700;border:1.5px solid transparent;cursor:pointer;transition:all .12s;font-family:var(--font);}
+.plan-area-pill.active-prod{background:rgba(239,68,68,.15);color:#b91c1c;border-color:rgba(185,28,28,.3);}
+.plan-area-pill.active-compras{background:rgba(217,119,6,.15);color:#92400e;border-color:rgba(146,64,14,.3);}
+.plan-area-pill.active-ing{background:rgba(99,102,241,.15);color:#4338ca;border-color:rgba(67,56,202,.3);}
+.plan-area-pill.active-inst{background:rgba(16,185,129,.15);color:#065f46;border-color:rgba(6,95,70,.3);}
+.plan-area-pill.active-tarea{background:rgba(100,116,139,.12);color:var(--muted);border-color:var(--border);}
+.plan-area-pill:not([class*="active"]){background:var(--card);color:var(--muted);border-color:var(--border);}
+.plan-add-item{background:var(--accent);color:#fff;border:none;border-radius:10px;padding:9px 16px;font-size:13px;font-weight:700;cursor:pointer;font-family:var(--font);display:inline-flex;align-items:center;gap:6px;}
+.plan-kpi-row{display:flex;gap:8px;overflow-x:auto;margin-bottom:14px;padding-bottom:2px;}
+.plan-kpi-box{flex-shrink:0;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px 14px;min-width:110px;}
+.plan-kpi-box .pk-val{font-size:22px;font-weight:900;line-height:1;}
+.plan-kpi-box .pk-lbl{font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-top:3px;}
+.plan-detail-row{display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);}
+.plan-detail-row:last-child{border-bottom:none;}
+.plan-area-dot{width:10px;height:10px;border-radius:3px;flex-shrink:0;margin-top:3px;}
+@media(max-width:600px){.plan-week-grid{grid-template-columns:repeat(7,1fr);gap:2px;} .plan-chip{font-size:9px;padding:3px 4px;}}
+</style>
   <!-- Firebase SDK (compat) -->
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
@@ -619,6 +705,11 @@ tbody tr:hover td{background:rgba(37,99,235,.03);}
       <div class="hico">📈</div>
       <div class="hlabel">Ventas</div>
       <div class="hdesc">Resumen mensual</div>
+    </div>
+    <div class="home-btn" id="hbtnPlan" style="grid-column:1/-1;background:rgba(255,255,255,.22);border-color:rgba(255,255,255,.4);">
+      <div class="hico">🗓️</div>
+      <div class="hlabel">Plan de Producción</div>
+      <div class="hdesc">Semana · por área y persona</div>
     </div>
   </div>
   <div class="home-footer">
@@ -708,6 +799,9 @@ tbody tr:hover td{background:rgba(37,99,235,.03);}
     <button class="s-nav-item" id="snav-resumen" onclick="sNavGo('resumen')">
       <span class="s-ico">📋</span>Resumen diario
     </button>
+    <button class="s-nav-item" id="snav-plan" onclick="showPage('plan');sNavActive('plan')">
+      <span class="s-ico">🗓️</span>Plan de Producción
+    </button>
     <button class="s-nav-item" id="snav-bom" onclick="showPage('bom');sNavActive('bom')">
       <span class="s-ico">📦</span>BOM Materiales
     </button>
@@ -767,6 +861,18 @@ tbody tr:hover td{background:rgba(37,99,235,.03);}
           <div class="tab" data-dtab="ops">Operación</div>
         </div>
         <div id="detailContent"></div>
+      </div>
+    </div>
+
+
+    <!-- PAGE: PLAN DE PRODUCCIÓN -->
+    <div class="page" id="page-plan">
+      <div style="padding:16px 0 10px;">
+        <div class="sec-head">
+          <div><h2>🏭 Plan de Producción</h2><div class="sub" id="planWeekLabel">Flujo de etapas por proyecto</div></div>
+          <button class="btn primary" id="btnAddPlanItem" style="gap:6px;">＋ Actividad</button>
+        </div>
+        <div id="planContent"></div>
       </div>
     </div>
 
@@ -861,6 +967,7 @@ tbody tr:hover td{background:rgba(37,99,235,.03);}
   <div class="nav-dropdown" id="dd-more">
     <div class="nav-dd-item" onclick="mNavGo('calendar')"><span class="dd-ico">📅</span>Calendario</div>
     <div class="nav-dd-item" onclick="mNavGo('sales')"><span class="dd-ico">📈</span>Ventas</div>
+    <div class="nav-dd-item" onclick="closeAllDropdowns();mNavGo('plan')"><span class="dd-ico">🗓️</span>Plan de Producción</div>
     <div class="nav-dd-item" onclick="mNavGo('resumen')"><span class="dd-ico">📋</span>Resumen diario</div>
     <div class="nav-dd-item" onclick="closeAllDropdowns();mShowSection('compras')"><span class="dd-ico">🛒</span>Compras</div>
     <div class="nav-dd-item" onclick="closeAllDropdowns();mShowSection('instalaciones')"><span class="dd-ico">🛠️</span>Instalaciones</div>
@@ -988,7 +1095,7 @@ function defaultDB(){
         fixedAdmin: { finance:0, hr:0, it:0, adminInst:0, otherAdmin:0, direction:0, depreciation:0 }
       },
     },
-    projects:[], quotes:[], installs:[], purchases:[], tasks:[]
+    projects:[], quotes:[], installs:[], purchases:[], tasks:[], planItems:[], flujos:{}
   };
 }
 let db = null;
@@ -1010,6 +1117,10 @@ function normalizeDB(){
   db.installs  = Array.isArray(db.installs)?  db.installs  : [];
   db.purchases = Array.isArray(db.purchases)? db.purchases : [];
   db.tasks     = Array.isArray(db.tasks)?     db.tasks     : [];
+  db.planItems = Array.isArray(db.planItems)? db.planItems : [];
+  if(!db.flujos) db.flujos = {};
+  if(!Array.isArray(db.settings.team)) db.settings.team = [];
+  if(!db.settings.stockItems) db.settings.stockItems = {};
   if(!db.settings.empresa) db.settings.empresa = {nombre:"ESMA INDUSTRIAL", tel:"", email:"", web:"", redes:"", direccion:"", logoB64:"", titulo:"Propuesta de Servicios"};
   else { db.settings.empresa.titulo = db.settings.empresa.titulo || "Propuesta de Servicios"; }
   db.settings.empresa.logoB64 = localStorage.getItem("esma_logo_b64") || "";
@@ -3596,7 +3707,8 @@ function showPage(name){
     sales:"ssub-results-sales",
     settings:"snav-settings",
     bom:"snav-bom",
-    resumen:"snav-resumen"
+    resumen:"snav-resumen",
+    plan:"snav-plan"
   };
   const sBtn = document.getElementById(sMap[name]||"");
   if(sBtn) sBtn.classList.add("active");
@@ -3609,6 +3721,7 @@ function showPage(name){
   if(name==="settings") renderSettingsPage();
   if(name==="resumen") renderResumenPage();
   if(name==="bom") renderBOMPage();
+  if(name==="plan"){ _planView='pipeline'; renderPlanPage(); }
 }
 
 function showHome(){
@@ -3982,7 +4095,7 @@ function renderDetailOverview(p, content){
       <div class="kpi-box"><div class="kl">Total autorizado</div><div class="kv" style="font-size:18px;color:var(--accent2);">$${money(authTotal)}</div></div>
       <div class="kpi-box"><div class="kl">Cotizaciones</div><div class="kv">${quotes.length}</div></div>
       <div class="kpi-box"><div class="kl">Tareas</div><div class="kv">${doneCount}/${tasks.length}</div></div>
-      <div class="kpi-box"><div class="kl">Estado</div><div class="kv" style="font-size:13px;">${isDone?'\u2705 Terminado':projectHasAuthorized(p.id)?'\u2B50 Autorizado':'\u{1F504} En curso'}</div></div>
+      <div class="kpi-box" style="cursor:pointer;" onclick="showPage('plan'); _planView='project'; _planProjectId='${p.id}'; renderPlanPage();"><div class="kl">Flujo de producción</div><div class="kv" style="font-size:11px;">${_currentStageName(p.id)}</div><div class="ks" style="color:var(--accent);font-weight:700;">Ver etapas →</div></div>
     </div>
     <div class="card">
       <div class="card-header"><div class="card-title">Datos del proyecto</div></div>
@@ -4677,6 +4790,20 @@ function renderSettingsPage(){
       <div style="display:flex;gap:8px;"><div class="field" style="flex:1;"><input id="folioCounterInput" type="number" min="0" value="${Number(db.settings?.folioCounter||0)}"></div><button class="btn small primary" id="btnSaveFolio">Guardar</button></div>
     </div>
     <div class="card" style="margin-bottom:10px;">
+      <div class="card-header"><div class="card-title">👥 Equipo / Personal</div><button class="btn small primary" id="btnAddTeamMember">＋ Agregar</button></div>
+      <div id="teamMembersList" style="display:flex;flex-wrap:wrap;gap:4px;min-height:32px;"></div>
+    </div>
+
+    <div class="card" style="margin-bottom:10px;">
+      <div class="card-header">
+        <div class="card-title">📦 Inventario / Stock</div>
+        <button class="btn small primary" id="btnAddStock">＋ Agregar material</button>
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:10px;">Registra lo que tienes en bodega. El BOM lo descuenta automáticamente al calcular la orden de compra.</div>
+      <div id="stockList"></div>
+    </div>
+
+    <div class="card" style="margin-bottom:10px;">
       <div class="card-header"><div class="card-title">\u{1F4BE} Datos locales</div></div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
         <button class="btn small" id="btnBackup" style="flex:1;justify-content:center;">\u2B07 Respaldo</button>
@@ -4693,6 +4820,154 @@ function renderSettingsPage(){
   document.getElementById("btnGsPull").addEventListener("click",gsPullOnBoot);
   document.getElementById("btnResetSync").addEventListener("click",async()=>{ if(!confirm("\u00BFDescargar datos de Sheets y reemplazar los locales?")) return; await gsPullOnBoot(); });
   document.getElementById("btnSaveFolio").addEventListener("click",()=>{ const val=Number(document.getElementById("folioCounterInput").value||0); db.settings.folioCounter=val; save(); alert("\u2705 Proximo folio: "+String(val+1).padStart(4,"0")); });
+
+  // ── EQUIPO / PERSONAL ──────────────────────────────────
+  function _renderTeam(){
+    if(!Array.isArray(db.settings.team)) db.settings.team = [];
+  if(!db.settings.stockItems) db.settings.stockItems = {};
+    const box = document.getElementById('teamMembersList'); if(!box) return;
+    if(!db.settings.team.length){
+      box.innerHTML = '<span style="font-size:12px;color:var(--muted);padding:6px 4px;">Sin personal agregado. Usa ＋ Agregar.</span>';
+      return;
+    }
+    box.innerHTML = db.settings.team.map((name,i)=>
+      `<span class="team-chip">👤 ${escapeHTML(name)}<button class="del-x" data-del-team="${i}">✕</button></span>`
+    ).join('');
+    box.querySelectorAll('[data-del-team]').forEach(btn=>btn.addEventListener('click',()=>{
+      db.settings.team.splice(Number(btn.dataset.delTeam),1); save(); _renderTeam();
+    }));
+  }
+  _renderTeam();
+  const addTeamBtn = document.getElementById('btnAddTeamMember');
+  if(addTeamBtn) addTeamBtn.addEventListener('click',()=>{
+    const name = prompt('Nombre del integrante:','');
+    if(!name || !name.trim()) return;
+    if(!Array.isArray(db.settings.team)) db.settings.team=[];
+    if(db.settings.team.includes(name.trim())){ alert('Ya existe ese nombre.'); return; }
+    db.settings.team.push(name.trim()); save(); _renderTeam();
+  });
+
+  // ── INVENTARIO / STOCK ──────────────────────────────────
+  function _renderStock(){
+    if(!db.settings.stockItems) db.settings.stockItems = {};
+    const box = document.getElementById('stockList'); if(!box) return;
+    const items = Object.entries(db.settings.stockItems);
+    if(!items.length){
+      box.innerHTML = '<div style="font-size:12px;color:var(--muted);padding:6px 0;">Sin materiales en inventario. Agrega los que tienes en bodega.</div>';
+      return;
+    }
+    box.innerHTML = `
+      <div class="table-wrap">
+        <table style="width:100%;border-collapse:collapse;font-size:13px;">
+          <thead><tr>
+            <th style="text-align:left;padding:7px 10px;background:var(--bg3);font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;">Material</th>
+            <th style="text-align:center;padding:7px 10px;background:var(--bg3);font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;">Cant. en stock</th>
+            <th style="text-align:center;padding:7px 10px;background:var(--bg3);font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;">UOM</th>
+            <th style="padding:7px 10px;background:var(--bg3);"></th>
+          </tr></thead>
+          <tbody>
+            ${items.map(([key, val])=>{
+              const qty = typeof val === 'object' ? (val.qty||0) : 0;
+              const uom = typeof val === 'object' ? (val.uom||'') : '';
+              return `<tr>
+                <td style="padding:8px 10px;font-weight:700;">${escapeHTML(key)}</td>
+                <td style="padding:8px 10px;text-align:center;">
+                  <input type="number" min="0" step="0.01" value="${qty}" data-stock-qty="${escapeAttr(key)}"
+                    style="width:80px;text-align:center;background:var(--bg3);border:1.5px solid var(--border);border-radius:7px;padding:5px 8px;font-family:var(--font);font-size:13px;font-weight:700;">
+                </td>
+                <td style="padding:8px 10px;text-align:center;">
+                  <input type="text" value="${escapeHTML(uom)}" placeholder="pza" data-stock-uom="${escapeAttr(key)}"
+                    style="width:60px;text-align:center;background:var(--bg3);border:1.5px solid var(--border);border-radius:7px;padding:5px 8px;font-family:var(--font);font-size:13px;">
+                </td>
+                <td style="padding:8px 10px;text-align:right;">
+                  <button class="btn small danger" data-del-stock="${escapeAttr(key)}">✕</button>
+                </td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>`;
+
+    // Wire qty/uom changes
+    box.querySelectorAll('[data-stock-qty]').forEach(inp=>{
+      inp.addEventListener('change',()=>{
+        const key=inp.dataset.stockQty;
+        if(!db.settings.stockItems[key]) db.settings.stockItems[key]={qty:0,uom:''};
+        db.settings.stockItems[key].qty = Number(inp.value||0);
+        save();
+      });
+    });
+    box.querySelectorAll('[data-stock-uom]').forEach(inp=>{
+      inp.addEventListener('change',()=>{
+        const key=inp.dataset.stockUom;
+        if(!db.settings.stockItems[key]) db.settings.stockItems[key]={qty:0,uom:''};
+        db.settings.stockItems[key].uom = inp.value.trim();
+        save();
+      });
+    });
+    // Delete
+    box.querySelectorAll('[data-del-stock]').forEach(btn=>{
+      btn.addEventListener('click',()=>{
+        delete db.settings.stockItems[btn.dataset.delStock];
+        save(); _renderStock();
+      });
+    });
+  }
+  _renderStock();
+
+  // Add stock item
+  const addStockBtn = document.getElementById('btnAddStock');
+  if(addStockBtn) addStockBtn.addEventListener('click',()=>{
+    // Build list from materialDB + any existing keys not in materialDB
+    const matDB = (db.settings.materialDB||[]).map(m=>m.desc).filter(Boolean);
+    const existing = Object.keys(db.settings.stockItems||{});
+    const available = [...new Set([...matDB, ...existing])].filter(m=>!db.settings.stockItems[m.toLowerCase()]&&!db.settings.stockItems[m]);
+
+    if(!available.length && !matDB.length){
+      const name = prompt('Nombre del material:','');
+      if(!name||!name.trim()) return;
+      _addStockEntry(name.trim()); return;
+    }
+
+    // Show sheet with picker
+    openSheet('＋ Agregar al inventario',`
+      <div class="field-label">Material</div>
+      <div class="field" style="padding:6px 10px;">
+        <select id="stock_mat_sel" style="background:transparent;border:none;color:var(--text);font-family:var(--font);font-size:14px;font-weight:700;width:100%;">
+          <option value="">-- Selecciona o escribe abajo --</option>
+          ${[...new Set([...matDB])].map(m=>`<option value="${escapeAttr(m)}">${escapeHTML(m)}</option>`).join('')}
+          <option value="__custom__">✏️ Otro (escribir)</option>
+        </select>
+      </div>
+      <div id="stock_custom_row" style="display:none;">
+        <div class="field-label">Nombre del material</div>
+        <div class="field"><input id="stock_custom_name" placeholder="Ej: Tornillo 1/4"></div>
+      </div>
+      <div class="field-label">Cantidad en bodega</div>
+      <div class="field"><input id="stock_qty" type="number" min="0" step="0.01" placeholder="0" value="0"></div>
+      <div class="field-label">Unidad (UOM)</div>
+      <div class="field"><input id="stock_uom" placeholder="pza, kg, m, lámina..."></div>
+    `,[
+      {label:'Cancelar', cls:'btn', action:closeSheet},
+      {label:'Agregar', cls:'btn primary', action:()=>{
+        let name = document.getElementById('stock_mat_sel').value;
+        if(name==='__custom__') name = document.getElementById('stock_custom_name').value.trim();
+        if(!name){ alert('Selecciona o escribe un material'); return; }
+        const qty = Number(document.getElementById('stock_qty').value||0);
+        const uom = document.getElementById('stock_uom').value.trim();
+        if(!db.settings.stockItems) db.settings.stockItems={};
+        db.settings.stockItems[name.toLowerCase()] = {qty, uom, label:name};
+        save(); closeSheet(); _renderStock();
+      }}
+    ]);
+    // Wire custom toggle
+    setTimeout(()=>{
+      const sel=document.getElementById('stock_mat_sel');
+      const row=document.getElementById('stock_custom_row');
+      if(sel&&row) sel.addEventListener('change',()=>{ row.style.display=sel.value==='__custom__'?'':'none'; });
+    },80);
+  });
+
   document.getElementById("btnBackup").addEventListener("click",exportJSON);
   document.getElementById("btnRestore").addEventListener("click",()=>document.getElementById("restoreFile").click());
   document.getElementById("restoreFile").addEventListener("change",()=>{ const f=document.getElementById("restoreFile").files?.[0]; if(f) restoreJSON(f); });
@@ -4834,6 +5109,7 @@ function openToolsMenu(){
     <div class="tools-item" id="tm-instalaciones"><span class="ti-ico">\u{1F6E0}\uFE0F</span>Instalaciones</div>
     <div class="tools-item" id="tm-compras"><span class="ti-ico">\u{1F6D2}</span>Compras</div>
     <div class="tools-item" id="tm-tareas"><span class="ti-ico">\u2705</span>Tareas</div>
+    <div class="tools-item" id="tm-plan"><span class="ti-ico">\U0001f5d3\ufe0f</span>Plan de Producción</div>
     <div class="tools-divider"></div>
     <div class="tools-label">Herramientas</div>
     <div class="tools-item" id="tm-push"><span class="ti-ico">\u2B06</span>Subir a Sheets</div>
@@ -5516,8 +5792,15 @@ function renderBOMPage(){
   function render(){
     const projects = db.projects;
     const bom = buildBOM();
-    const totalCost = bom.reduce((s, r) => s + r.totalCost, 0);
-    const totalItems = bom.length;
+    const totalCost = bom.reduce((s, r) => {
+      const sk = r.desc.toLowerCase();
+      const se = db.settings.stockItems && db.settings.stockItems[sk];
+      const sq = se ? Number(se.qty||0) : 0;
+      const nq = Math.max(0, r.totalQty - sq);
+      return s + nq * (r.unitCost||0);
+    }, 0);
+    const stockCount = bom.filter(r=>{ const se=db.settings.stockItems&&db.settings.stockItems[r.desc.toLowerCase()]; return se&&Number(se.qty||0)>=r.totalQty; }).length;
+    const totalItems = bom.length; const _stockCnt = bom.filter(r=>{ const se=db.settings.stockItems&&db.settings.stockItems[r.desc.toLowerCase()]; return se&&Number(se.qty||0)>0; }).length;
     const totalSelQuotes = selQuoteIds.size;
 
     // ── Project groups ──
@@ -5593,13 +5876,34 @@ function renderBOMPage(){
       const sourceSummary = [...new Set(row.sources.map(s => s.projectName))].join(', ');
       const matDef = (db.settings.materialDB||[]).find(m=>(m.desc||'').toLowerCase()===row.desc.toLowerCase());
       const hasNote = !!(matDef?.notes);
-      return `<tr>
-        <td style="font-weight:700;font-size:13px;">${escapeHTML(row.desc)}${hasNote?` <span title="${escapeAttr(matDef.notes)}" style="font-size:10px;background:rgba(59,130,246,.15);color:var(--accent);border-radius:4px;padding:1px 5px;font-weight:700;cursor:default;">📝</span>`:''}  </td>
+      const stockKey = row.desc.toLowerCase();
+      const stockEntry = db.settings.stockItems && db.settings.stockItems[stockKey];
+      const stockQty   = stockEntry ? Number(stockEntry.qty||0) : 0;
+      const netQty     = Math.max(0, row.totalQty - stockQty);
+      const netCost    = netQty * (row.unitCost||0);
+      const fullyInStock = stockQty >= row.totalQty;
+      const partialStock = stockQty > 0 && !fullyInStock;
+      const rowStyle = fullyInStock ? 'opacity:.45;background:rgba(21,128,61,.04);' : '';
+      return `<tr style="${rowStyle}">
+        <td style="font-weight:700;font-size:13px;">${escapeHTML(row.desc)}${hasNote?` <span title="${escapeAttr(matDef.notes)}" style="font-size:10px;background:rgba(59,130,246,.15);color:var(--accent);border-radius:4px;padding:1px 5px;font-weight:700;cursor:default;">📝</span>`:''}
+        </td>
         <td style="text-align:center;color:var(--muted);font-size:12px;">${escapeHTML(row.uom||'—')}</td>
-        <td style="text-align:right;font-weight:800;font-size:14px;">${money(row.totalQty)}</td>
-        <td style="text-align:right;font-size:12px;color:var(--muted);">$${money(row.unitCost)}</td>
-        <td style="text-align:right;font-weight:800;color:var(--accent);">$${money(row.totalCost)}</td>
-        <td style="font-size:11px;color:var(--muted);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeAttr(sourceSummary)}">${escapeHTML(sourceSummary)}</td>
+        <td style="text-align:right;font-weight:800;font-size:14px;${fullyInStock?'text-decoration:line-through;':''}">${money(row.totalQty)}</td>
+        <td style="text-align:center;">
+          <input type="number" min="0" step="0.01"
+            value="${stockQty||''}"
+            placeholder="0"
+            data-bom-stock="${escapeAttr(stockKey)}"
+            data-bom-uom="${escapeAttr(row.uom||'')}"
+            style="width:72px;text-align:center;background:${stockQty>0?'rgba(21,128,61,.08)':'var(--bg3)'};border:1.5px solid ${stockQty>0?'rgba(21,128,61,.3)':'var(--border)'};border-radius:7px;padding:4px 6px;font-family:var(--font);font-size:13px;font-weight:${stockQty>0?'800':'400'};color:${stockQty>0?'var(--green)':'var(--text)'};">
+        </td>
+        <td style="text-align:right;font-weight:800;font-size:14px;color:${fullyInStock?'var(--green)':netQty<row.totalQty?'var(--amber)':'var(--text)'};">
+          ${fullyInStock ? '<span style="color:var(--green);">✓ Cubierto</span>' : money(netQty)}
+        </td>
+        <td style="text-align:right;font-weight:800;color:${fullyInStock?'var(--green)':partialStock?'var(--amber)':'var(--accent)'};">
+          ${fullyInStock ? '—' : '$'+money(netCost)}
+        </td>
+        <td style="font-size:11px;color:var(--muted);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeAttr(sourceSummary)}">${escapeHTML(sourceSummary)}</td>
         <td>
           <button class="btn small" style="font-size:11px;padding:5px 8px;" onclick="document.getElementById('bomDetail_${i}').style.display=document.getElementById('bomDetail_${i}').style.display==='table-row'?'none':'table-row'">Ver</button>
         </td>
@@ -5684,9 +5988,10 @@ function renderBOMPage(){
                 <tr>
                   <th>Material</th>
                   <th style="text-align:center;">UOM</th>
-                  <th style="text-align:right;">Cantidad total</th>
-                  <th style="text-align:right;">Costo unit.</th>
-                  <th style="text-align:right;">Costo total</th>
+                  <th style="text-align:right;">Necesito</th>
+                  <th style="text-align:center;">📦 En stock</th>
+                  <th style="text-align:right;">A comprar</th>
+                  <th style="text-align:right;">Costo</th>
                   <th>Proyectos</th>
                   <th></th>
                 </tr>
@@ -5817,27 +6122,63 @@ function renderBOMPage(){
       });
     });
 
-    // Print BOM
+    // Print BOM — pass only items that still need purchasing
     const printBtn = document.getElementById('bomPrintBtn');
-    if(printBtn) printBtn.addEventListener('click', () => printBOM(bom, totalCost));
+    if(printBtn) printBtn.addEventListener('click', () => printBOM(bom));
+
+    // Wire inline stock inputs — must run inside render() so it survives re-renders
+    document.querySelectorAll('[data-bom-stock]').forEach(inp=>{
+      inp.addEventListener('change', ()=>{
+        const key = inp.dataset.bomStock;
+        const uom = inp.dataset.bomUom||'';
+        const qty = Number(inp.value||0);
+        if(!db.settings.stockItems) db.settings.stockItems={};
+        if(qty > 0){
+          db.settings.stockItems[key] = {qty, uom, label:key};
+        } else {
+          delete db.settings.stockItems[key];
+        }
+        save(); render();
+      });
+      inp.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); inp.blur(); } });
+    });
   }
 
   render();
 }
 
-function printBOM(bom, totalCost){
+function printBOM(bom){
   const emp = (db.settings && db.settings.empresa) || {};
-  const rows = bom.map((r,i) => {
+  // Filter out materials fully covered by stock
+  const bomToPrint = bom.filter(r=>{
+    const sk = r.desc.toLowerCase();
+    const se = db.settings.stockItems && db.settings.stockItems[sk];
+    const sq = se ? Number(se.qty||0) : 0;
+    return sq < r.totalQty;
+  });
+  const printTotal = bomToPrint.reduce((s,r)=>{
+    const sk = r.desc.toLowerCase();
+    const se = db.settings.stockItems && db.settings.stockItems[sk];
+    const sq = se ? Number(se.qty||0) : 0;
+    const nq = Math.max(0, r.totalQty - sq);
+    return s + nq * (r.unitCost||0);
+  }, 0);
+  const rows = bomToPrint.map((r,i) => {
     const matDef = (db.settings.materialDB||[]).find(m=>(m.desc||'').toLowerCase()===r.desc.toLowerCase());
     const note = matDef?.notes || '';
+    const sk = r.desc.toLowerCase();
+    const se = db.settings.stockItems && db.settings.stockItems[sk];
+    const sq = se ? Number(se.qty||0) : 0;
+    const nq = Math.max(0, r.totalQty - sq);
+    const nc = nq * (r.unitCost||0);
     return `
     <tr>
       <td>${i+1}</td>
-      <td><b>${escapeHTML(r.desc)}</b>${note?`<div style="font-size:10px;color:#666;margin-top:2px;">${escapeHTML(note)}</div>`:''}  </td>
+      <td><b>${escapeHTML(r.desc)}</b>${note?`<div style="font-size:10px;color:#666;margin-top:2px;">${escapeHTML(note)}</div>`:''}${sq>0?`<div style="font-size:10px;color:#15803d;">📦 Stock: ${sq} — comprar: ${money(nq)}</div>`:''}</td>
       <td style="text-align:center;">${escapeHTML(r.uom||'—')}</td>
-      <td style="text-align:right;">${money(r.totalQty)}</td>
+      <td style="text-align:right;">${money(nq)}</td>
       <td style="text-align:right;">$${money(r.unitCost)}</td>
-      <td style="text-align:right;"><b>$${money(r.totalCost)}</b></td>
+      <td style="text-align:right;"><b>$${money(nc)}</b></td>
       <td style="font-size:11px;">${[...new Set(r.sources.map(s=>s.projectName))].join(', ')}</td>
     </tr>`;
   }).join('');
@@ -5872,12 +6213,12 @@ function printBOM(bom, totalCost){
         ${rows}
         <tr class="total-row">
           <td colspan="5" style="text-align:right;">TOTAL ESTIMADO</td>
-          <td style="text-align:right;">$${money(totalCost)}</td>
+          <td style="text-align:right;">$${money(printTotal)}</td>
           <td></td>
         </tr>
       </tbody>
     </table>
-    <div style="margin-top:20px;font-size:11px;color:#888;">Generado por ESMA Industrial · ${bom.length} materiales distintos</div>
+    <div style="margin-top:20px;font-size:11px;color:#888;">Generado por ESMA Industrial · ${bomToPrint.length} material${bomToPrint.length!==1?'es':''} a comprar${bom.length-bomToPrint.length>0?' · '+(bom.length-bomToPrint.length)+' cubierto'+(bom.length-bomToPrint.length!==1?'s':'')+' con stock':''}</div>
   </body></html>`;
 
   const iframe = document.createElement('iframe');
@@ -5888,6 +6229,395 @@ function printBOM(bom, totalCost){
   iframe.onload = ()=>{ try{ iframe.contentWindow.focus(); iframe.contentWindow.print(); } finally { setTimeout(()=>iframe.remove(),1000); }};
   setTimeout(()=>{ try{ iframe.contentWindow.focus(); iframe.contentWindow.print(); }catch(e){} }, 450);
 }
+
+
+
+// ═══════════════════════════════════════════════════════════════
+// PLAN DE PRODUCCIÓN — Flujo de etapas + Tabla maestra
+// ═══════════════════════════════════════════════════════════════
+
+const FLUJO_STAGES_DEFAULT = [
+  {id:'dibujo',     label:'Dibujo / Diseño',       icon:'✏️',  color:'#6366f1'},
+  {id:'ingenieria', label:'Ingeniería / Planos',    icon:'📐',  color:'#8b5cf6'},
+  {id:'compras',    label:'Compra de materiales',   icon:'🛒',  color:'#f59e0b'},
+  {id:'produccion', label:'Producción / Fabricación',icon:'🔨', color:'#ef4444'},
+  {id:'calidad',    label:'Control de calidad',     icon:'🔍',  color:'#06b6d4'},
+  {id:'instalacion',label:'Instalación',            icon:'🛠️', color:'#10b981'},
+  {id:'entrega',    label:'Entrega / Cierre',       icon:'🏁',  color:'#0f172a'},
+];
+
+// Status: 'pending' | 'active' | 'done' | 'skip'
+const ST_LABEL  = {pending:'Pendiente', active:'En proceso', done:'Listo', skip:'N/A'};
+const ST_BADGE  = {pending:'st-badge-pending', active:'st-badge-active', done:'st-badge-done', skip:'st-badge-skip'};
+const ST_ICON   = {pending:'⬜', active:'🔵', done:'✅', skip:'➖'};
+
+let _planView = 'pipeline'; // 'pipeline' | 'project'
+let _planProjectId = '';    // project open in detail view
+
+function _getProjectFlujo(pid){
+  // Returns array of stage objects for this project, creating defaults if needed
+  if(!db.flujos) db.flujos = {};
+  if(!Array.isArray(db.settings.team)) db.settings.team = [];
+  if(!db.settings.stockItems) db.settings.stockItems = {};
+  if(!db.flujos[pid]){
+    db.flujos[pid] = FLUJO_STAGES_DEFAULT.map(s=>({
+      stageId: s.id,
+      status: 'pending',
+      assignee: '',
+      startDate: '',
+      endDate: '',
+      notes: '',
+      active: true,   // whether this stage applies to this project
+    }));
+  }
+  // Ensure all default stages exist (for new stages added later)
+  const existing = new Set(db.flujos[pid].map(x=>x.stageId));
+  FLUJO_STAGES_DEFAULT.forEach(s=>{ if(!existing.has(s.id)) db.flujos[pid].push({stageId:s.id,status:'pending',assignee:'',startDate:'',endDate:'',notes:'',active:true}); });
+  return db.flujos[pid];
+}
+
+function _projectFlujoProgress(pid){
+  const stages = _getProjectFlujo(pid).filter(x=>x.active);
+  const total = stages.length;
+  const done  = stages.filter(x=>x.status==='done'||x.status==='skip').length;
+  const active= stages.filter(x=>x.status==='active').length;
+  return {total, done, active, pct: total>0 ? Math.round(done/total*100) : 0};
+}
+
+function _currentStageName(pid){
+  const stages = _getProjectFlujo(pid).filter(x=>x.active);
+  const active = stages.find(x=>x.status==='active');
+  if(active){ const def=FLUJO_STAGES_DEFAULT.find(s=>s.id===active.stageId); return def?def.icon+' '+def.label:'—'; }
+  const next = stages.find(x=>x.status==='pending');
+  if(next){ const def=FLUJO_STAGES_DEFAULT.find(s=>s.id===next.stageId); return def?'⏳ '+def.label:'—'; }
+  return '✅ Completo';
+}
+
+function renderPlanPage(){
+  const content = document.getElementById('planContent');
+  if(!content) return;
+  if(!db.flujos) db.flujos = {};
+  if(!Array.isArray(db.settings.team)) db.settings.team = [];
+  if(!db.settings.stockItems) db.settings.stockItems = {};
+
+  if(_planView === 'pipeline') _renderPipeline(content);
+  else _renderProjectFlujo(content, _planProjectId);
+}
+
+// ── VISTA 1: TABLA MAESTRA (Pipeline) ─────────────────────────
+function _renderPipeline(content){
+  // Only show authorized + in-progress projects (not done unless filter)
+  let projects = db.projects.filter(p => !projectIsDone(p.id) && projectHasAuthorized(p.id));
+  const allProj = db.projects.filter(p=>projectHasAuthorized(p.id) && !projectIsDone(p.id));
+
+  const _pipeAddBtn = document.getElementById('btnAddPlanItem');
+  if(_pipeAddBtn) _pipeAddBtn.style.display = 'none';
+
+  if(!allProj.length){
+    content.innerHTML=`<div class="empty"><div class="ico">🏭</div><h3>Sin proyectos autorizados</h3><p>Autoriza una cotización en un proyecto para ver su flujo de producción aquí.</p></div>`;
+    return;
+  }
+
+  // KPIs globales
+  let totalActive=0, totalDone=0, totalPending=0;
+  allProj.forEach(p=>{ const prog=_projectFlujoProgress(p.id); totalDone+=prog.done; totalActive+=prog.active; totalPending+=(prog.total-prog.done-prog.active); });
+
+  // Stage header columns
+  const stageHeaders = FLUJO_STAGES_DEFAULT.map((s,i)=>
+    `<th title="${s.label}" style="text-align:center;min-width:38px;"><span style="font-size:15px;">${s.icon}</span><div style="font-size:9px;margin-top:2px;max-width:38px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${s.label.split('/')[0].trim()}</div></th>`
+  ).join('');
+
+  const rows = allProj.map(p=>{
+    const stages = _getProjectFlujo(p.id);
+    const prog = _projectFlujoProgress(p.id);
+    const isDone = projectIsDone(p.id);
+    const stageCells = FLUJO_STAGES_DEFAULT.map((s,i)=>{
+      const st = stages.find(x=>x.stageId===s.id);
+      if(!st || !st.active) return `<td style="text-align:center;"><span class="pipe-stage-dot s-skip" title="N/A">➖</span></td>`;
+      const cls = 'pipe-stage-dot s-'+st.status;
+      const ico = ST_ICON[st.status]||'⬜';
+      const tt = `${s.label}: ${ST_LABEL[st.status]}${st.assignee?' · '+st.assignee:''}${st.endDate?' · '+st.endDate:''}`;
+      return `<td style="text-align:center;"><span class="${cls}" title="${escapeAttr(tt)}" data-toggle-stage="${p.id}" data-stage-id="${s.id}">${ico}</span></td>`;
+    }).join('');
+    const progressBar = `<div class="pipe-progress-bar"><div class="pipe-progress-fill" style="width:${prog.pct}%;"></div></div>`;
+    const etapa = _currentStageName(p.id);
+    return `<tr>
+      <td style="min-width:150px;">
+        <div class="pipe-proj-name" data-open-proj="${p.id}">${escapeHTML(p.name||'—')}</div>
+        <div style="font-size:10px;color:var(--muted);margin-top:2px;">${escapeHTML(p.client||'')} ${isDone?'· <span style="color:var(--green);">Terminado</span>':''}</div>
+        ${progressBar}
+        <div style="font-size:10px;color:var(--muted);margin-top:3px;">${prog.pct}% · ${escapeHTML(etapa)}</div>
+      </td>
+      ${stageCells}
+    </tr>`;
+  }).join('');
+
+  content.innerHTML = `
+    <!-- KPIs -->
+    <div class="plan-kpi-row" style="margin-bottom:16px;">
+      <div class="plan-kpi-box"><div class="pk-val">${allProj.length}</div><div class="pk-lbl">Proyectos</div></div>
+      <div class="plan-kpi-box" style="border-color:rgba(37,99,235,.25);background:rgba(37,99,235,.05);"><div class="pk-val" style="color:var(--accent);">${totalActive}</div><div class="pk-lbl">En proceso</div></div>
+      <div class="plan-kpi-box" style="border-color:rgba(220,38,38,.25);background:rgba(220,38,38,.05);"><div class="pk-val" style="color:var(--red);">${totalPending}</div><div class="pk-lbl">Pendientes</div></div>
+      <div class="plan-kpi-box" style="border-color:rgba(21,128,61,.25);background:rgba(21,128,61,.05);"><div class="pk-val" style="color:var(--green);">${totalDone}</div><div class="pk-lbl">Listos</div></div>
+    </div>
+
+    <!-- Leyenda -->
+    <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px;font-size:11px;color:var(--muted);">
+      <span>${ST_ICON.done} Listo</span>
+      <span>${ST_ICON.active} En proceso</span>
+      <span>${ST_ICON.pending} Pendiente</span>
+      <span>${ST_ICON.skip} N/A</span>
+      <span style="margin-left:auto;font-size:10px;">Toca un ícono para cambiar estado · Toca el nombre para ver detalle</span>
+    </div>
+
+    <!-- Tabla -->
+    <div class="table-wrap" style="overflow-x:auto;">
+      <table class="pipe-table">
+        <thead><tr><th style="min-width:150px;">Proyecto</th>${stageHeaders}</tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+
+    <!-- Btn ver todos -->
+    <div style="margin-top:10px;display:flex;gap:8px;align-items:center;">
+      <span style="font-size:11px;color:var(--muted);">Mostrando ${allProj.length} proyecto${allProj.length!==1?'s':''} autorizados</span>
+    </div>
+  `;
+
+  // Toggle stage status on click
+  content.querySelectorAll('[data-toggle-stage]').forEach(el=>{
+    el.addEventListener('click',()=>{
+      const pid=el.dataset.toggleStage, sid=el.dataset.stageId;
+      const stages=_getProjectFlujo(pid);
+      const st=stages.find(x=>x.stageId===sid); if(!st) return;
+      // Cycle: pending → active → done → pending
+      const cycle={pending:'active',active:'done',done:'pending',skip:'pending'};
+      st.status=cycle[st.status]||'pending';
+      if(st.status==='active' && !st.startDate) st.startDate=_isoDate(new Date());
+      if(st.status==='done' && !st.endDate) st.endDate=_isoDate(new Date());
+      save(); _renderPipeline(content);
+    });
+  });
+
+  // Open project detail
+  content.querySelectorAll('[data-open-proj]').forEach(el=>{
+    el.addEventListener('click',()=>{ _planProjectId=el.dataset.openProj; _planView='project'; renderPlanPage(); });
+  });
+}
+
+// ── VISTA 2: DETALLE DE PROYECTO (Acordeón de etapas) ─────────
+function _renderProjectFlujo(content, pid){
+  const p = db.projects.find(x=>x.id===pid);
+
+  const _projAddBtn = document.getElementById('btnAddPlanItem');
+  if(_projAddBtn) _projAddBtn.style.display = '';
+
+  if(!p){
+    // Show project picker
+    const authProjects = db.projects.filter(x=>projectHasAuthorized(x.id));
+    if(!authProjects.length){ content.innerHTML=`<div class="empty"><div class="ico">🏭</div><h3>Sin proyectos autorizados</h3></div>`; return; }
+    content.innerHTML = `
+      <button class="btn" id="btnBackPipeline" style="margin-bottom:16px;">← Tabla maestra</button>
+      <div class="card"><div class="card-title" style="margin-bottom:12px;">Selecciona un proyecto</div>
+        ${authProjects.map(proj=>{
+          const prog=_projectFlujoProgress(proj.id);
+          return `<div style="display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--border);cursor:pointer;" data-open-proj="${proj.id}">
+            <div style="flex:1;min-width:0;"><div style="font-weight:800;font-size:13px;">${escapeHTML(proj.name||'—')}</div><div style="font-size:11px;color:var(--muted);">${escapeHTML(proj.client||'')} · ${_currentStageName(proj.id)}</div>
+            <div class="pipe-progress-bar"><div class="pipe-progress-fill" style="width:${prog.pct}%;"></div></div></div>
+            <span style="font-size:13px;font-weight:900;color:var(--accent);">${prog.pct}%</span>
+            <span style="font-size:18px;color:var(--muted);">›</span>
+          </div>`;
+        }).join('')}
+      </div>`;
+    content.querySelectorAll('[data-open-proj]').forEach(el=>el.addEventListener('click',()=>{ _planProjectId=el.dataset.openProj; renderPlanPage(); }));
+    document.getElementById('btnBackPipeline').addEventListener('click',()=>{ _planView='pipeline'; renderPlanPage(); });
+    return;
+  }
+
+  const stages = _getProjectFlujo(pid);
+  const prog = _projectFlujoProgress(pid);
+  const users = (db.settings.users||[]).map(u=>u.name||u.email).filter(Boolean);
+
+  const stageCards = FLUJO_STAGES_DEFAULT.map((s, idx)=>{
+    const st = stages.find(x=>x.stageId===s.id) || {stageId:s.id,status:'pending',active:true};
+    const stClass = 'st-'+st.status;
+    const badgeCls = ST_BADGE[st.status]||'st-badge-pending';
+    const isOpen = st.status==='active';
+    return `
+    <div class="flujo-stage ${stClass} ${isOpen?'open':''}" data-stage-card="${s.id}">
+      <div class="flujo-stage-hdr" data-toggle-accordion="${s.id}">
+        <div class="fs-num sn-${idx}" style="background:${s.color};">${idx+1}</div>
+        <span style="font-size:16px;">${s.icon}</span>
+        <div class="fs-title">${s.label}</div>
+        ${st.assignee?`<span style="font-size:11px;color:var(--muted);">👤${escapeHTML(st.assignee)}</span>`:''}
+        ${st.endDate&&st.status==='done'?`<span style="font-size:10px;color:var(--green);">✓ ${st.endDate}</span>`:''}
+        <span class="fs-status ${badgeCls}">${ST_ICON[st.status]} ${ST_LABEL[st.status]}</span>
+        ${st.active?'':'<span style="font-size:10px;color:var(--muted);">N/A</span>'}
+        <span class="fs-chevron">▼</span>
+      </div>
+      <div class="flujo-stage-body">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+          <div>
+            <div class="field-label">Estado</div>
+            <div class="field" style="padding:6px 10px;">
+              <select data-sf="status" data-pid="${pid}" data-sid="${s.id}" style="background:transparent;border:none;color:var(--text);font-family:var(--font);font-size:13px;font-weight:700;width:100%;">
+                <option value="pending" ${st.status==='pending'?'selected':''}>⬜ Pendiente</option>
+                <option value="active"  ${st.status==='active'?'selected':''}>🔵 En proceso</option>
+                <option value="done"    ${st.status==='done'?'selected':''}>✅ Listo</option>
+                <option value="skip"    ${st.status==='skip'?'selected':''}>➖ N/A</option>
+              </select>
+            </div>
+          </div>
+          <div>
+            <div class="field-label">Responsable</div>
+            <div class="field" style="padding:6px 10px;">
+              <select data-sf="assignee" data-pid="${pid}" data-sid="${s.id}" style="background:transparent;border:none;color:var(--text);font-family:var(--font);font-size:13px;width:100%;">
+                <option value="">Sin asignar</option>
+                ${users.map(u=>`<option value="${escapeAttr(u)}" ${st.assignee===u?'selected':''}>${escapeHTML(u)}</option>`).join('')}
+                ${st.assignee && !users.includes(st.assignee)?`<option value="${escapeAttr(st.assignee)}" selected>${escapeHTML(st.assignee)}</option>`:''}
+              </select>
+            </div>
+          </div>
+          <div>
+            <div class="field-label">Fecha inicio</div>
+            <div class="field"><input type="date" data-sf="startDate" data-pid="${pid}" data-sid="${s.id}" value="${st.startDate||''}"></div>
+          </div>
+          <div>
+            <div class="field-label">Fecha fin / entrega</div>
+            <div class="field"><input type="date" data-sf="endDate" data-pid="${pid}" data-sid="${s.id}" value="${st.endDate||''}"></div>
+          </div>
+        </div>
+        <div class="field-label">Notas / instrucciones</div>
+        <div class="field"><textarea data-sf="notes" data-pid="${pid}" data-sid="${s.id}" placeholder="Ej: Cortar paneles 19mm, revisar medidas con plano v3...">${escapeHTML(st.notes||'')}</textarea></div>
+        <div style="display:flex;gap:8px;margin-top:10px;justify-content:flex-end;">
+          <button class="btn small" data-toggle-active="${pid}" data-sid="${s.id}">${st.active?'Marcar como N/A':'Activar etapa'}</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+
+  content.innerHTML = `
+    <!-- Nav back -->
+    <button class="btn" id="btnBackPipeline" style="margin-bottom:14px;gap:6px;">← Tabla maestra</button>
+
+    <!-- Project header -->
+    <div class="card" style="margin-bottom:14px;background:linear-gradient(135deg,var(--accent-dark),var(--accent));border:none;">
+      <div style="color:#fff;">
+        <div style="font-size:11px;opacity:.7;font-weight:700;text-transform:uppercase;letter-spacing:.6px;">Proyecto</div>
+        <div style="font-size:18px;font-weight:900;margin:4px 0;">${escapeHTML(p.name||'—')}</div>
+        <div style="font-size:12px;opacity:.8;">${escapeHTML(p.client||'')}${p.deliveryDate?' · Entrega: '+p.deliveryDate:''}</div>
+        <div style="margin-top:10px;background:rgba(255,255,255,.2);border-radius:6px;overflow:hidden;height:8px;">
+          <div style="height:100%;background:#fff;border-radius:6px;width:${prog.pct}%;transition:width .4s;"></div>
+        </div>
+        <div style="font-size:12px;opacity:.8;margin-top:6px;">${prog.pct}% completado · ${prog.done} de ${prog.total} etapas · Etapa actual: ${_currentStageName(pid)}</div>
+      </div>
+    </div>
+
+    <!-- Etapas acordeón -->
+    <div id="flujoStages">${stageCards}</div>
+  `;
+
+  // Back to pipeline
+  document.getElementById('btnBackPipeline').addEventListener('click',()=>{ _planView='pipeline'; renderPlanPage(); });
+
+  // Accordion toggle
+  content.querySelectorAll('[data-toggle-accordion]').forEach(hdr=>{
+    hdr.addEventListener('click',()=>{
+      const sid=hdr.dataset.toggleAccordion;
+      const card=content.querySelector(`[data-stage-card="${sid}"]`);
+      if(card) card.classList.toggle('open');
+    });
+  });
+
+  // Field changes (status, assignee, dates, notes)
+  const saveField=(el)=>{
+    const pid2=el.dataset.pid, sid=el.dataset.sid, field=el.dataset.sf;
+    if(!pid2||!sid||!field) return;
+    const stages2=_getProjectFlujo(pid2);
+    const st=stages2.find(x=>x.stageId===sid); if(!st) return;
+    st[field]=el.tagName==='SELECT'?el.value:el.value;
+    if(field==='status'){
+      if(el.value==='active' && !st.startDate) st.startDate=_isoDate(new Date());
+      if(el.value==='done'   && !st.endDate)   st.endDate=_isoDate(new Date());
+      // Update visual class on card
+      const card=content.querySelector(`[data-stage-card="${sid}"]`);
+      if(card){ card.className=card.className.replace(/st-\w+/,'st-'+el.value); }
+    }
+    save();
+    // Refresh progress bar in header
+    const newProg=_projectFlujoProgress(pid2);
+    const bar=content.querySelector('[id="flujoStages"]')?.closest('[id="planContent"]')?.querySelector('.pipe-progress-fill');
+  };
+
+  content.querySelectorAll('[data-sf]').forEach(el=>{
+    if(el.tagName==='SELECT') el.addEventListener('change',()=>{ saveField(el); });
+    else if(el.tagName==='TEXTAREA') el.addEventListener('blur',()=>saveField(el));
+    else el.addEventListener('change',()=>saveField(el));
+  });
+
+  // Toggle active/skip
+  content.querySelectorAll('[data-toggle-active]').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      const pid2=btn.dataset.toggleActive, sid=btn.dataset.sid;
+      const stages2=_getProjectFlujo(pid2);
+      const st=stages2.find(x=>x.stageId===sid); if(!st) return;
+      st.active=!st.active;
+      if(!st.active) st.status='skip'; else if(st.status==='skip') st.status='pending';
+      save(); renderPlanPage();
+    });
+  });
+
+  // Add activity button
+  const _stageAddBtn=document.getElementById('btnAddPlanItem');
+  if(_stageAddBtn){ _stageAddBtn.onclick=null; _stageAddBtn.addEventListener('click',()=>_openPlanItemSheet({date:_isoDate(new Date()),projectId:pid})); }
+}
+
+// ── WEEK-LEVEL ITEMS (kept for calendar integration) ──────────
+const PLAN_AREAS = [
+  {id:'prod',   label:'Producción',   icon:'🔨', cls:'area-prod'},
+  {id:'compras',label:'Compras',      icon:'🛒', cls:'area-compras'},
+  {id:'ing',    label:'Ingeniería',   icon:'📐', cls:'area-ing'},
+  {id:'inst',   label:'Instalación',  icon:'🛠️', cls:'area-inst'},
+  {id:'tarea',  label:'Tarea general',icon:'✅', cls:'area-tarea'},
+];
+const AREA_DOT_COLORS = {prod:'#ef4444',compras:'#d97706',ing:'#6366f1',inst:'#10b981',tarea:'#94a3b8'};
+let _planWeekOffset=0, _planAreaFilter=[], _planViewMode='week';
+function _planWeekStart(offset){ const today=new Date(); today.setHours(0,0,0,0); const dow=today.getDay(); const diffMon=(dow===0)?-6:(1-dow); const mon=new Date(today); mon.setDate(today.getDate()+diffMon+offset*7); return mon; }
+function _isoDate(d){ return d.toISOString().slice(0,10); }
+function _planItemsForRange(startISO,endISO){ const items=[]; (db.planItems||[]).forEach(item=>{ if(item.date&&item.date>=startISO&&item.date<=endISO) items.push({...item,_src:'plan'}); }); (db.tasks||[]).forEach(t=>{ if(t.date&&t.date>=startISO&&t.date<=endISO) items.push({id:t.id,_src:'task',area:'tarea',title:t.title||'Tarea',date:t.date,projectId:t.projectId,done:!!t.done,assignee:t.assignee||'',notes:t.notes||''}); }); (db.purchases||[]).forEach(c=>{ if(c.date&&c.date>=startISO&&c.date<=endISO) items.push({id:c.id,_src:'purchase',area:'compras',title:c.title||'Compra',date:c.date,projectId:c.projectId,done:c.status==='received',assignee:c.assignee||'',notes:c.notes||''}); }); (db.installs||[]).forEach(i=>{ if(i.date&&i.date>=startISO&&i.date<=endISO) items.push({id:i.id,_src:'install',area:'inst',title:i.title||'Instalación',date:i.date,projectId:i.projectId,done:i.status==='done',assignee:i.assignee||'',notes:i.notes||''}); }); return items; }
+
+function _openPlanItemSheet(defaults, editing){
+  const isNew=!editing;
+  const users=[...new Set([...(db.settings.users||[]).map(u=>u.name||u.email),...(db.settings.team||[])].filter(Boolean))];
+  const projects=db.projects.map(p=>`<option value="${p.id}" ${(defaults.projectId===p.id)?'selected':''}>${escapeHTML(p.name||'—')}</option>`).join('');
+  const areaOpts=PLAN_AREAS.map(a=>`<option value="${a.id}" ${(defaults.area||'prod')===a.id?'selected':''}>${a.icon} ${a.label}</option>`).join('');
+  const userOpts=['<option value="">Sin asignar</option>',...users.map(u=>`<option value="${escapeAttr(u)}" ${defaults.assignee===u?'selected':''}>${escapeHTML(u)}</option>`)].join('');
+  openSheet(isNew?'＋ Nueva actividad':'✏️ Editar actividad',`
+    <div class="field-label">Área</div><div class="field" style="padding:6px 10px;"><select id="pi_area" style="background:transparent;border:none;color:var(--text);font-family:inherit;font-size:14px;font-weight:700;width:100%;">${areaOpts}</select></div>
+    <div class="field-label">Título / Descripción</div><div class="field"><input id="pi_title" placeholder="Ej: Cortar paneles melamina" value="${escapeAttr(defaults.title||'')}"></div>
+    <div class="field-label">Fecha</div><div class="field"><input id="pi_date" type="date" value="${defaults.date||_isoDate(new Date())}"></div>
+    <div class="field-label">Proyecto (opcional)</div><div class="field" style="padding:6px 10px;"><select id="pi_project" style="background:transparent;border:none;color:var(--text);font-family:inherit;font-size:13px;width:100%;"><option value="">Sin proyecto</option>${projects}</select></div>
+    <div class="field-label">Asignar a</div><div class="field" style="padding:6px 10px;"><select id="pi_assignee" style="background:transparent;border:none;color:var(--text);font-family:inherit;font-size:13px;width:100%;">${userOpts}</select></div>
+    <div class="field-label">Notas (opcional)</div><div class="field"><textarea id="pi_notes" placeholder="Instrucciones, materiales, etc.">${escapeHTML(defaults.notes||'')}</textarea></div>
+    <div class="field-label">Estado</div><div class="field" style="padding:6px 10px;"><select id="pi_done" style="background:transparent;border:none;color:var(--text);font-family:inherit;font-size:14px;font-weight:700;width:100%;"><option value="0" ${!defaults.done?'selected':''}>⏳ Pendiente</option><option value="1" ${defaults.done?'selected':''}>✅ Listo</option></select></div>
+    ${!isNew?`<div style="margin-top:14px;"><button class="btn danger" id="pi_del_btn" style="width:100%;justify-content:center;">🗑️ Eliminar actividad</button></div>`:''}
+  `,[
+    {label:'Cancelar',cls:'btn',action:closeSheet},
+    {label:isNew?'Crear':'Guardar',cls:'btn primary',action:()=>{
+      const title=document.getElementById('pi_title').value.trim(); if(!title){alert('Escribe una descripción');return;}
+      if(!Array.isArray(db.planItems)) db.planItems=[];
+      if(isNew){ db.planItems.push({id:uid(),area:document.getElementById('pi_area').value,title,date:document.getElementById('pi_date').value,projectId:document.getElementById('pi_project').value||'',assignee:document.getElementById('pi_assignee').value||'',notes:document.getElementById('pi_notes').value.trim(),done:document.getElementById('pi_done').value==='1',createdAt:_isoDate(new Date())}); }
+      else { const item=db.planItems.find(x=>x.id===defaults.id); if(item){item.area=document.getElementById('pi_area').value;item.title=title;item.date=document.getElementById('pi_date').value;item.projectId=document.getElementById('pi_project').value||'';item.assignee=document.getElementById('pi_assignee').value||'';item.notes=document.getElementById('pi_notes').value.trim();item.done=document.getElementById('pi_done').value==='1';} }
+      save(); closeSheet(); renderPlanPage();
+    }}
+  ]);
+  if(!isNew){ setTimeout(()=>{ const delBtn=document.getElementById('pi_del_btn'); if(delBtn) delBtn.addEventListener('click',()=>{ if(!confirm('¿Eliminar esta actividad?')) return; db.planItems=(db.planItems||[]).filter(x=>x.id!==defaults.id); save(); closeSheet(); renderPlanPage(); }); },100); }
+}
+
+// Normalize flujos in normalizeDB (called separately)
+function _normalizeFlujos(){ if(!db.flujos) db.flujos={}; }
+
+
 
 // _popNav fixed directly in original function
 
