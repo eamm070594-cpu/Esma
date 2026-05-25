@@ -6251,7 +6251,8 @@ const ST_LABEL  = {pending:'Pendiente', active:'En proceso', done:'Listo', skip:
 const ST_BADGE  = {pending:'st-badge-pending', active:'st-badge-active', done:'st-badge-done', skip:'st-badge-skip'};
 const ST_ICON   = {pending:'⬜', active:'🔵', done:'✅', skip:'➖'};
 
-let _planView = 'pipeline'; // 'pipeline' | 'project'
+let _planView = 'pipeline'; // 'pipeline' | 'project' | 'persona'
+let _planPersona = ''; // selected person filter
 let _planProjectId = '';    // project open in detail view
 
 function _getProjectFlujo(pid){
@@ -6301,6 +6302,7 @@ function renderPlanPage(){
   if(!db.settings.stockItems) db.settings.stockItems = {};
 
   if(_planView === 'pipeline') _renderPipeline(content);
+  else if(_planView === 'persona') _renderPersonaView(content);
   else _renderProjectFlujo(content, _planProjectId);
 }
 
@@ -6353,6 +6355,13 @@ function _renderPipeline(content){
   }).join('');
 
   content.innerHTML = `
+    <!-- Vista tabs -->
+    <div style="display:flex;gap:6px;margin-bottom:16px;">
+      <button class="tab active" id="planTabPipeline">🏭 Pipeline</button>
+      <button class="tab" id="planTabPersona">👤 Por persona</button>
+      <button class="tab" id="planTabProject">📋 Por proyecto</button>
+    </div>
+
     <!-- KPIs -->
     <div class="plan-kpi-row" style="margin-bottom:16px;">
       <div class="plan-kpi-box"><div class="pk-val">${allProj.length}</div><div class="pk-lbl">Proyectos</div></div>
@@ -6384,6 +6393,11 @@ function _renderPipeline(content){
     </div>
   `;
 
+  // View tabs
+  const _pt1=content.querySelector('#planTabPipeline'); if(_pt1) _pt1.addEventListener('click',()=>{ _planView='pipeline'; renderPlanPage(); });
+  const _pt2=content.querySelector('#planTabPersona');  if(_pt2) _pt2.addEventListener('click',()=>{ _planView='persona';  renderPlanPage(); });
+  const _pt3=content.querySelector('#planTabProject');  if(_pt3) _pt3.addEventListener('click',()=>{ _planView='project';  _planProjectId=''; renderPlanPage(); });
+
   // Toggle stage status on click
   content.querySelectorAll('[data-toggle-stage]').forEach(el=>{
     el.addEventListener('click',()=>{
@@ -6402,6 +6416,167 @@ function _renderPipeline(content){
   // Open project detail
   content.querySelectorAll('[data-open-proj]').forEach(el=>{
     el.addEventListener('click',()=>{ _planProjectId=el.dataset.openProj; _planView='project'; renderPlanPage(); });
+  });
+}
+
+
+// ── VISTA 3: POR PERSONA ──────────────────────────────────
+function _renderPersonaView(content){
+  const _addBtn = document.getElementById('btnAddPlanItem');
+  if(_addBtn) _addBtn.style.display = 'none';
+
+  // Build full person list from team + users
+  const allPeople = [...new Set([
+    ...(db.settings.users||[]).map(u=>u.name||u.email),
+    ...(db.settings.team||[])
+  ].filter(Boolean))];
+
+  // Collect ALL pending/active stages across all authorized projects
+  function getPendingByPerson(){
+    const byPerson = {}; // name -> [{proj, stage, stageLabel, stageIcon, status}]
+    const unassigned = [];
+
+    db.projects.filter(p=>projectHasAuthorized(p.id)&&!projectIsDone(p.id)).forEach(proj=>{
+      const stages = _getProjectFlujo(proj.id).filter(s=>s.active && s.status!=='done' && s.status!=='skip');
+      stages.forEach(s=>{
+        const def = FLUJO_STAGES_DEFAULT.find(d=>d.id===s.stageId)||{label:s.stageId,icon:'•',color:'#94a3b8'};
+        const item = {proj, stage:s, def};
+        if(s.assignee && s.assignee.trim()){
+          if(!byPerson[s.assignee]) byPerson[s.assignee]=[];
+          byPerson[s.assignee].push(item);
+        } else {
+          unassigned.push(item);
+        }
+      });
+    });
+    return {byPerson, unassigned};
+  }
+
+  const {byPerson, unassigned} = getPendingByPerson();
+  const totalPending = Object.values(byPerson).reduce((s,v)=>s+v.length,0) + unassigned.length;
+
+  // If a person is selected, filter to just them
+  const showingPerson = _planPersona;
+
+  const stageCard = (item, showAssignee) => {
+    const statusColor = item.stage.status==='active' ? 'rgba(37,99,235,.12)' : 'var(--bg3)';
+    const statusTxt = item.stage.status==='active' ? '🔵 En proceso' : '⏳ Pendiente';
+    return `<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);cursor:pointer;" data-open-proj-stage="${item.proj.id}">
+      <div style="width:32px;height:32px;border-radius:8px;background:${item.def.color};display:grid;place-items:center;font-size:15px;flex-shrink:0;">${item.def.icon}</div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:13px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHTML(item.proj.name||'—')}</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:1px;">${item.def.label}${item.stage.endDate?' · 📅 '+item.stage.endDate:''}</div>
+      </div>
+      <span style="font-size:10px;font-weight:700;padding:3px 8px;border-radius:99px;background:${statusColor};white-space:nowrap;">${statusTxt}</span>
+    </div>`;
+  };
+
+  // Person pill buttons
+  const pills = allPeople.map(name=>{
+    const count = (byPerson[name]||[]).length;
+    if(!count) return '';
+    const active = showingPerson===name;
+    return `<button class="plan-area-pill ${active?'active-prod':''}" data-persona="${escapeAttr(name)}" style="${active?'background:rgba(29,78,216,.12);color:var(--accent);border-color:var(--accent);':''}">
+      👤 ${escapeHTML(name)} <span style="opacity:.7;">${count}</span>
+    </button>`;
+  }).filter(Boolean).join('');
+
+  const unassignedCount = unassigned.length;
+  const unassignedPill = unassignedCount
+    ? `<button class="plan-area-pill ${showingPerson==='__unassigned__'?'active-prod':''}" data-persona="__unassigned__" style="${showingPerson==='__unassigned__'?'background:rgba(220,38,38,.1);color:var(--red);border-color:var(--red);':''}">⚠️ Sin asignar <span style="opacity:.7;">${unassignedCount}</span></button>`
+    : '';
+
+  // Items to show
+  let itemsToShow = [];
+  let sectionTitle = '';
+  if(!showingPerson){
+    // Show summary of all people
+  } else if(showingPerson==='__unassigned__'){
+    itemsToShow = unassigned;
+    sectionTitle = '⚠️ Sin asignar';
+  } else {
+    itemsToShow = byPerson[showingPerson]||[];
+    sectionTitle = '👤 '+showingPerson;
+  }
+
+  content.innerHTML = `
+    <!-- Vista tabs -->
+    <div style="display:flex;gap:6px;margin-bottom:16px;">
+      <button class="tab" id="planTabPipeline3">🏭 Pipeline</button>
+      <button class="tab active" id="planTabPersona3">👤 Por persona</button>
+      <button class="tab" id="planTabProject3">📋 Por proyecto</button>
+    </div>
+
+    <!-- KPIs -->
+    <div class="plan-kpi-row" style="margin-bottom:14px;">
+      <div class="plan-kpi-box"><div class="pk-val">${Object.keys(byPerson).length}</div><div class="pk-lbl">Personas</div></div>
+      <div class="plan-kpi-box" style="border-color:rgba(220,38,38,.25);background:rgba(220,38,38,.05);"><div class="pk-val" style="color:var(--red);">${totalPending}</div><div class="pk-lbl">Pendientes</div></div>
+      ${unassignedCount?`<div class="plan-kpi-box" style="border-color:rgba(220,38,38,.3);background:rgba(220,38,38,.07);"><div class="pk-val" style="color:var(--red);font-size:16px;">${unassignedCount}</div><div class="pk-lbl">Sin asignar</div></div>`:''}
+    </div>
+
+    <!-- Pills de personas -->
+    <div class="plan-area-filters" style="margin-bottom:14px;">
+      <button class="plan-area-pill ${!showingPerson?'active-tarea':''}" data-persona="" style="${!showingPerson?'background:var(--accent-light);color:var(--accent);border-color:var(--accent);':''}">📋 Todos</button>
+      ${pills}
+      ${unassignedPill}
+    </div>
+
+    <!-- Resumen general (sin filtro) -->
+    ${!showingPerson ? `
+      ${allPeople.map(name=>{
+        const items = byPerson[name]||[];
+        if(!items.length) return '';
+        const active = items.filter(x=>x.stage.status==='active').length;
+        const pending = items.filter(x=>x.stage.status==='pending').length;
+        return `<div class="card" style="margin-bottom:8px;cursor:pointer;" data-select-persona="${escapeAttr(name)}">
+          <div style="display:flex;align-items:center;gap:12px;">
+            <div style="width:40px;height:40px;border-radius:50%;background:var(--accent-light);display:grid;place-items:center;font-size:18px;flex-shrink:0;">👤</div>
+            <div style="flex:1;min-width:0;">
+              <div style="font-size:14px;font-weight:800;">${escapeHTML(name)}</div>
+              <div style="font-size:11px;color:var(--muted);margin-top:2px;">${active?`🔵 ${active} en proceso · `:''}⏳ ${pending} pendiente${pending!==1?'s':''}</div>
+              <div style="margin-top:6px;display:flex;gap:4px;flex-wrap:wrap;">
+                ${items.slice(0,3).map(item=>`<span style="font-size:10px;background:var(--bg3);border-radius:5px;padding:2px 7px;font-weight:700;">${item.def.icon} ${escapeHTML(item.proj.name)}</span>`).join('')}
+                ${items.length>3?`<span style="font-size:10px;color:var(--muted);">+${items.length-3} más</span>`:''}
+              </div>
+            </div>
+            <div style="font-size:22px;font-weight:900;color:var(--accent);">${items.length}</div>
+          </div>
+        </div>`;
+      }).join('')}
+      ${unassignedCount?`<div class="card" style="margin-bottom:8px;cursor:pointer;border-color:rgba(220,38,38,.25);background:rgba(220,38,38,.04);" data-select-persona="__unassigned__">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <div style="width:40px;height:40px;border-radius:50%;background:rgba(220,38,38,.1);display:grid;place-items:center;font-size:18px;">⚠️</div>
+          <div style="flex:1;"><div style="font-size:14px;font-weight:800;color:var(--red);">Sin asignar</div><div style="font-size:11px;color:var(--muted);">Etapas sin responsable</div></div>
+          <div style="font-size:22px;font-weight:900;color:var(--red);">${unassignedCount}</div>
+        </div>
+      </div>`:''}
+      ${!allPeople.length && !unassignedCount?`<div class="empty"><div class="ico">👥</div><h3>Sin personal asignado</h3><p>Ve a Ajustes → Equipo y agrega a tu equipo. Luego asígnalos en las etapas del Plan.</p></div>`:''}
+    ` : `
+      <!-- Detalle persona -->
+      <div class="card">
+        <div class="card-header"><div class="card-title">${sectionTitle} — ${itemsToShow.length} etapa${itemsToShow.length!==1?'s':''} pendiente${itemsToShow.length!==1?'s':''}</div></div>
+        ${itemsToShow.length ? itemsToShow.map(item=>stageCard(item,false)).join('') : '<div style="padding:16px;color:var(--muted);font-size:13px;">Sin pendientes 🎉</div>'}
+      </div>
+    `}
+  `;
+
+  // Tab nav
+  const _pp1=content.querySelector('#planTabPipeline3'); if(_pp1) _pp1.addEventListener('click',()=>{ _planView='pipeline'; renderPlanPage(); });
+  const _pp3=content.querySelector('#planTabProject3');  if(_pp3) _pp3.addEventListener('click',()=>{ _planView='project'; _planProjectId=''; renderPlanPage(); });
+
+  // Person pill clicks
+  content.querySelectorAll('[data-persona]').forEach(btn=>{
+    btn.addEventListener('click',()=>{ _planPersona=btn.dataset.persona; renderPlanPage(); });
+  });
+
+  // Summary card clicks → select person
+  content.querySelectorAll('[data-select-persona]').forEach(el=>{
+    el.addEventListener('click',()=>{ _planPersona=el.dataset.selectPersona; renderPlanPage(); });
+  });
+
+  // Stage row click → go to project detail
+  content.querySelectorAll('[data-open-proj-stage]').forEach(el=>{
+    el.addEventListener('click',()=>{ _planView='project'; _planProjectId=el.dataset.openProjStage; renderPlanPage(); });
   });
 }
 
@@ -6430,13 +6605,15 @@ function _renderProjectFlujo(content, pid){
         }).join('')}
       </div>`;
     content.querySelectorAll('[data-open-proj]').forEach(el=>el.addEventListener('click',()=>{ _planProjectId=el.dataset.openProj; renderPlanPage(); }));
-    document.getElementById('btnBackPipeline').addEventListener('click',()=>{ _planView='pipeline'; renderPlanPage(); });
+    const _ppt1=content.querySelector('#planTabPipeline2'); if(_ppt1) _ppt1.addEventListener('click',()=>{ _planView='pipeline'; renderPlanPage(); });
+  const _ppt2=content.querySelector('#planTabPersona2');  if(_ppt2) _ppt2.addEventListener('click',()=>{ _planView='persona';  renderPlanPage(); });
+  const _ppt3=content.querySelector('#planTabProject2');  if(_ppt3) _ppt3.addEventListener('click',()=>{ /* already here */ });
     return;
   }
 
   const stages = _getProjectFlujo(pid);
   const prog = _projectFlujoProgress(pid);
-  const users = (db.settings.users||[]).map(u=>u.name||u.email).filter(Boolean);
+  const users = [...new Set([...(db.settings.users||[]).map(u=>u.name||u.email),...(db.settings.team||[])].filter(Boolean))];
 
   const stageCards = FLUJO_STAGES_DEFAULT.map((s, idx)=>{
     const st = stages.find(x=>x.stageId===s.id) || {stageId:s.id,status:'pending',active:true};
@@ -6498,7 +6675,11 @@ function _renderProjectFlujo(content, pid){
 
   content.innerHTML = `
     <!-- Nav back -->
-    <button class="btn" id="btnBackPipeline" style="margin-bottom:14px;gap:6px;">← Tabla maestra</button>
+    <div style="display:flex;gap:6px;margin-bottom:14px;">
+      <button class="tab" id="planTabPipeline2">🏭 Pipeline</button>
+      <button class="tab" id="planTabPersona2">👤 Por persona</button>
+      <button class="tab active" id="planTabProject2">📋 Por proyecto</button>
+    </div>
 
     <!-- Project header -->
     <div class="card" style="margin-bottom:14px;background:linear-gradient(135deg,var(--accent-dark),var(--accent));border:none;">
@@ -6518,7 +6699,9 @@ function _renderProjectFlujo(content, pid){
   `;
 
   // Back to pipeline
-  document.getElementById('btnBackPipeline').addEventListener('click',()=>{ _planView='pipeline'; renderPlanPage(); });
+  const _ppt1=content.querySelector('#planTabPipeline2'); if(_ppt1) _ppt1.addEventListener('click',()=>{ _planView='pipeline'; renderPlanPage(); });
+  const _ppt2=content.querySelector('#planTabPersona2');  if(_ppt2) _ppt2.addEventListener('click',()=>{ _planView='persona';  renderPlanPage(); });
+  const _ppt3=content.querySelector('#planTabProject2');  if(_ppt3) _ppt3.addEventListener('click',()=>{ /* already here */ });
 
   // Accordion toggle
   content.querySelectorAll('[data-toggle-accordion]').forEach(hdr=>{
