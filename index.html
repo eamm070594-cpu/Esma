@@ -211,7 +211,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);overscroll-b
   .s-tile:hover{background:rgba(14,165,233,.1);border-color:rgba(14,165,233,.25);color:#7cb9d8;}
   .s-tile.active{background:rgba(14,165,233,.18);border-color:#0ea5e9;color:#38bdf8;}
   .s-tile .s-tile-ico{font-size:18px;line-height:1;}
-  .s-tile .s-tile-lbl{font-size:9px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;line-height:1.2;}
+  .s-tile .s-tile-lbl{font-size:11px;font-weight:700;letter-spacing:.3px;text-transform:uppercase;line-height:1.2;color:#f5f9fc;}
   .s-tile-full{
     display:flex;align-items:center;gap:8px;padding:8px 12px;
     cursor:pointer;font-size:12px;font-weight:600;
@@ -296,6 +296,98 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);overscroll-b
 .badge.red{background:rgba(220,38,38,.08);color:var(--red);border-color:rgba(220,38,38,.18);}
 .badge.blue{background:rgba(37,99,235,.08);color:var(--blue);border-color:rgba(37,99,235,.18);}
 .badge.gray{background:var(--bg3);color:var(--muted);border-color:var(--border);}
+.badge.st-gray{background:var(--bg3);color:var(--muted);border-color:var(--border);}
+.badge.st-purple{background:rgba(124,58,237,.1);color:#6d28d9;border-color:rgba(124,58,237,.2);}
+.badge.st-amber{background:rgba(217,119,6,.1);color:#b45309;border-color:rgba(217,119,6,.2);}
+.badge.st-blue{background:rgba(37,99,235,.08);color:var(--blue);border-color:rgba(37,99,235,.18);}
+.badge.st-teal{background:rgba(13,148,136,.1);color:var(--accent2);border-color:rgba(13,148,136,.2);}
+.badge.st-coral{background:rgba(234,88,12,.1);color:#c2410c;border-color:rgba(234,88,12,.2);}
+.badge.st-green{background:rgba(22,163,74,.1);color:#15803d;border-color:rgba(22,163,74,.2);}
+
+.dash-alert{display:flex;align-items:center;gap:6px;padding:8px 12px;border-radius:var(--radius2);background:rgba(220,38,38,.08);color:var(--red);border:1px solid rgba(220,38,38,.18);font-size:12px;font-weight:700;margin-bottom:14px;}
+
+/* ── STEPPER (usado en la ficha técnica) ── */
+.casc-stepper{display:flex;align-items:flex-start;margin-top:14px;}
+.casc-step{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;position:relative;cursor:pointer;min-width:0;}
+.casc-step-line{position:absolute;top:9px;left:-50%;width:100%;height:2px;background:var(--border);z-index:0;}
+.casc-step:first-child .casc-step-line{display:none;}
+.casc-step.done .casc-step-line{background:var(--accent);}
+.casc-step-dot{width:18px;height:18px;border-radius:50%;border:2px solid var(--border);background:var(--card);display:flex;align-items:center;justify-content:center;font-size:10px;z-index:1;color:#fff;flex-shrink:0;}
+.casc-step.done .casc-step-dot{background:var(--accent);border-color:var(--accent);}
+.casc-step.current .casc-step-dot{background:var(--card);border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-light);}
+.casc-step-label{font-size:9px;color:var(--muted);text-align:center;line-height:1.2;padding:0 2px;}
+.casc-step.current .casc-step-label{color:var(--text);font-weight:700;}
+.casc-substeps{margin-top:14px;border-top:1px solid var(--border);padding-top:10px;display:flex;flex-direction:column;gap:6px;}
+.casc-substep{display:flex;align-items:center;gap:8px;}
+.casc-substep-check{width:18px;height:18px;border-radius:5px;border:1.5px solid var(--border);background:var(--card);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;color:#fff;font-size:11px;}
+.casc-substep.done .casc-substep-check{background:var(--green);border-color:var(--green);}
+.casc-substep-title{flex:1;border:none;background:transparent;font-size:13px;color:var(--text);font-family:var(--font);padding:4px 0;min-width:0;}
+.casc-substep.done .casc-substep-title{color:var(--muted);text-decoration:line-through;}
+.casc-substep-date{font-size:12px;border:1px solid var(--border);border-radius:6px;padding:3px 6px;background:var(--card2);color:var(--text);font-family:var(--font);}
+.casc-substep.overdue .casc-substep-date{border-color:var(--red);color:var(--red);background:rgba(220,38,38,.06);}
+.casc-substep.overdue .casc-substep-title{color:var(--red);}
+.casc-substep-del{background:none;border:none;color:var(--muted);cursor:pointer;font-size:15px;padding:0 2px;flex-shrink:0;}
+.casc-add-substep{font-size:12px;padding:5px 10px;border-radius:6px;border:1px dashed var(--border);background:transparent;color:var(--muted);cursor:pointer;align-self:flex-start;margin-top:2px;}
+.casc-add-substep:hover{border-color:var(--accent);color:var(--accent2);}
+
+/* ── FICHA TÉCNICA (master-detail) ── */
+.ficha-layout{display:flex;gap:14px;align-items:flex-start;}
+.ficha-list{width:300px;flex-shrink:0;display:flex;flex-direction:column;gap:6px;}
+.ficha-item{display:flex;gap:10px;align-items:flex-start;padding:9px 10px;border-radius:var(--radius2);border:1px solid var(--border);background:var(--card);cursor:pointer;transition:background .1s,border-color .1s;}
+.ficha-item:hover{background:rgba(13,148,136,.04);}
+.ficha-item.active{border-color:var(--accent);background:var(--accent-light);}
+.ficha-item-ring{flex-shrink:0;display:flex;align-items:center;justify-content:center;}
+.ficha-item-ring svg text{fill:var(--text);}
+.ficha-item-body{flex:1;min-width:0;}
+.ficha-item-top{display:flex;align-items:center;gap:6px;justify-content:space-between;}
+.ficha-item-name{font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.ficha-item-meta{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.ficha-item-extra{display:flex;gap:10px;margin-top:3px;font-size:11px;color:var(--muted);}
+.ficha-item-extra i{font-size:13px;vertical-align:-1px;margin-right:2px;}
+.ficha-item-extra .overdue{color:var(--red);font-weight:700;}
+.ficha-item-stage{font-size:10px;font-weight:700;padding:2px 6px;border-radius:99px;flex-shrink:0;white-space:nowrap;}
+.ficha-item.done{opacity:.55;}
+.ficha-detail{flex:1;min-width:0;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:16px;}
+.ficha-back{display:none;align-items:center;gap:6px;font-size:13px;font-weight:600;color:var(--accent2);background:none;border:none;cursor:pointer;padding:0 0 12px;}
+.ficha-head{display:flex;gap:14px;align-items:flex-start;cursor:pointer;}
+.ficha-photo{width:88px;height:88px;border-radius:var(--radius2);overflow:hidden;background:var(--bg3);display:flex;align-items:center;justify-content:center;color:var(--border);flex-shrink:0;}
+.ficha-photo img{width:100%;height:100%;object-fit:cover;}
+.ficha-head-info{flex:1;min-width:0;}
+.ficha-head-ring{flex-shrink:0;display:flex;align-items:center;justify-content:center;}
+.ficha-head-ring svg text{fill:var(--text);}
+.ficha-name{font-size:17px;font-weight:700;}
+.ficha-meta{font-size:13px;color:var(--muted);margin-top:3px;}
+.ficha-dates{display:flex;gap:18px;margin-top:12px;flex-wrap:wrap;}
+.ficha-date-box{display:flex;flex-direction:column;}
+.ficha-date-label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;}
+.ficha-date-value{font-size:14px;font-weight:700;margin-top:2px;}
+.ficha-date-value.overdue{color:var(--red);}
+.ficha-section{margin-top:18px;}
+.flujo-row{padding:8px 0;border-bottom:1px solid var(--border);}
+.flujo-row:last-child{border-bottom:none;}
+.flujo-row-top{display:flex;align-items:center;justify-content:space-between;gap:8px;}
+.flujo-row-label{font-size:13px;font-weight:600;}
+.flujo-status-badge{font-size:11px;font-weight:700;padding:3px 9px;border-radius:99px;cursor:pointer;white-space:nowrap;flex-shrink:0;}
+.flujo-row-fields{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;}
+.flujo-input{font-size:12px;border:1px solid var(--border);border-radius:6px;padding:4px 7px;background:var(--card2);color:var(--text);font-family:var(--font);}
+.flujo-input:not([type="date"]){flex:1;min-width:90px;}
+.flujo-input[type="date"]{width:120px;}
+.ficha-section-title{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);margin-bottom:8px;}
+.ficha-act-row{display:flex;align-items:center;gap:8px;padding:5px 0;}
+.ficha-act-row.done .ficha-act-title{color:var(--muted);text-decoration:line-through;}
+.ficha-act-hours{font-size:11px;color:var(--muted);margin-left:auto;flex-shrink:0;}
+.ficha-mat-table{width:100%;font-size:13px;border-collapse:collapse;}
+.ficha-mat-table th{text-align:left;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;padding:4px 0;border-bottom:1px solid var(--border);}
+.ficha-mat-table td{padding:6px 0;border-bottom:1px solid var(--border);}
+.ficha-mat-table td:last-child, .ficha-mat-table th:last-child{text-align:right;}
+.ficha-empty{font-size:13px;color:var(--muted);padding:6px 0;}
+@media(max-width:767px){
+  .ficha-layout{flex-direction:column;}
+  .ficha-list{width:100%;}
+  .ficha-layout[data-mobile-detail="1"] .ficha-list{display:none;}
+  .ficha-layout:not([data-mobile-detail="1"]) .ficha-detail{display:none;}
+  .ficha-back{display:flex;}
+}
 .dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
 .dot.green{background:var(--green);}
 .dot.amber{background:var(--amber);}
@@ -681,13 +773,6 @@ tbody tr:hover td{background:rgba(13,148,136,.03);}
     </div>
 
     <!-- Fila 4: Producción (ancho completo) -->
-    <div class="home-btn" id="hbtnPlan" style="grid-column:1/-1;flex-direction:row;justify-content:center;gap:12px;padding:14px 16px;background:rgba(13,148,136,.25);border-color:rgba(13,148,136,.5);">
-      <i class="ti ti-calendar-stats" style="font-size:24px;color:rgba(255,255,255,.85);flex-shrink:0;"></i>
-      <div style="text-align:left;">
-        <div class="hlabel">Plan de Producción</div>
-        <div class="hdesc">Semana · por área y persona</div>
-      </div>
-    </div>
 
   </div>
 
@@ -751,10 +836,16 @@ tbody tr:hover td{background:rgba(13,148,136,.03);}
 
     </div>
 
+    <!-- INICIO: Tablero por etapas -->
+    <div class="s-tile-section">Inicio</div>
+    <button class="s-tile-full active" id="snav-dashboard" onclick="showPage('dashboard');this.classList.add('active')">
+      <i class="ti ti-layout-kanban s-ico"></i>Tablero de proyectos
+    </button>
+
     <!-- TRABAJO: Tiles grid -->
     <div class="s-tile-section">Trabajo</div>
     <div class="s-tile-grid">
-      <button class="s-tile active" id="snav-projects" onclick="sNavGo('projects');toggleSubnav('subnav-projects')">
+      <button class="s-tile" id="snav-projects" onclick="sNavGo('projects');toggleSubnav('subnav-projects')">
         <i class="ti ti-folder s-tile-ico"></i>
         <span class="s-tile-lbl">Proyectos</span>
       </button>
@@ -786,9 +877,6 @@ tbody tr:hover td{background:rgba(13,148,136,.03);}
 
     <!-- PRODUCCIÓN: Full-width buttons -->
     <div class="s-tile-section">Producción</div>
-    <button class="s-tile-full" id="snav-plan" onclick="showPage('plan');sTileFullActive('snav-plan')">
-      <i class="ti ti-calendar-stats s-ico"></i>Plan de Producción
-    </button>
     <button class="s-tile-full" id="snav-bom" onclick="showPage('bom');sTileFullActive('snav-bom')">
       <i class="ti ti-package s-ico"></i>BOM Materiales
     </button>
@@ -838,8 +926,21 @@ tbody tr:hover td{background:rgba(13,148,136,.03);}
     <!-- TOPBAR (mobile only) -->
     <div class="topbar" id="mainTopbar"></div>
 
+    <!-- PAGE: DASHBOARD (TABLERO) -->
+    <div class="page active" id="page-dashboard">
+      <div class="page-header">
+        <div>
+          <h1>Resumen de proyectos</h1>
+          <div class="sub" id="dashCount">—</div>
+        </div>
+        <button class="btn primary" id="btnNewProjectDash"><i class="ti ti-plus"></i> Nuevo proyecto</button>
+      </div>
+      <div id="dashAlert"></div>
+      <div id="dashboardBoard"></div>
+    </div>
+
     <!-- PAGE: PROYECTOS -->
-    <div class="page active" id="page-projects">
+    <div class="page" id="page-projects">
       <div class="page-header">
         <div>
           <h1>Proyectos</h1>
@@ -869,7 +970,7 @@ tbody tr:hover td{background:rgba(13,148,136,.03);}
     <div class="page" id="page-project-detail">
       <div style="padding:max(16px,env(safe-area-inset-top)) max(0px,env(safe-area-inset-right)) 10px max(0px,env(safe-area-inset-left));">
         <div style="display:flex;align-items:center;gap:12px;margin-bottom:18px;">
-          <button class="btn icon" id="btnBackProjects"><i class="ti ti-arrow-left"></i></button>
+          <button class="btn icon" id="btnBackProjects"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg></button>
           <div style="flex:1;min-width:0;">
             <div style="font-size:18px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" id="detailProjectName">—</div>
             <div style="font-size:12px;color:var(--muted);margin-top:2px;" id="detailProjectMeta">—</div>
@@ -937,7 +1038,11 @@ tbody tr:hover td{background:rgba(13,148,136,.03);}
 
   <!-- BOTTOM NAV (mobile) -->
   <nav class="bottomnav">
-    <button class="nav-item active" id="mnav-projects" onclick="mNavGo('projects')">
+    <button class="nav-item active" id="mnav-dashboard" onclick="mNavGo('dashboard')">
+      <div class="nav-ico-wrap"><i class="ti ti-layout-kanban nav-ico"></i></div>
+      <span class="nav-lbl">Tablero</span>
+    </button>
+    <button class="nav-item" id="mnav-projects" onclick="mNavGo('projects')">
       <div class="nav-ico-wrap"><i class="ti ti-folder nav-ico"></i></div>
       <span class="nav-lbl">Proyectos</span>
     </button>
@@ -974,7 +1079,6 @@ tbody tr:hover td{background:rgba(13,148,136,.03);}
 
   <!-- DROPDOWN: Más -->
   <div class="nav-dropdown" id="dd-more">
-    <div class="nav-dd-item" onclick="closeAllDropdowns();mNavGo('plan')"><i class="ti ti-calendar-stats dd-ico"></i>Plan de Producción</div>
     <div class="nav-dd-item" onclick="closeAllDropdowns();mNavGo('bom')"><i class="ti ti-package dd-ico"></i>BOM Materiales</div>
     <div class="nav-dd-item" onclick="closeAllDropdowns();mShowSection('materiales')"><i class="ti ti-database dd-ico"></i>Materiales y Rutas</div>
     <div class="nav-dd-divider"></div>
@@ -1087,6 +1191,256 @@ function uid(){ return Math.random().toString(16).slice(2)+Date.now().toString(1
 function todayISO(){ const d=new Date(); d.setHours(0,0,0,0); return d.toISOString().slice(0,10); }
 function parseISO(s){ if(!s) return null; const d=new Date(s+"T00:00:00"); return isNaN(d.getTime())? null : d; }
 
+// ── PROJECT STAGES (Dashboard) ───────────────────────────────
+const PROJECT_STAGES = [
+  {id:'cotizacion', label:'Cotización',             icon:'ti-file-invoice', cls:'st-gray'},
+  {id:'render',     label:'Render',                  icon:'ti-photo',        cls:'st-purple'},
+  {id:'aprobacion', label:'Aprobación',              icon:'ti-clock-hour-4', cls:'st-amber'},
+  {id:'inicio',     label:'Inicio',                   icon:'ti-flag',         cls:'st-blue'},
+  {id:'materiales', label:'Boom de materiales',      icon:'ti-list-details',cls:'st-teal'},
+  {id:'fabricacion',label:'Fabricación',              icon:'ti-tools',        cls:'st-coral'},
+  {id:'logistica',  label:'Logística e instalación', icon:'ti-truck',        cls:'st-green'},
+];
+function stageInfo(stageId){ return PROJECT_STAGES.find(s=>s.id===stageId) || PROJECT_STAGES[0]; }
+function stageIndex(stageId){ const i=PROJECT_STAGES.findIndex(s=>s.id===stageId); return i<0?0:i; }
+function daysInStage(p){
+  const ref = p.stageUpdatedAt || p.createdAt || todayISO();
+  const d = parseISO(ref); if(!d) return 0;
+  return Math.max(0, Math.floor((Date.now()-d.getTime())/86400000));
+}
+function advanceProjectStage(pid){
+  const p = db.projects.find(x=>x.id===pid); if(!p) return;
+  const idx = stageIndex(p.stage);
+  if(idx >= PROJECT_STAGES.length-1) return;
+  _syncFlujoForStageTransition(pid, idx, idx+1);
+  p.stage = PROJECT_STAGES[idx+1].id;
+  p.stageUpdatedAt = todayISO();
+  if(p.stage==='inicio' && !p.inicioDate) p.inicioDate = todayISO();
+  save(); renderDashboardPage();
+}
+function setProjectStage(pid, stageId){
+  const p = db.projects.find(x=>x.id===pid); if(!p) return;
+  if(p.stage===stageId) return;
+  const fromIdx = stageIndex(p.stage);
+  const toIdx = stageIndex(stageId);
+  if(toIdx>fromIdx) _syncFlujoForStageTransition(pid, fromIdx, toIdx);
+  p.stage = stageId;
+  p.stageUpdatedAt = todayISO();
+  if(p.stage==='inicio' && !p.inicioDate) p.inicioDate = todayISO();
+  save(); renderDashboardPage();
+}
+
+// ── Vínculo Etapas principales ↔ Flujo de producción ──
+// Al "cerrar" una etapa principal, se actualiza el estatus correspondiente
+// del Flujo de producción (Ingeniería / Producción / Calidad / etc.)
+function _setFlujoStatus(pid, stageId, status){
+  const flujo = _getProjectFlujo(pid);
+  const s = flujo.find(x=>x.stageId===stageId); if(!s) return;
+  if(status==='done'){
+    s.status = 'done';
+    if(!s.endDate) s.endDate = todayISO();
+  } else if(status==='active'){
+    if(s.status==='pending'){
+      s.status = 'active';
+      if(!s.startDate) s.startDate = todayISO();
+    }
+  }
+}
+function _syncFlujoForStageTransition(pid, fromIdx, toIdx){
+  if(toIdx<=fromIdx) return;
+  for(let i=fromIdx; i<toIdx; i++){
+    const stageId = PROJECT_STAGES[i] && PROJECT_STAGES[i].id;
+    if(stageId==='render'){
+      _setFlujoStatus(pid,'dibujo','done');
+    } else if(stageId==='aprobacion'){
+      _setFlujoStatus(pid,'ingenieria','active');
+    } else if(stageId==='materiales'){
+      _setFlujoStatus(pid,'compras','done');
+      _setFlujoStatus(pid,'produccion','active');
+    } else if(stageId==='fabricacion'){
+      _setFlujoStatus(pid,'produccion','done');
+      _setFlujoStatus(pid,'calidad','done');
+      _setFlujoStatus(pid,'instalacion','active');
+    }
+  }
+}
+function _syncFlujoForCompletion(pid){
+  _setFlujoStatus(pid,'instalacion','done');
+  _setFlujoStatus(pid,'entrega','done');
+}
+// Autorizar una cotización cierra "Aprobación" y manda el proyecto a "Inicio"
+// (si todavía no había llegado ahí).
+function _onQuoteAuthorized(pid){
+  const p = db.projects.find(x=>x.id===pid); if(!p) return;
+  const idx = stageIndex(p.stage);
+  const inicioIdx = stageIndex('inicio');
+  if(idx < inicioIdx){
+    _syncFlujoForStageTransition(pid, idx, inicioIdx);
+    p.stage = 'inicio';
+    p.stageUpdatedAt = todayISO();
+    if(!p.inicioDate) p.inicioDate = todayISO();
+  }
+}
+// Crear la primera cotización mientras está en "Cotización" → avanza a "Render"
+function _onQuoteCreated(pid){
+  const p = db.projects.find(x=>x.id===pid); if(!p) return;
+  if(p.stage==='cotizacion'){
+    _syncFlujoForStageTransition(pid, stageIndex('cotizacion'), stageIndex('render'));
+    p.stage = 'render';
+    p.stageUpdatedAt = todayISO();
+  }
+}
+// Subir la primera foto mientras está en "Render" → avanza a "Aprobación"
+function _onPhotoAdded(pid){
+  const p = db.projects.find(x=>x.id===pid); if(!p) return;
+  if(p.stage==='render'){
+    _syncFlujoForStageTransition(pid, stageIndex('render'), stageIndex('aprobacion'));
+    p.stage = 'aprobacion';
+    p.stageUpdatedAt = todayISO();
+  }
+}
+
+// ── Flujo de producción embebido en la ficha técnica (etapa Fabricación) ──
+const FLUJO_EMBED_STAGES = ['ingenieria','produccion','calidad'];
+const FLUJO_CYCLE = ['pending','active','done','skip'];
+function cycleFlujoStatus(pid, stageId){
+  const flujo = _getProjectFlujo(pid);
+  const s = flujo.find(x=>x.stageId===stageId); if(!s) return;
+  const idx = FLUJO_CYCLE.indexOf(s.status);
+  s.status = FLUJO_CYCLE[(idx+1)%FLUJO_CYCLE.length];
+  if(s.status==='active' && !s.startDate) s.startDate = todayISO();
+  if(s.status==='done' && !s.endDate) s.endDate = todayISO();
+  save(); renderDashboardPage();
+}
+function updateFlujoField(pid, stageId, field, value){
+  const flujo = _getProjectFlujo(pid);
+  const s = flujo.find(x=>x.stageId===stageId); if(!s) return;
+  s[field] = value;
+  save();
+}
+function renderFlujoEmbed(p){
+  const flujo = _getProjectFlujo(p.id);
+  return FLUJO_EMBED_STAGES.map(stageId=>{
+    const def = FLUJO_STAGES_DEFAULT.find(s=>s.id===stageId);
+    const item = flujo.find(x=>x.stageId===stageId) || {status:'pending',assignee:'',startDate:'',endDate:''};
+    return `<div class="flujo-row">
+      <div class="flujo-row-top">
+        <span class="flujo-row-label">${def?def.icon:''} ${escapeHTML(def?def.label:stageId)}</span>
+        <span class="flujo-status-badge ${ST_BADGE[item.status]||''}" data-flujo-cycle="${stageId}" data-pid="${p.id}">${ST_LABEL[item.status]||item.status}</span>
+      </div>
+      <div class="flujo-row-fields">
+        <input class="flujo-input" data-flujo-field="assignee" data-stage="${stageId}" data-pid="${p.id}" placeholder="Responsable" value="${escapeAttr(item.assignee||'')}">
+        <input type="date" class="flujo-input" data-flujo-field="startDate" data-stage="${stageId}" data-pid="${p.id}" value="${escapeAttr(item.startDate||'')}" title="Inicio">
+        <input type="date" class="flujo-input" data-flujo-field="endDate" data-stage="${stageId}" data-pid="${p.id}" value="${escapeAttr(item.endDate||'')}" title="Fin">
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── PROJECT SUB-STEPS (fecha compromiso) ─────────────────────
+function addSubStep(pid){
+  const p = db.projects.find(x=>x.id===pid); if(!p) return;
+  if(!Array.isArray(p.subSteps)) p.subSteps = [];
+  p.subSteps.push({id:uid(), title:'', dueDate:'', done:false});
+  save(); renderDashboardPage();
+  setTimeout(()=>{ const els=document.querySelectorAll(`[data-field-sub][data-pid="${pid}"]`); const el=els[els.length-1]; if(el) el.focus(); },50);
+}
+function updateSubStep(pid, subId, field, value){
+  const p = db.projects.find(x=>x.id===pid); if(!p) return;
+  const s = (p.subSteps||[]).find(x=>x.id===subId); if(!s) return;
+  s[field] = value;
+  save();
+}
+function toggleSubStep(pid, subId){
+  const p = db.projects.find(x=>x.id===pid); if(!p) return;
+  const s = (p.subSteps||[]).find(x=>x.id===subId); if(!s) return;
+  s.done = !s.done;
+  save(); renderDashboardPage();
+}
+function deleteSubStep(pid, subId){
+  const p = db.projects.find(x=>x.id===pid); if(!p) return;
+  p.subSteps = (p.subSteps||[]).filter(x=>x.id!==subId);
+  save(); renderDashboardPage();
+}
+function isSubStepOverdue(s){
+  if(s.done || !s.dueDate) return false;
+  return s.dueDate < todayISO();
+}
+function countOverdueSubSteps(){
+  let n=0;
+  db.projects.filter(p=>!p.manualDone).forEach(p=>(p.subSteps||[]).forEach(s=>{ if(isSubStepOverdue(s)) n++; }));
+  return n;
+}
+
+// ── FICHA TÉCNICA: actividades (rutas) y materiales desde la cotización ──
+function getAuthorizedQuotes(pid){
+  return db.quotes.filter(q=>q.projectId===pid && q.status==="authorized");
+}
+function getProjectRouteActivities(p){
+  const map = new Map();
+  getAuthorizedQuotes(p.id).forEach(q=>{
+    (q.routes||[]).forEach(r=>{
+      const name = (r.routeName || r.name || "").trim();
+      if(!name) return;
+      map.set(name, (map.get(name)||0) + Number(r.hours||0));
+    });
+  });
+  return [...map.entries()].map(([name,hours])=>{
+    const key = "route:"+name;
+    return {key, title:name, hours, done: !!(p.activityDone && p.activityDone[key]), source:"ruta"};
+  });
+}
+function toggleRouteActivity(pid, key){
+  const p = db.projects.find(x=>x.id===pid); if(!p) return;
+  if(!p.activityDone) p.activityDone = {};
+  p.activityDone[key] = !p.activityDone[key];
+  save(); renderDashboardPage();
+}
+function getProjectMaterials(p){
+  const map = new Map();
+  getAuthorizedQuotes(p.id).forEach(q=>{
+    const mult = Number(q.qty)||1;
+    (q.products||[]).forEach(prod=>{
+      const desc = (prod.desc || prod.matPick || "Material").trim();
+      const mat = materialByDesc(prod.matPick||desc);
+      const uom = mat?.uom || "";
+      const qty = Number(prod.qty||0) * mult;
+      if(map.has(desc)) map.get(desc).qty += qty;
+      else map.set(desc, {qty, uom});
+    });
+  });
+  return [...map.entries()].map(([desc,v])=>({desc, qty:v.qty, uom:v.uom}));
+}
+function projectAuthorizedCosto(pid){
+  return getAuthorizedQuotes(pid).reduce((s,q)=>{
+    const t=quoteSellTotals(q); const qty=Number(q.qty)||1;
+    return s+(t.mp+t.ruta)*qty;
+  },0);
+}
+function projectNextDueDate(p){
+  const dates = (p.subSteps||[]).filter(s=>!s.done && s.dueDate).map(s=>s.dueDate);
+  if(!dates.length) return null;
+  dates.sort();
+  return dates[0];
+}
+function projectProgressPct(p){
+  const total = PROJECT_STAGES.length-1;
+  if(p.manualDone) return 100;
+  return total>0 ? Math.round(stageIndex(p.stage)/total*100) : 0;
+}
+function progressRingSVG(pct, size, stroke){
+  pct = Math.max(0, Math.min(100, pct));
+  const r = (size-stroke)/2;
+  const c = size/2;
+  const circ = 2*Math.PI*r;
+  const offset = circ*(1-pct/100);
+  return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" class="progress-ring">
+    <circle cx="${c}" cy="${c}" r="${r}" fill="none" stroke="var(--border)" stroke-width="${stroke}"/>
+    <circle cx="${c}" cy="${c}" r="${r}" fill="none" stroke="var(--accent)" stroke-width="${stroke}" stroke-dasharray="${circ}" stroke-dashoffset="${offset}" stroke-linecap="round" transform="rotate(-90 ${c} ${c})"/>
+    <text x="${c}" y="${c}" text-anchor="middle" dominant-baseline="central" font-size="${Math.round(size*0.28)}" font-weight="700" fill="var(--text)">${pct}%</text>
+  </svg>`;
+}
+
 function defaultDB(){
   return {
     settings:{
@@ -1143,6 +1497,12 @@ function normalizeDB(){
     const localExtra = local.filter(ph=>!ph.url || !remoteUrls.has(ph.url));
     p.photos = [...remote, ...localExtra];
     if(p.photos.length) savePhotos(p.id, p.photos);
+    if(!p.stage || !stageInfo(p.stage)) p.stage = 'cotizacion';
+    if(!p.stageUpdatedAt) p.stageUpdatedAt = p.createdAt || todayISO();
+    if(!Array.isArray(p.subSteps)) p.subSteps = [];
+    if(typeof p.inicioDate !== 'string') p.inicioDate = '';
+    if(!p.activityDone || typeof p.activityDone !== 'object') p.activityDone = {};
+    if(p.stage==='inicio' && !p.inicioDate) p.inicioDate = p.stageUpdatedAt || todayISO();
   });
   db.settings.materialDB.forEach(m=>{ m.cost = Number(m.cost||0); });
 }
@@ -1402,6 +1762,7 @@ function applyRemoteData(data){
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(db)); } catch(e){}
   try { buildTopbar(); } catch(e){}
   try { renderProjectsPage(); } catch(e){}
+  try { renderDashboardPage(); } catch(e){}
   try {
     if(typeof currentPage !== "undefined"){
       if(currentPage==="settings") renderSettingsPage();
@@ -1499,10 +1860,10 @@ function renderQuoteBreakdown(q){
   $("bdAdmin").textContent = "$"+money(t.admin)+" ("+t.adminPct+"%)";
   $("bdCostoAdmin").textContent = "$"+money(t.costoConAdmin);
   $("bdUtil").textContent  = "$"+money(t.util);
-  $("bdSinExtras").textContent = "$"+money(t.ventaSinExtras);
-  $("bdExtra").textContent = "$"+money(t.extra);
-  $("bdVenta").textContent = "$"+money(t.venta);
-  $("bdRetorno").textContent = "$"+money(t.retorno);
+  const _bdSinExtrasEl = $("bdSinExtras"); if(_bdSinExtrasEl) _bdSinExtrasEl.textContent = "$"+money(t.ventaSinExtras);
+  const _bdExtraEl = $("bdExtra"); if(_bdExtraEl) _bdExtraEl.textContent = "$"+money(t.extra);
+  const _bdVentaEl = $("bdVenta"); if(_bdVentaEl) _bdVentaEl.textContent = "$"+money(t.venta);
+  const _bdRetornoEl = $("bdRetorno"); if(_bdRetornoEl) _bdRetornoEl.textContent = "$"+money(t.retorno);
   // Show total × qty row (works for both table-row and div versions)
   const totalVal = document.getElementById("bdTotalQty");
   const totalLabel = document.getElementById("bdTotalQtyLabel");
@@ -2030,7 +2391,7 @@ function bindInlineTable(tbodyId, arr){
 function createProject(){
   const name=prompt("Nombre del proyecto:", "Proyecto nuevo");
   if(name===null) return;
-  const p={id:uid(), name:name.trim()||"Proyecto", createdAt:todayISO(), deliveryDate:"", client:"", notes:""};
+  const p={id:uid(), name:name.trim()||"Proyecto", createdAt:todayISO(), deliveryDate:"", client:"", notes:"", stage:'cotizacion', stageUpdatedAt:todayISO()};
   db.projects.unshift(p); save();
   selectedProjectId=p.id; mainTab="overview";
   setSeg("noauth");
@@ -2039,7 +2400,9 @@ function createQuote(projectId){
   db.settings.folioCounter = (Number(db.settings.folioCounter)||0) + 1;
   const folio = String(db.settings.folioCounter).padStart(4,"0");
   const q={id:uid(), projectId, code: folio, name:"Cotización "+folio, qty:1, status:"draft", saleType:"manufactured", marginPct:25, createdAt:todayISO(), products:[], routes:[], extras:[]};
-  db.quotes.unshift(q); save(); return q;
+  db.quotes.unshift(q);
+  _onQuoteCreated(projectId);
+  save(); return q;
 }
 function routeByName(name){ return (db.settings.routeDB||[]).find(r=>r.name===name)||null; }
 function materialByDesc(desc){ return (db.settings.materialDB||[]).find(m=>(m.desc||"")===desc)||null; }
@@ -2362,7 +2725,7 @@ function openQuoteEditor(q){
   on($("qNameInput"),"blur", ()=>{ q.name=$("qNameInput").value.trim()||"Cotización"; save(); });
   on($("qQtyInput"),"blur", ()=>{ q.qty=Math.max(1,Number($("qQtyInput").value||1)); save(); renderLines(); });
   on($("qQtyInput"),"keydown",(e)=>{ if(e.key==="Enter"){ e.preventDefault(); $("qQtyInput").blur(); }});
-  on($("btnToggleAuth"),"click", ()=>{ q.status=(q.status==="authorized")?"draft":"authorized"; if(q.status==="authorized") q.authorizedAt=todayISO(); else delete q.authorizedAt; save(); renderProjectsList(); renderMain(); });
+  on($("btnToggleAuth"),"click", ()=>{ q.status=(q.status==="authorized")?"draft":"authorized"; if(q.status==="authorized"){ q.authorizedAt=todayISO(); _onQuoteAuthorized(q.projectId); } else delete q.authorizedAt; save(); renderProjectsList(); renderMain(); });
   on($("btnBackQuotes"),"click", ()=>{ q.name=$("qNameInput").value.trim()||"Cotización"; save(); mainTab="quotes"; renderMain(); });
 
   // ── Guardar como plantilla ──
@@ -3795,7 +4158,7 @@ function downloadQuotePDF(){ alert('Función PDF no encontrada en esta versión.
 //  NEW UI LAYER — Navigation, Pages, Components
 // ========================================================
 
-let currentPage = "projects";
+let currentPage = "dashboard";
 let currentSection = "";
 let _calSelectedDay = "";
 let _calFilter = {delivery:true, install:true, purchase:true, task:true};
@@ -3821,12 +4184,13 @@ function showPage(name){
   if(pg) pg.classList.add("active");
   // mobile bottom nav active
   document.querySelectorAll(".nav-item").forEach(n=>n.classList.remove("active"));
-  const mMap = {projects:"mnav-projects",agenda:"mnav-more",sales:"mnav-more",settings:"mnav-more",bom:"mnav-bom",plan:"mnav-more"};
+  const mMap = {dashboard:"mnav-dashboard",projects:"mnav-projects",agenda:"mnav-more",sales:"mnav-more",settings:"mnav-more",bom:"mnav-bom",plan:"mnav-more"};
   const mBtn = document.getElementById(mMap[name]||"");
   if(mBtn) mBtn.classList.add("active");
   // sidebar active
-  document.querySelectorAll(".s-nav-item,.s-sub-item").forEach(n=>n.classList.remove("active"));
+  document.querySelectorAll(".s-nav-item,.s-sub-item,.s-tile,.s-tile-full").forEach(n=>n.classList.remove("active"));
   const sMap = {
+    dashboard:"snav-dashboard",
     projects:"snav-projects",
     agenda:"snav-agenda",
     sales:"ssub-results-sales",
@@ -3839,6 +4203,7 @@ function showPage(name){
   const scr = document.getElementById("screen");
   if(scr) scr.scrollTop = 0;
   _pushNav(name, {});
+  if(name==="dashboard") renderDashboardPage();
   if(name==="projects") renderProjectsPage();
   if(name==="agenda"){ renderCalendarPage(); renderResumenPage(); switchAgendaTab("cal"); }
   if(name==="sales") renderSalesPage();
@@ -3880,11 +4245,16 @@ function showApp(){
   const ss=document.getElementById("sectionScreen"); ss.classList.remove("show"); ss.style.display="";
   const scr=document.getElementById("screen"); if(scr) scr.style.display="";
   document.getElementById("app").style.display = "";
-  renderProjectsPage();
+  currentPage = "dashboard";
+  document.querySelectorAll(".page").forEach(p=>p.classList.remove("active"));
+  const pg = document.getElementById("page-dashboard"); if(pg) pg.classList.add("active");
+  renderDashboardPage();
+  // mobile bottom nav active
+  document.querySelectorAll(".nav-item").forEach(n=>n.classList.remove("active"));
+  const mbtn=document.getElementById("mnav-dashboard"); if(mbtn) mbtn.classList.add("active");
   // sync sidebar
-  document.querySelectorAll(".s-nav-item,.s-sub-item").forEach(n=>n.classList.remove("active"));
-  const el=document.getElementById("snav-projects"); if(el) el.classList.add("active");
-  const ss2=document.getElementById("ssub-projects-list"); if(ss2) ss2.classList.add("active");
+  document.querySelectorAll(".s-nav-item,.s-sub-item,.s-tile,.s-tile-full").forEach(n=>n.classList.remove("active"));
+  const el=document.getElementById("snav-dashboard"); if(el) el.classList.add("active");
   // update sidebar user info
   const _su = currentUser();
   const _sunEl = document.getElementById("sidebarUserName");
@@ -4176,6 +4546,193 @@ function renderProjKpis(){
   }
 }
 
+// ---- Dashboard (Ficha técnica de proyectos) ----
+let _fichaSelectedId = null;
+let _fichaMobileOpen = false;
+
+function renderDashboardPage(){
+  const box=document.getElementById("dashboardBoard"); if(!box) return;
+  const active = db.projects.filter(p=>!p.manualDone);
+  const cnt=document.getElementById("dashCount");
+  if(cnt) cnt.textContent = db.projects.length+" proyecto"+(db.projects.length!==1?"s":"")+" · "+active.length+" activo"+(active.length!==1?"s":"");
+
+  const alertBox = document.getElementById("dashAlert");
+  if(alertBox){
+    const overdue = countOverdueSubSteps();
+    alertBox.innerHTML = overdue>0
+      ? `<div class="dash-alert"><i class="ti ti-alert-triangle"></i> ${overdue} fecha${overdue!==1?'s':''} compromiso vencida${overdue!==1?'s':''}</div>`
+      : '';
+  }
+
+  if(!db.projects.length){
+    box.innerHTML='<div class="empty"><div class="ico" style="font-size:40px;margin-bottom:12px;">📁</div><h3>Sin proyectos</h3><p>Crea tu primer proyecto para empezar a moverlo por las etapas.</p></div>';
+    return;
+  }
+
+  renderFichaView(box, db.projects);
+}
+
+// ---- Ficha técnica (master-detail) ----
+function makeFichaListItem(p, isActive){
+  const stage = stageInfo(p.stage);
+  const costo = projectAuthorizedCosto(p.id);
+  const nextDue = projectNextDueDate(p);
+  const dueOverdue = nextDue && nextDue < todayISO();
+  const pct = projectProgressPct(p);
+  return `<div class="ficha-item ${isActive?'active':''} ${p.manualDone?'done':''}" data-ficha-select="${p.id}">
+    <div class="ficha-item-ring">${progressRingSVG(pct, 34, 4)}</div>
+    <div class="ficha-item-body">
+      <div class="ficha-item-top">
+        <div class="ficha-item-name">${escapeHTML(p.name||"Sin nombre")}</div>
+        <span class="ficha-item-stage badge ${stage.cls}">${escapeHTML(p.manualDone?"Terminado":stage.label)}</span>
+      </div>
+      <div class="ficha-item-meta">${escapeHTML(p.client||"—")}</div>
+      <div class="ficha-item-extra">
+        ${costo>0?`<span><i class="ti ti-currency-dollar"></i> $${money(costo)}</span>`:''}
+        ${nextDue?`<span class="${dueOverdue?'overdue':''}"><i class="ti ti-calendar-event"></i> ${escapeHTML(nextDue)}</span>`:''}
+      </div>
+    </div>
+  </div>`;
+}
+
+function renderFichaDetail(p){
+  if(!p) return '<div class="ficha-empty">Selecciona un proyecto de la lista.</div>';
+  const photos = loadPhotos(p.id);
+  const thumbSrc = photos.length ? (photos[0].url || photos[0].data || "") : "";
+  const thumb = thumbSrc
+    ? `<img src="${escapeAttr(thumbSrc)}" alt="">`
+    : `<i class="ti ti-photo" style="font-size:32px;"></i>`;
+  const curIdx = stageIndex(p.stage);
+  const steps = PROJECT_STAGES.map((s,i)=>{
+    const cls = i<curIdx ? 'done' : (i===curIdx ? 'current' : '');
+    const dotContent = i<curIdx ? '<i class="ti ti-check"></i>' : '';
+    return `<div class="casc-step ${cls}" data-jump="${p.id}" data-stage="${s.id}" title="${escapeAttr(s.label)}">
+      <div class="casc-step-line"></div>
+      <div class="casc-step-dot">${dotContent}</div>
+      <div class="casc-step-label">${escapeHTML(s.label)}</div>
+    </div>`;
+  }).join('');
+
+  const routeActs = getProjectRouteActivities(p);
+  const routeHtml = routeActs.map(a=>`<div class="ficha-act-row ${a.done?'done':''}">
+    <div class="casc-substep-check" data-toggle-route="${a.key}" data-pid="${p.id}">${a.done?'<i class="ti ti-check"></i>':''}</div>
+    <span class="ficha-act-title">${escapeHTML(a.title)}</span>
+    ${a.hours?`<span class="ficha-act-hours">${a.hours}h</span>`:''}
+  </div>`).join('');
+
+  const subs = (p.subSteps||[]).map(s=>{
+    const overdue = isSubStepOverdue(s);
+    return `<div class="casc-substep ${s.done?'done':''} ${overdue?'overdue':''}">
+      <div class="casc-substep-check" data-toggle-sub="${s.id}" data-pid="${p.id}">${s.done?'<i class="ti ti-check"></i>':''}</div>
+      <input class="casc-substep-title" data-field-sub="${s.id}" data-pid="${p.id}" placeholder="Actividad adicional..." value="${escapeAttr(s.title)}">
+      <input type="date" class="casc-substep-date" data-date-sub="${s.id}" data-pid="${p.id}" value="${escapeAttr(s.dueDate||'')}">
+      ${overdue?'<i class="ti ti-alert-triangle" style="color:var(--red);font-size:14px;" title="Fecha compromiso vencida"></i>':''}
+      <button class="casc-substep-del" data-del-sub="${s.id}" data-pid="${p.id}" aria-label="Eliminar"><i class="ti ti-x"></i></button>
+    </div>`;
+  }).join('');
+
+  const hasActivities = routeActs.length>0 || (p.subSteps||[]).length>0;
+
+  const mats = getProjectMaterials(p);
+  const matsHtml = mats.length ? `<table class="ficha-mat-table">
+    <tr><th>Material</th><th>Consumo</th></tr>
+    ${mats.map(m=>`<tr><td>${escapeHTML(m.desc)}</td><td>${money(m.qty)}${m.uom?' '+escapeHTML(m.uom):''}</td></tr>`).join('')}
+  </table>` : '<div class="ficha-empty">Sin materiales — agrégalos como productos en la cotización autorizada de este proyecto.</div>';
+
+  const costo = projectAuthorizedCosto(p.id);
+  const nextDue = projectNextDueDate(p);
+  const dueOverdue = nextDue && nextDue < todayISO();
+  const pct = projectProgressPct(p);
+  return `
+    <button class="ficha-back" data-ficha-back type="button"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg> Volver a la lista</button>
+    <div class="ficha-head" data-open-full="${p.id}">
+      <div class="ficha-photo">${thumb}</div>
+      <div class="ficha-head-info">
+        <div class="ficha-name">${escapeHTML(p.name||"Sin nombre")}</div>
+        <div class="ficha-meta">${escapeHTML(p.client||"Sin cliente")}</div>
+      </div>
+      <div class="ficha-head-ring">${progressRingSVG(pct, 56, 6)}</div>
+    </div>
+    <div class="ficha-dates">
+      <div class="ficha-date-box"><span class="ficha-date-label">Inicio</span><span class="ficha-date-value">${p.inicioDate?escapeHTML(p.inicioDate):'—'}</span></div>
+      <div class="ficha-date-box"><span class="ficha-date-label">Término</span><span class="ficha-date-value">${p.deliveryDate?escapeHTML(p.deliveryDate):'—'}</span></div>
+      <div class="ficha-date-box"><span class="ficha-date-label">Costo</span><span class="ficha-date-value">${costo>0?'$'+money(costo):'—'}</span></div>
+      <div class="ficha-date-box"><span class="ficha-date-label">Fecha compromiso</span><span class="ficha-date-value ${dueOverdue?'overdue':''}">${nextDue?escapeHTML(nextDue):'—'}</span></div>
+    </div>
+    <div class="casc-stepper" style="margin-top:16px;">${steps}</div>
+    <div class="ficha-section">
+      <div class="ficha-section-title">Actividades</div>
+      ${routeHtml}
+      <div class="casc-substeps" style="border-top:none;padding-top:0;margin-top:${routeHtml?'2px':'0'};">
+        ${subs}
+        ${!hasActivities?'<div class="ficha-empty">Sin actividades todavía.</div>':''}
+        <button class="casc-add-substep" data-add-sub="${p.id}"><i class="ti ti-plus"></i> Agregar actividad manual</button>
+      </div>
+    </div>
+    <div class="ficha-section">
+      <div class="ficha-section-title">Flujo de producción · Fabricación</div>
+      ${renderFlujoEmbed(p)}
+    </div>
+    <div class="ficha-section">
+      <div class="ficha-section-title">Materiales y consumo</div>
+      ${matsHtml}
+    </div>
+  `;
+}
+
+function renderFichaView(box, projects){
+  const sorted = [...projects].sort((a,b)=>{
+    const da = a.manualDone?1:0, dbb = b.manualDone?1:0;
+    if(da!==dbb) return da-dbb;
+    return stageIndex(a.stage)-stageIndex(b.stage) || String(a.deliveryDate||"9999-12-31").localeCompare(String(b.deliveryDate||"9999-12-31"));
+  });
+  if(!_fichaSelectedId || !sorted.find(p=>p.id===_fichaSelectedId)) _fichaSelectedId = sorted[0].id;
+
+  box.innerHTML = `<div class="ficha-layout" data-mobile-detail="${_fichaMobileOpen?1:0}">
+    <div class="ficha-list">${sorted.map(p=>makeFichaListItem(p, p.id===_fichaSelectedId)).join("")}</div>
+    <div class="ficha-detail">${renderFichaDetail(db.projects.find(x=>x.id===_fichaSelectedId))}</div>
+  </div>`;
+
+  box.querySelectorAll("[data-ficha-select]").forEach(el=>{
+    el.addEventListener("click",()=>{ _fichaSelectedId = el.dataset.fichaSelect; _fichaMobileOpen = true; renderDashboardPage(); });
+  });
+  const backBtn = box.querySelector("[data-ficha-back]");
+  if(backBtn) backBtn.addEventListener("click",()=>{ _fichaMobileOpen = false; renderDashboardPage(); });
+  box.querySelectorAll("[data-open-full]").forEach(el=>{
+    el.addEventListener("click",()=>openProjectDetail(el.dataset.openFull,"overview"));
+  });
+  box.querySelectorAll("[data-jump]").forEach(el=>{
+    el.addEventListener("click",(e)=>{ e.stopPropagation(); setProjectStage(el.dataset.jump, el.dataset.stage); });
+  });
+  box.querySelectorAll("[data-toggle-route]").forEach(el=>{
+    el.addEventListener("click",(e)=>{ e.stopPropagation(); toggleRouteActivity(el.dataset.pid, el.dataset.toggleRoute); });
+  });
+  box.querySelectorAll("[data-toggle-sub]").forEach(el=>{
+    el.addEventListener("click",(e)=>{ e.stopPropagation(); toggleSubStep(el.dataset.pid, el.dataset.toggleSub); });
+  });
+  box.querySelectorAll("[data-field-sub]").forEach(el=>{
+    el.addEventListener("click",(e)=>e.stopPropagation());
+    el.addEventListener("input",()=>updateSubStep(el.dataset.pid, el.dataset.fieldSub, "title", el.value));
+  });
+  box.querySelectorAll("[data-date-sub]").forEach(el=>{
+    el.addEventListener("click",(e)=>e.stopPropagation());
+    el.addEventListener("change",()=>{ updateSubStep(el.dataset.pid, el.dataset.dateSub, "dueDate", el.value); renderDashboardPage(); });
+  });
+  box.querySelectorAll("[data-del-sub]").forEach(el=>{
+    el.addEventListener("click",(e)=>{ e.stopPropagation(); deleteSubStep(el.dataset.pid, el.dataset.delSub); });
+  });
+  box.querySelectorAll("[data-add-sub]").forEach(el=>{
+    el.addEventListener("click",(e)=>{ e.stopPropagation(); addSubStep(el.dataset.addSub); });
+  });
+  box.querySelectorAll("[data-flujo-cycle]").forEach(el=>{
+    el.addEventListener("click",(e)=>{ e.stopPropagation(); cycleFlujoStatus(el.dataset.pid, el.dataset.flujoCycle); });
+  });
+  box.querySelectorAll("[data-flujo-field]").forEach(el=>{
+    el.addEventListener("click",(e)=>e.stopPropagation());
+    el.addEventListener(el.type==="date"?"change":"input",()=>{ updateFlujoField(el.dataset.pid, el.dataset.stage, el.dataset.flujoField, el.value); });
+  });
+}
+
 function renderProjectsPage(){
   const box=document.getElementById("projectsList"); if(!box) return;
   try{ renderProjKpis(); }catch(e){ console.warn('KPI error',e); }
@@ -4405,10 +4962,10 @@ function renderDetailFull(p, content){
         <div class="kl">Tareas</div>
         <div class="kv">${doneCount}/${tasks.length||0}</div>
       </div>
-      <div class="kpi-box" style="padding:10px 12px;cursor:pointer;" onclick="showPage('plan');_planView='project';_planProjectId='${p.id}';renderPlanPage();">
+      <div class="kpi-box" style="padding:10px 12px;cursor:pointer;" onclick="showPage('dashboard');_fichaSelectedId='${p.id}';_fichaMobileOpen=true;renderDashboardPage();">
         <div class="kl">Flujo de producción</div>
         <div style="font-size:12px;font-weight:600;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${_currentStageName(p.id)}</div>
-        <div style="font-size:10px;color:var(--accent);margin-top:1px;">Ver etapas →</div>
+        <div style="font-size:10px;color:var(--accent);margin-top:1px;">Ver ficha técnica →</div>
       </div>
     </div>
 
@@ -4443,10 +5000,10 @@ function renderDetailFull(p, content){
             <div class="field-label" style="margin-top:0;">Monto anticipo ($)</div>
             <div class="field"><input id="pAnticipo" type="number" step="0.01" min="0" placeholder="0.00" value="${Number(p.anticipo||0)||""}"></div>
           </div>
-          <div>
-            <div class="field-label" style="margin-top:0;">Notas</div>
-            <div class="field"><input id="pNotes" value="${escapeAttr(p.notes||"")}"></div>
-          </div>
+        </div>
+        <div style="margin-top:8px;">
+          <div class="field-label" style="margin-top:0;">Descripción detallada</div>
+          <div class="field"><textarea id="pNotes" rows="4" placeholder="Detalles del proyecto, especificaciones, acuerdos con el cliente, etc." style="resize:vertical;min-height:90px;">${escapeHTML(p.notes||"")}</textarea></div>
         </div>
         <div style="display:flex;gap:8px;margin-top:10px;">
           <button class="btn" id="btnMarkDone" style="flex:1;justify-content:center;${isDone?"color:var(--amber);border-color:rgba(180,83,9,.35);":""}">${isDone?"↩ Reabrir proyecto":"✓ Marcar terminado"}</button>
@@ -4552,6 +5109,7 @@ function renderDetailFull(p, content){
       if(!t.length) db.tasks.push({id:uid(),projectId:p.id,date:todayISO(),title:"Cierre de proyecto",done:true});
       db.tasks.filter(x=>x.projectId===p.id).forEach(x=>x.done=true);
       p.manualDone=true;
+      _syncFlujoForCompletion(p.id);
     }
     save(); renderProjectsPage(); renderProjectDetail();
   });
@@ -4579,7 +5137,7 @@ function renderDetailFull(p, content){
   const pdfAllBtn = document.getElementById("btnPDFAll");
   if(pdfAllBtn) pdfAllBtn.addEventListener("click",()=>{ openPDFSelector(p.id); });
   content.querySelectorAll("[data-edit-q]").forEach(b=>b.addEventListener("click",()=>{ const q=db.quotes.find(x=>x.id===b.dataset.editQ); if(q) openQuoteEditorPage(q); }));
-  content.querySelectorAll("[data-toggle-q]").forEach(b=>b.addEventListener("click",()=>{ const q=db.quotes.find(x=>x.id===b.dataset.toggleQ); if(!q) return; q.status=q.status==="authorized"?"draft":"authorized"; if(q.status==="authorized") q.authorizedAt=todayISO(); else delete q.authorizedAt; save(); renderProjectsPage(); renderDetailFull(p,content); }));
+  content.querySelectorAll("[data-toggle-q]").forEach(b=>b.addEventListener("click",()=>{ const q=db.quotes.find(x=>x.id===b.dataset.toggleQ); if(!q) return; q.status=q.status==="authorized"?"draft":"authorized"; if(q.status==="authorized"){ q.authorizedAt=todayISO(); _onQuoteAuthorized(q.projectId); } else delete q.authorizedAt; save(); renderProjectsPage(); renderDetailFull(p,content); }));
   content.querySelectorAll("[data-del-q]").forEach(b=>b.addEventListener("click",()=>{ if(!confirm("¿Eliminar cotización?")) return; db.quotes=db.quotes.filter(x=>x.id!==b.dataset.delQ); save(); renderProjectsPage(); renderDetailFull(p,content); }));
   content.querySelectorAll("[data-dup-q]").forEach(b=>b.addEventListener("click",()=>{ const q=db.quotes.find(x=>x.id===b.dataset.dupQ); if(!q) return; const copy=JSON.parse(JSON.stringify(q)); copy.id=uid(); copy.status="draft"; copy.createdAt=todayISO(); copy.name=(q.name||"Cotización")+" (copia)"; copy.code=""; db.quotes.push(copy); save(); renderProjectsPage(); renderDetailFull(p,content); openQuoteEditorPage(copy); }));
   content.querySelectorAll("[data-pdf-q]").forEach(b=>b.addEventListener("click",(e)=>{ e.stopPropagation(); const q=db.quotes.find(x=>x.id===b.dataset.pdfQ); if(!q) return; openPDFSelector(q.projectId, q.id); }));
@@ -4640,6 +5198,7 @@ function renderDetailFull(p, content){
     photoInput.addEventListener("change",async(e)=>{
       const files=[...e.target.files]; if(!files.length) return;
       p.photos=p.photos||[];
+      const _wasEmpty = p.photos.length===0;
       const ind=document.getElementById("photoUploading"); if(ind) ind.style.display="";
       for(const file of files){
         try{
@@ -4649,6 +5208,7 @@ function renderDetailFull(p, content){
         } catch(err){ alert("Error al subir foto: "+err.message); }
       }
       if(ind) ind.style.display="none";
+      if(_wasEmpty && p.photos.length>0) _onPhotoAdded(p.id);
       savePhotos(p.id,p.photos); save(); renderDetailFull(p,content);
     });
   }
@@ -4684,7 +5244,7 @@ function openQuoteEditorPage(q){
 
     <!-- ── HEADER ── -->
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
-      <button class="btn icon" id="btnBackFromQuote"><i class="ti ti-arrow-left"></i></button>
+      <button class="btn icon" id="btnBackFromQuote"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg></button>
       <input id="qNameInput" value="${escapeAttr(q.name||"Cotización")}" style="flex:1;background:transparent;border:none;border-bottom:2px solid var(--border);color:var(--text);font-family:inherit;font-size:17px;font-weight:700;padding:4px 0;outline:none;">
       <span class="badge ${q.status==='authorized'?'green':'amber'}" style="font-size:12px;">${q.status==='authorized'?'✓ Autorizada':'Borrador'}</span>
       <span style="font-size:12px;color:var(--muted);">Folio: ${escapeHTML((q.code||q.id.slice(0,8)).toUpperCase())}</span>
@@ -4814,7 +5374,7 @@ function openQuoteEditorPage(q){
   document.getElementById("btnBackFromQuote").addEventListener("click",()=>{ q.name=document.getElementById("qNameInput").value.trim()||"Cotización"; save(); currentProjectId=q.projectId; showPage("project-detail"); renderProjectDetail(); });
   document.getElementById("qNameInput").addEventListener("blur",()=>{ q.name=document.getElementById("qNameInput").value.trim()||"Cotización"; save(); });
   document.getElementById("qNameInput").addEventListener("keydown",(e)=>{ if(e.key==="Enter"){ e.preventDefault(); q.name=document.getElementById("qNameInput").value.trim()||"Cotización"; save(); document.getElementById("qNameInput").blur(); } });
-  document.getElementById("btnToggleAuth").addEventListener("click",()=>{ q.status=q.status==="authorized"?"draft":"authorized"; if(q.status==="authorized") q.authorizedAt=todayISO(); else delete q.authorizedAt; save(); renderProjectsPage(); openQuoteEditorPage(q); });
+  document.getElementById("btnToggleAuth").addEventListener("click",()=>{ q.status=q.status==="authorized"?"draft":"authorized"; if(q.status==="authorized"){ q.authorizedAt=todayISO(); _onQuoteAuthorized(q.projectId); } else delete q.authorizedAt; save(); renderProjectsPage(); openQuoteEditorPage(q); });
   document.getElementById("btnSaveQuote").addEventListener("click",()=>{ q.name=document.getElementById("qNameInput").value.trim()||"Cotización"; save(); const btn=document.getElementById("btnSaveQuote"); btn.innerHTML='<i class="ti ti-check"></i> Guardado'; setTimeout(()=>{ if(btn) btn.innerHTML='<i class="ti ti-device-floppy"></i> Guardar'; },1500); });
   document.getElementById("btnQuotePDF2").addEventListener("click",()=>{ openPDFSelector(q.projectId); });
 
@@ -5539,7 +6099,7 @@ function _popNav(){
   // Pop current, then navigate to the one before
   if(_navStack.length > 1) _navStack.pop();
   const prev = _navStack[_navStack.length - 1];
-  if(!prev){ showPage("projects"); return; }
+  if(!prev){ showPage("dashboard"); return; }
   // Remove so target function re-pushes it cleanly
   _navStack.pop();
   const hs=document.getElementById("homeScreen");
@@ -5587,7 +6147,6 @@ function openToolsMenu(){
     <div class="tools-item" id="tm-instalaciones"><span class="ti-ico">\u{1F6E0}\uFE0F</span>Instalaciones</div>
     <div class="tools-item" id="tm-compras"><span class="ti-ico">\u{1F6D2}</span>Compras</div>
     <div class="tools-item" id="tm-tareas"><span class="ti-ico">\u2705</span>Tareas</div>
-    <div class="tools-item" id="tm-plan"><span class="ti-ico">\U0001f5d3\ufe0f</span>Plan de Producción</div>
     <div class="tools-divider"></div>
     <div class="tools-label">Herramientas</div>
     <div class="tools-item" id="tm-push"><span class="ti-ico">\u2B06</span>Subir a Sheets</div>
@@ -5673,7 +6232,18 @@ function bootNew(){
       <div class="field-label">Fecha de entrega</div><div class="field"><input id="np_delivery" type="date" value="${todayISO()}"></div>
     `,[
       {label:"Cancelar",cls:"btn",action:closeSheet},
-      {label:"Crear",cls:"btn primary",action:()=>{ const name=document.getElementById("np_name").value.trim(); if(!name){ alert("Escribe el nombre"); return; } const p={id:uid(),name,client:document.getElementById("np_client").value.trim(),createdAt:todayISO(),deliveryDate:document.getElementById("np_delivery").value||"",notes:""}; db.projects.unshift(p); save(); closeSheet(); renderProjectsPage(); openProjectDetail(p.id,"overview"); }}
+      {label:"Crear",cls:"btn primary",action:()=>{ const name=document.getElementById("np_name").value.trim(); if(!name){ alert("Escribe el nombre"); return; } const p={id:uid(),name,client:document.getElementById("np_client").value.trim(),createdAt:todayISO(),deliveryDate:document.getElementById("np_delivery").value||"",notes:"",stage:'cotizacion',stageUpdatedAt:todayISO()}; db.projects.unshift(p); save(); closeSheet(); renderProjectsPage(); openProjectDetail(p.id,"overview"); }}
+    ]);
+  });
+  const _btnNewProjectDash = document.getElementById("btnNewProjectDash");
+  if(_btnNewProjectDash) _btnNewProjectDash.addEventListener("click",()=>{
+    openSheet("Nuevo proyecto",`
+      <div class="field-label">Nombre del proyecto</div><div class="field"><input id="npd_name" placeholder="Ej: Showroom Leon"></div>
+      <div class="field-label">Cliente</div><div class="field"><input id="npd_client" placeholder="Nombre del cliente"></div>
+      <div class="field-label">Fecha de entrega</div><div class="field"><input id="npd_delivery" type="date" value="${todayISO()}"></div>
+    `,[
+      {label:"Cancelar",cls:"btn",action:closeSheet},
+      {label:"Crear",cls:"btn primary",action:()=>{ const name=document.getElementById("npd_name").value.trim(); if(!name){ alert("Escribe el nombre"); return; } const p={id:uid(),name,client:document.getElementById("npd_client").value.trim(),createdAt:todayISO(),deliveryDate:document.getElementById("npd_delivery").value||"",notes:"",stage:'cotizacion',stageUpdatedAt:todayISO()}; db.projects.unshift(p); save(); closeSheet(); renderDashboardPage(); openProjectDetail(p.id,"overview"); }}
     ]);
   });
 
@@ -5746,7 +6316,7 @@ function sNavToggle(key){
   sNavGo(key);
 }
 function sNavGo(page){
-  document.querySelectorAll('.s-nav-item,.s-sub-item').forEach(el=>el.classList.remove('active'));
+  document.querySelectorAll('.s-nav-item,.s-sub-item,.s-tile,.s-tile-full').forEach(el=>el.classList.remove('active'));
   const el = document.getElementById('snav-'+page);
   if(el) el.classList.add('active');
   showPage(page);
@@ -5759,7 +6329,7 @@ function closeAllDropdowns(){
   if(ov) ov.classList.remove('open');
   document.querySelectorAll('.nav-item').forEach(el=>el.classList.remove('active'));
   // Restore active based on current page / section
-  const mMap = {projects:'mnav-projects',calendar:'mnav-more',sales:'mnav-more',settings:'mnav-more',bom:'mnav-bom','project-detail':'mnav-projects'};
+  const mMap = {dashboard:'mnav-dashboard',projects:'mnav-projects',calendar:'mnav-more',sales:'mnav-more',settings:'mnav-more',bom:'mnav-bom','project-detail':'mnav-projects'};
   const cur = mMap[currentPage||'projects'];
   const btn = cur && document.getElementById(cur);
   if(btn) btn.classList.add('active');
@@ -5802,7 +6372,7 @@ function mNavGo(page){
   const ap = document.getElementById('app');
   if(ap){ ap.style.cssText='display:flex;'; }
   document.querySelectorAll('.nav-item').forEach(el=>el.classList.remove('active'));
-  const mMap = {projects:'mnav-projects',calendar:'mnav-more',sales:'mnav-more',settings:'mnav-more',resumen:'mnav-more',bom:'mnav-bom'};
+  const mMap = {dashboard:'mnav-dashboard',projects:'mnav-projects',calendar:'mnav-more',sales:'mnav-more',settings:'mnav-more',resumen:'mnav-more',bom:'mnav-bom'};
   const btn = document.getElementById(mMap[page]||'mnav-projects');
   if(btn) btn.classList.add('active');
   showPage(page);
