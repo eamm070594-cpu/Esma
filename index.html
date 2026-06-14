@@ -333,6 +333,9 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);overscroll-b
 /* ── FICHA TÉCNICA (master-detail) ── */
 .ficha-layout{display:flex;gap:14px;align-items:flex-start;}
 .ficha-list{width:300px;flex-shrink:0;display:flex;flex-direction:column;gap:6px;}
+.ficha-week-header{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;padding:10px 4px 4px;}
+.ficha-week-header:first-child{padding-top:0;}
+.ficha-week-header-done{color:var(--accent2);display:flex;align-items:center;gap:5px;border-top:1px solid var(--border);margin-top:6px;padding-top:14px;}
 .ficha-item{display:flex;gap:10px;align-items:flex-start;padding:9px 10px;border-radius:var(--radius2);border:1px solid var(--border);background:var(--card);cursor:pointer;transition:background .1s,border-color .1s;}
 .ficha-item:hover{background:rgba(13,148,136,.04);}
 .ficha-item.active{border-color:var(--accent);background:var(--accent-light);}
@@ -347,10 +350,21 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);overscroll-b
 .ficha-item-extra .overdue{color:var(--red);font-weight:700;}
 .ficha-item-stage{font-size:10px;font-weight:700;padding:2px 6px;border-radius:99px;flex-shrink:0;white-space:nowrap;}
 .ficha-item.done{opacity:.55;}
+.ficha-success-item{border-radius:var(--radius2);border:1px solid var(--border);background:var(--card);overflow:hidden;cursor:pointer;transition:border-color .1s,box-shadow .1s;}
+.ficha-success-item:hover{box-shadow:var(--shadow);}
+.ficha-success-item.active{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-light);}
+.ficha-success-photo{position:relative;width:100%;height:180px;background:var(--bg3);overflow:hidden;}
+.ficha-success-photo img{width:100%;height:100%;object-fit:contain;display:block;}
+.ficha-success-photo-empty{width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:var(--border);font-size:32px;}
+.ficha-success-badge{position:absolute;top:8px;right:8px;background:rgba(22,163,74,.92);color:#fff;font-size:11px;font-weight:700;padding:4px 10px;border-radius:99px;display:flex;align-items:center;gap:4px;}
+.ficha-success-info{padding:10px 12px;}
+.ficha-success-name{font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.ficha-success-client{font-size:12px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.ficha-success-date{font-size:11px;color:var(--muted);margin-top:5px;display:flex;align-items:center;gap:4px;}
 .ficha-detail{flex:1;min-width:0;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:16px;}
 .ficha-back{display:none;align-items:center;gap:6px;font-size:13px;font-weight:600;color:var(--accent2);background:none;border:none;cursor:pointer;padding:0 0 12px;}
-.ficha-head{display:flex;gap:14px;align-items:flex-start;cursor:pointer;}
-.ficha-photo{width:88px;height:88px;border-radius:var(--radius2);overflow:hidden;background:var(--bg3);display:flex;align-items:center;justify-content:center;color:var(--border);flex-shrink:0;}
+.ficha-head{display:flex;gap:14px;align-items:flex-start;cursor:pointer;flex-wrap:wrap;}
+.ficha-photo{width:176px;height:176px;border-radius:var(--radius2);overflow:hidden;background:var(--bg3);display:flex;align-items:center;justify-content:center;color:var(--border);flex-shrink:0;}
 .ficha-photo img{width:100%;height:100%;object-fit:cover;}
 .ficha-head-info{flex:1;min-width:0;}
 .ficha-head-ring{flex-shrink:0;display:flex;align-items:center;justify-content:center;}
@@ -372,6 +386,23 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);overscroll-b
 .flujo-input{font-size:12px;border:1px solid var(--border);border-radius:6px;padding:4px 7px;background:var(--card2);color:var(--text);font-family:var(--font);}
 .flujo-input:not([type="date"]){flex:1;min-width:90px;}
 .flujo-input[type="date"]{width:120px;}
+.flujo-gantt-placeholder{display:flex;gap:10px;align-items:flex-start;margin-top:10px;padding:12px;border:1.5px dashed var(--border);border-radius:var(--radius2);color:var(--muted);font-size:12px;}
+.flujo-gantt-placeholder i{font-size:22px;flex-shrink:0;color:var(--accent);}
+.flujo-gantt-placeholder b{display:block;font-size:13px;color:var(--text);margin-bottom:3px;}
+.flujo-gantt-scroll{margin-top:10px;padding-top:10px;border-top:1px solid var(--border);overflow-x:auto;}
+.flujo-gantt-grid{display:grid;gap:3px;align-items:center;min-width:max-content;}
+.flujo-gantt-day{text-align:center;display:flex;flex-direction:column;}
+.flujo-gantt-day-wd{font-size:9px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.3px;}
+.flujo-gantt-day-num{font-size:12px;font-weight:700;color:var(--text);}
+.flujo-gantt-day.today .flujo-gantt-day-wd, .flujo-gantt-day.today .flujo-gantt-day-num{color:var(--accent2);}
+.flujo-gantt-rowlabel{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:6px;}
+.flujo-gantt-cell{height:20px;border-radius:4px;background:var(--bg3);}
+.flujo-gantt-cell.today{box-shadow:0 0 0 2px var(--accent2);}
+.flujo-gantt-cell-pending{background:var(--muted);opacity:.45;}
+.flujo-gantt-cell-active{background:var(--accent);}
+.flujo-gantt-cell-done{background:var(--green);}
+.flujo-gantt-cell-skip{background:var(--muted);opacity:.25;}
+.flujo-gantt-note{font-size:10px;color:var(--muted);margin-top:6px;text-align:right;}
 .ficha-section-title{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);margin-bottom:8px;}
 .ficha-act-row{display:flex;align-items:center;gap:8px;padding:5px 0;}
 .ficha-act-row.done .ficha-act-title{color:var(--muted);text-decoration:line-through;}
@@ -379,7 +410,11 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);overscroll-b
 .ficha-mat-table{width:100%;font-size:13px;border-collapse:collapse;}
 .ficha-mat-table th{text-align:left;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;padding:4px 0;border-bottom:1px solid var(--border);}
 .ficha-mat-table td{padding:6px 0;border-bottom:1px solid var(--border);}
-.ficha-mat-table td:last-child, .ficha-mat-table th:last-child{text-align:right;}
+.ficha-mat-table td:nth-child(2), .ficha-mat-table th:nth-child(2){text-align:right;}
+.ficha-mat-table td:nth-child(3), .ficha-mat-table th:nth-child(3){text-align:right;}
+.mat-dispo{font-size:11px;font-weight:700;padding:3px 8px;border-radius:99px;white-space:nowrap;}
+.mat-dispo-ok{background:rgba(22,163,74,.1);color:var(--green);}
+.mat-dispo-falta{background:rgba(220,38,38,.1);color:var(--red);}
 .ficha-empty{font-size:13px;color:var(--muted);padding:6px 0;}
 @media(max-width:767px){
   .ficha-layout{flex-direction:column;}
@@ -542,8 +577,9 @@ tbody tr:hover td{background:rgba(13,148,136,.03);}
 .proj-kpi.pk-info{border-left:3px solid var(--blue);}
 .proj-kpi.pk-accent{border-left:3px solid var(--accent);}
 .pk-divider{grid-column:span 1;display:flex;align-items:center;justify-content:center;color:var(--border);font-size:18px;pointer-events:none;}
-@media(max-width:900px){#projKpiStrip{grid-template-columns:repeat(3,minmax(0,1fr));}}
-@media(max-width:600px){#projKpiStrip{grid-template-columns:repeat(2,minmax(0,1fr));}}
+.proj-kpi-strip{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin-bottom:16px;}
+@media(max-width:900px){.proj-kpi-strip{grid-template-columns:repeat(3,minmax(0,1fr));}}
+@media(max-width:600px){.proj-kpi-strip{grid-template-columns:repeat(2,minmax(0,1fr));}}
 
 /* ── QUOTE EDITOR ── */
 .quote-editor{background:var(--bg2);}
@@ -846,19 +882,19 @@ tbody tr:hover td{background:rgba(13,148,136,.03);}
     <div class="s-tile-section">Trabajo</div>
     <div class="s-tile-grid">
       <button class="s-tile" id="snav-projects" onclick="sNavGo('projects');toggleSubnav('subnav-projects')">
-        <i class="ti ti-folder s-tile-ico"></i>
+        <svg class="s-tile-ico" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h3.586a1 1 0 0 1 .707.293l1.414 1.414a1 1 0 0 0 .707.293H19a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/></svg>
         <span class="s-tile-lbl">Proyectos</span>
       </button>
       <button class="s-tile" id="snav-purchases" onclick="showSection('compras');sTileActive('snav-purchases')">
-        <i class="ti ti-shopping-cart s-tile-ico"></i>
+        <svg class="s-tile-ico" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="20" r="1"/><circle cx="18" cy="20" r="1"/><path d="M2.5 3h2l2.6 12.2a2 2 0 0 0 2 1.6h8.4a2 2 0 0 0 2-1.6L21 8H5.5"/></svg>
         <span class="s-tile-lbl">Compras</span>
       </button>
       <button class="s-tile" id="snav-agenda" onclick="sNavGo('agenda');sTileActive('snav-agenda')">
-        <i class="ti ti-calendar s-tile-ico"></i>
+        <svg class="s-tile-ico" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="3" x2="8" y2="7"/><line x1="16" y1="3" x2="16" y2="7"/></svg>
         <span class="s-tile-lbl">Agenda</span>
       </button>
       <button class="s-tile" id="snav-settings" onclick="sNavGo('settings');sTileActive('snav-settings')">
-        <i class="ti ti-settings s-tile-ico"></i>
+        <svg class="s-tile-ico" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
         <span class="s-tile-lbl">Ajustes</span>
       </button>
     </div>
@@ -933,8 +969,12 @@ tbody tr:hover td{background:rgba(13,148,136,.03);}
           <h1>Resumen de proyectos</h1>
           <div class="sub" id="dashCount">—</div>
         </div>
-        <button class="btn primary" id="btnNewProjectDash"><i class="ti ti-plus"></i> Nuevo proyecto</button>
+        <div style="display:flex;gap:8px;">
+          <button class="btn" id="btnGeneralReport"><i class="ti ti-printer"></i> Reporte general (PDF)</button>
+          <button class="btn primary" id="btnNewProjectDash"><i class="ti ti-plus"></i> Nuevo proyecto</button>
+        </div>
       </div>
+      <div class="proj-kpi-strip" id="dashKpiStrip"></div>
       <div id="dashAlert"></div>
       <div id="dashboardBoard"></div>
     </div>
@@ -950,7 +990,7 @@ tbody tr:hover td{background:rgba(13,148,136,.03);}
       </div>
 
       <!-- KPI STRIP -->
-      <div id="projKpiStrip" style="display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px;margin-bottom:16px;"></div>
+      <div class="proj-kpi-strip" id="projKpiStrip"></div>
 
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
         <div class="field" style="flex:1;">
@@ -972,6 +1012,7 @@ tbody tr:hover td{background:rgba(13,148,136,.03);}
         <div style="display:flex;align-items:center;gap:12px;margin-bottom:18px;">
           <button class="btn icon" id="btnBackProjects"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg></button>
           <div style="flex:1;min-width:0;">
+            <div style="font-size:44px;font-weight:800;color:var(--accent2);letter-spacing:.5px;line-height:1.1;margin-bottom:2px;">Ficha de producto</div>
             <div style="font-size:18px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" id="detailProjectName">—</div>
             <div style="font-size:12px;color:var(--muted);margin-top:2px;" id="detailProjectMeta">—</div>
           </div>
@@ -1090,7 +1131,7 @@ tbody tr:hover td{background:rgba(13,148,136,.03);}
     <div class="nav-dd-item" onclick="closeAllDropdowns();mShowSection('instalaciones')"><i class="ti ti-tool dd-ico"></i>Instalaciones</div>
     <div class="nav-dd-item" onclick="closeAllDropdowns();mShowSection('tareas')"><i class="ti ti-check dd-ico"></i>Tareas</div>
     <div class="nav-dd-divider"></div>
-    <div class="nav-dd-item" onclick="mNavGo('settings')"><i class="ti ti-settings dd-ico"></i>Ajustes</div>
+    <div class="nav-dd-item" onclick="mNavGo('settings')"><svg class="dd-ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Ajustes</div>
     <div class="nav-dd-item" onclick="closeAllDropdowns();exportJSON()"><i class="ti ti-device-floppy dd-ico"></i>Respaldo</div>
     <div class="nav-dd-divider"></div>
     <div class="nav-dd-item" style="color:var(--red)" onclick="closeAllDropdowns();logout()"><i class="ti ti-logout dd-ico"></i>Cerrar sesión</div>
@@ -1190,6 +1231,23 @@ const money = (n)=> (Number(n||0)).toLocaleString("es-MX", {minimumFractionDigit
 function uid(){ return Math.random().toString(16).slice(2)+Date.now().toString(16); }
 function todayISO(){ const d=new Date(); d.setHours(0,0,0,0); return d.toISOString().slice(0,10); }
 function parseISO(s){ if(!s) return null; const d=new Date(s+"T00:00:00"); return isNaN(d.getTime())? null : d; }
+function _weekMonday(dateISO){
+  const d = parseISO(dateISO); if(!d) return null;
+  const dow = d.getDay(); // 0=domingo..6=sábado
+  const diffToMonday = (dow===0?6:dow-1);
+  const monday = new Date(d); monday.setDate(d.getDate()-diffToMonday);
+  return monday;
+}
+function weekKey(dateISO){
+  const monday = _weekMonday(dateISO); if(!monday) return "sin-fecha";
+  return monday.toISOString().slice(0,10);
+}
+function weekRangeLabel(dateISO){
+  const monday = _weekMonday(dateISO); if(!monday) return "Sin fecha de entrega";
+  const sunday = new Date(monday); sunday.setDate(monday.getDate()+6);
+  const fmt = dt => String(dt.getDate()).padStart(2,'0')+"/"+String(dt.getMonth()+1).padStart(2,'0')+"/"+String(dt.getFullYear()).slice(-2);
+  return `Semana del ${fmt(monday)} al ${fmt(sunday)}`;
+}
 
 // ── PROJECT STAGES (Dashboard) ───────────────────────────────
 const PROJECT_STAGES = [
@@ -1320,21 +1378,85 @@ function updateFlujoField(pid, stageId, field, value){
 }
 function renderFlujoEmbed(p){
   const flujo = _getProjectFlujo(p.id);
-  return FLUJO_EMBED_STAGES.map(stageId=>{
+  const team = Array.isArray(db.settings.team) ? db.settings.team : [];
+  const rows = FLUJO_EMBED_STAGES.map(stageId=>{
     const def = FLUJO_STAGES_DEFAULT.find(s=>s.id===stageId);
     const item = flujo.find(x=>x.stageId===stageId) || {status:'pending',assignee:'',startDate:'',endDate:''};
+    const assigneeOptions = ['<option value="">Sin asignar</option>']
+      .concat(team.map(n=>`<option value="${escapeAttr(n)}" ${item.assignee===n?'selected':''}>${escapeHTML(n)}</option>`));
+    if(item.assignee && !team.includes(item.assignee)){
+      assigneeOptions.push(`<option value="${escapeAttr(item.assignee)}" selected>${escapeHTML(item.assignee)}</option>`);
+    }
     return `<div class="flujo-row">
       <div class="flujo-row-top">
         <span class="flujo-row-label">${def?def.icon:''} ${escapeHTML(def?def.label:stageId)}</span>
         <span class="flujo-status-badge ${ST_BADGE[item.status]||''}" data-flujo-cycle="${stageId}" data-pid="${p.id}">${ST_LABEL[item.status]||item.status}</span>
       </div>
       <div class="flujo-row-fields">
-        <input class="flujo-input" data-flujo-field="assignee" data-stage="${stageId}" data-pid="${p.id}" placeholder="Responsable" value="${escapeAttr(item.assignee||'')}">
+        <select class="flujo-input" data-flujo-field="assignee" data-stage="${stageId}" data-pid="${p.id}">${assigneeOptions.join('')}</select>
         <input type="date" class="flujo-input" data-flujo-field="startDate" data-stage="${stageId}" data-pid="${p.id}" value="${escapeAttr(item.startDate||'')}" title="Inicio">
         <input type="date" class="flujo-input" data-flujo-field="endDate" data-stage="${stageId}" data-pid="${p.id}" value="${escapeAttr(item.endDate||'')}" title="Fin">
       </div>
     </div>`;
   }).join('');
+  return `${rows}${renderFlujoTimeline(p, flujo)}`;
+}
+const WEEKDAY_ABBR = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb']; // getDay(): 0=Dom..6=Sáb
+function renderFlujoTimeline(p, flujo){
+  const dates = [];
+  FLUJO_EMBED_STAGES.forEach(stageId=>{
+    const it = flujo.find(x=>x.stageId===stageId);
+    if(it){ if(it.startDate) dates.push(it.startDate); if(it.endDate) dates.push(it.endDate); }
+  });
+  if(p.inicioDate) dates.push(p.inicioDate);
+  if(p.deliveryDate) dates.push(p.deliveryDate);
+  if(dates.length<2){
+    return `<div class="flujo-gantt-placeholder">
+      <i class="ti ti-timeline"></i>
+      <div>
+        <b>Cronograma de fabricación</b>
+        <div>Captura la "Fecha de inicio" del proyecto y/o las fechas de inicio/fin de Ingeniería, Producción o Calidad para verlo aquí.</div>
+      </div>
+    </div>`;
+  }
+  dates.sort();
+  const minD = parseISO(dates[0]), maxD = parseISO(dates[dates.length-1]);
+  const totalDays = Math.round((maxD-minD)/86400000) + 1;
+  const MAX_DAYS = 21;
+  const numDays = Math.min(totalDays, MAX_DAYS);
+  const today = todayISO();
+
+  let headerCells = '';
+  const dayList = [];
+  for(let i=0;i<numDays;i++){
+    const d = new Date(minD); d.setDate(minD.getDate()+i);
+    const iso = d.toISOString().slice(0,10);
+    dayList.push(iso);
+    const isToday = iso===today ? ' today' : '';
+    headerCells += `<div class="flujo-gantt-day${isToday}"><span class="flujo-gantt-day-wd">${WEEKDAY_ABBR[d.getDay()]}</span><span class="flujo-gantt-day-num">${d.getDate()}</span></div>`;
+  }
+
+  const rowsHTML = FLUJO_EMBED_STAGES.map(stageId=>{
+    const def = FLUJO_STAGES_DEFAULT.find(s=>s.id===stageId);
+    const it = flujo.find(x=>x.stageId===stageId);
+    let cells = '';
+    dayList.forEach(iso=>{
+      let cls = 'flujo-gantt-cell';
+      if(it && it.startDate && it.endDate && iso>=it.startDate && iso<=it.endDate) cls += ' flujo-gantt-cell-'+it.status;
+      if(iso===today) cls += ' today';
+      cells += `<div class="${cls}"></div>`;
+    });
+    return `<div class="flujo-gantt-rowlabel">${def?def.icon:''} ${escapeHTML(def?def.label:stageId)}</div>${cells}`;
+  }).join('');
+
+  const note = totalDays>MAX_DAYS ? `<div class="flujo-gantt-note">Mostrando los primeros ${MAX_DAYS} días de ${totalDays}.</div>` : '';
+
+  return `<div class="flujo-gantt-scroll">
+    <div class="flujo-gantt-grid" style="grid-template-columns:110px repeat(${numDays},minmax(26px,1fr));">
+      <div></div>${headerCells}
+      ${rowsHTML}
+    </div>
+  </div>${note}`;
 }
 
 // ── PROJECT SUB-STEPS (fecha compromiso) ─────────────────────
@@ -1396,6 +1518,11 @@ function toggleRouteActivity(pid, key){
   p.activityDone[key] = !p.activityDone[key];
   save(); renderDashboardPage();
 }
+function getMaterialStock(desc){
+  const stock = db.settings.stockItems || {};
+  const entry = stock[desc] || stock[(desc||"").toLowerCase()] || stock[(desc||"").toUpperCase()];
+  return entry && typeof entry==="object" ? Number(entry.qty||0) : 0;
+}
 function getProjectMaterials(p){
   const map = new Map();
   getAuthorizedQuotes(p.id).forEach(q=>{
@@ -1409,7 +1536,11 @@ function getProjectMaterials(p){
       else map.set(desc, {qty, uom});
     });
   });
-  return [...map.entries()].map(([desc,v])=>({desc, qty:v.qty, uom:v.uom}));
+  return [...map.entries()].map(([desc,v])=>{
+    const stock = getMaterialStock(desc);
+    const faltante = Math.max(0, v.qty - stock);
+    return {desc, qty:v.qty, uom:v.uom, stock, faltante};
+  });
 }
 function projectAuthorizedCosto(pid){
   return getAuthorizedQuotes(pid).reduce((s,q)=>{
@@ -4440,9 +4571,9 @@ function _renderSecTareas(filtersEl, contentEl){
 // ---- Projects page ----
 
 function renderProjKpis(){
-  const strip = document.getElementById('projKpiStrip');
-  if(!strip) return;
-  if(typeof db === 'undefined' || !db) { strip.innerHTML=''; return; }
+  const strips = document.querySelectorAll('.proj-kpi-strip');
+  if(!strips.length) return;
+  if(typeof db === 'undefined' || !db) { strips.forEach(s=>s.innerHTML=''); return; }
 
   try {
     const today = new Date(); today.setHours(0,0,0,0);
@@ -4454,7 +4585,12 @@ function renderProjKpis(){
     const total = allP.length;
     const enCurso = active.length;
     const vencidos = active.filter(p => p.delivery && p.delivery < todayStr).length;
-    const comprasPend = (db.purchases||[]).filter(c => c.status !== 'received').length;
+    // Compras pend. = materiales en faltante (consumo > stock) entre los proyectos activos
+    const shortageSet = new Set();
+    active.forEach(p=>{
+      try{ getProjectMaterials(p).forEach(m=>{ if(m.faltante>0) shortageSet.add(m.desc); }); }catch(e){}
+    });
+    const comprasPend = shortageSet.size;
 
     // ── FINANZAS ──
     const y = today.getFullYear(), m = today.getMonth();
@@ -4496,12 +4632,12 @@ function renderProjKpis(){
     const peBE = (cmRatio>0&&totalFijos>0) ? totalFijos/cmRatio : 0;
     const brechaPE = ventasNetas - peBE;
 
-    const fmt = n => { const a=Math.abs(n); if(a>=1000000) return '$'+(n/1000000).toFixed(1)+'M'; if(a>=1000) return '$'+Math.round(n/1000)+'k'; return '$'+Math.round(n); };
+    const fmt = n => { const sign = n<0?'-':''; return sign+'$'+Math.round(Math.abs(n)).toLocaleString('es-MX'); };
     const utColor = utilidadOp>=0 ? 'var(--green)' : 'var(--red)';
     const brechaColor = brechaPE>=0 ? 'var(--green)' : 'var(--red)';
     const pct = total>0 ? Math.round(enCurso/total*100) : 0;
 
-    strip.innerHTML = `
+    const html = `
       <div class="proj-kpi pk-accent" style="position:relative;overflow:hidden;">
         <i class="ti ti-folder-open" style="position:absolute;right:-4px;bottom:-6px;font-size:42px;opacity:.08;color:var(--accent);pointer-events:none;"></i>
         <div class="pk-label" style="color:var(--accent);"><i class="ti ti-folder" style="font-size:11px;"></i>&nbsp;En curso</div>
@@ -4519,13 +4655,7 @@ function renderProjKpis(){
         <i class="ti ti-shopping-cart" style="position:absolute;right:-4px;bottom:-6px;font-size:42px;opacity:.08;color:${comprasPend>0?'var(--amber)':'var(--green)'};pointer-events:none;"></i>
         <div class="pk-label" style="color:${comprasPend>0?'var(--amber)':'var(--green)'};"><i class="ti ti-shopping-cart" style="font-size:11px;"></i>&nbsp;Compras pend.</div>
         <div class="pk-val" style="color:${comprasPend>0?'var(--amber)':'var(--green)'};">${comprasPend}</div>
-        <div class="pk-sub">${comprasPend===0?'Todo recibido ✓':'sin recibir'}</div>
-      </div>
-      <div class="proj-kpi" style="position:relative;overflow:hidden;border-left:3px solid var(--blue);background:rgba(37,99,235,.04);">
-        <i class="ti ti-chart-pie" style="position:absolute;right:-4px;bottom:-6px;font-size:42px;opacity:.08;color:var(--blue);pointer-events:none;"></i>
-        <div class="pk-label" style="color:var(--blue);"><i class="ti ti-chart-pie" style="font-size:11px;"></i>&nbsp;Finanzas</div>
-        <div class="pk-val" style="font-size:13px;color:var(--blue);font-weight:600;">${be.month||monthKey}</div>
-        <div class="pk-sub">mes activo</div>
+        <div class="pk-sub">${comprasPend===0?'Inventario al día ✓':'materiales en faltante'}</div>
       </div>
       <div class="proj-kpi pk-info" style="position:relative;overflow:hidden;">
         <i class="ti ti-trending-up" style="position:absolute;right:-4px;bottom:-6px;font-size:42px;opacity:.08;color:var(--blue);pointer-events:none;"></i>
@@ -4540,9 +4670,10 @@ function renderProjKpis(){
         <div class="pk-sub">MC ${cmRatio>0?(cmRatio*100).toFixed(1)+'%':'sin datos'}</div>
       </div>
     `;
+    strips.forEach(strip=>{ strip.innerHTML = html; });
   } catch(err) {
     console.warn('renderProjKpis error:', err);
-    strip.innerHTML = '';
+    strips.forEach(s=>s.innerHTML='');
   }
 }
 
@@ -4555,6 +4686,7 @@ function renderDashboardPage(){
   const active = db.projects.filter(p=>!p.manualDone);
   const cnt=document.getElementById("dashCount");
   if(cnt) cnt.textContent = db.projects.length+" proyecto"+(db.projects.length!==1?"s":"")+" · "+active.length+" activo"+(active.length!==1?"s":"");
+  try{ renderProjKpis(); }catch(e){}
 
   const alertBox = document.getElementById("dashAlert");
   if(alertBox){
@@ -4591,6 +4723,24 @@ function makeFichaListItem(p, isActive){
         ${costo>0?`<span><i class="ti ti-currency-dollar"></i> $${money(costo)}</span>`:''}
         ${nextDue?`<span class="${dueOverdue?'overdue':''}"><i class="ti ti-calendar-event"></i> ${escapeHTML(nextDue)}</span>`:''}
       </div>
+    </div>
+  </div>`;
+}
+function makeFichaSuccessItem(p, isActive){
+  const photos = loadPhotos(p.id);
+  const thumbSrc = photos.length ? (photos[0].url || photos[0].data || "") : "";
+  const photo = thumbSrc
+    ? `<img src="${escapeAttr(thumbSrc)}" alt="">`
+    : `<div class="ficha-success-photo-empty"><i class="ti ti-photo"></i></div>`;
+  return `<div class="ficha-success-item ${isActive?'active':''}" data-ficha-select="${p.id}">
+    <div class="ficha-success-photo">
+      ${photo}
+      <div class="ficha-success-badge"><i class="ti ti-trophy"></i> Completado</div>
+    </div>
+    <div class="ficha-success-info">
+      <div class="ficha-success-name">${escapeHTML(p.name||"Sin nombre")}</div>
+      <div class="ficha-success-client">${escapeHTML(p.client||"Sin cliente")}</div>
+      ${p.deliveryDate?`<div class="ficha-success-date"><i class="ti ti-calendar-check"></i> Entregado: ${escapeHTML(p.deliveryDate)}</div>`:''}
     </div>
   </div>`;
 }
@@ -4635,8 +4785,13 @@ function renderFichaDetail(p){
 
   const mats = getProjectMaterials(p);
   const matsHtml = mats.length ? `<table class="ficha-mat-table">
-    <tr><th>Material</th><th>Consumo</th></tr>
-    ${mats.map(m=>`<tr><td>${escapeHTML(m.desc)}</td><td>${money(m.qty)}${m.uom?' '+escapeHTML(m.uom):''}</td></tr>`).join('')}
+    <tr><th>Material</th><th>Consumo</th><th>Disponibilidad</th></tr>
+    ${mats.map(m=>{
+      const dispo = m.faltante>0
+        ? `<span class="mat-dispo mat-dispo-falta">Faltan ${money(m.faltante)}${m.uom?' '+escapeHTML(m.uom):''}</span>`
+        : `<span class="mat-dispo mat-dispo-ok">En stock</span>`;
+      return `<tr><td>${escapeHTML(m.desc)}</td><td>${money(m.qty)}${m.uom?' '+escapeHTML(m.uom):''}</td><td>${dispo}</td></tr>`;
+    }).join('')}
   </table>` : '<div class="ficha-empty">Sin materiales — agrégalos como productos en la cotización autorizada de este proyecto.</div>';
 
   const costo = projectAuthorizedCosto(p.id);
@@ -4659,6 +4814,9 @@ function renderFichaDetail(p){
       <div class="ficha-date-box"><span class="ficha-date-label">Costo</span><span class="ficha-date-value">${costo>0?'$'+money(costo):'—'}</span></div>
       <div class="ficha-date-box"><span class="ficha-date-label">Fecha compromiso</span><span class="ficha-date-value ${dueOverdue?'overdue':''}">${nextDue?escapeHTML(nextDue):'—'}</span></div>
     </div>
+    <button class="btn small primary" data-open-full="${p.id}" style="margin-top:10px;">
+      <i class="ti ti-file-text"></i> Ver ficha de producto y cotizaciones
+    </button>
     <div class="casc-stepper" style="margin-top:16px;">${steps}</div>
     <div class="ficha-section">
       <div class="ficha-section-title">Actividades</div>
@@ -4681,15 +4839,31 @@ function renderFichaDetail(p){
 }
 
 function renderFichaView(box, projects){
-  const sorted = [...projects].sort((a,b)=>{
-    const da = a.manualDone?1:0, dbb = b.manualDone?1:0;
-    if(da!==dbb) return da-dbb;
-    return stageIndex(a.stage)-stageIndex(b.stage) || String(a.deliveryDate||"9999-12-31").localeCompare(String(b.deliveryDate||"9999-12-31"));
-  });
+  const active = projects.filter(p=>!p.manualDone)
+    .sort((a,b)=> String(a.deliveryDate||"9999-12-31").localeCompare(String(b.deliveryDate||"9999-12-31")));
+  const done = projects.filter(p=>p.manualDone)
+    .sort((a,b)=> String(b.deliveryDate||"0000-01-01").localeCompare(String(a.deliveryDate||"0000-01-01")));
+  const sorted = [...active, ...done];
   if(!_fichaSelectedId || !sorted.find(p=>p.id===_fichaSelectedId)) _fichaSelectedId = sorted[0].id;
 
+  let listHtml = "";
+  let lastGroupKey = null;
+  active.forEach(p=>{
+    const groupKey = p.deliveryDate ? weekKey(p.deliveryDate) : "sin-fecha";
+    if(groupKey !== lastGroupKey){
+      const label = p.deliveryDate ? weekRangeLabel(p.deliveryDate) : "Sin fecha de entrega";
+      listHtml += `<div class="ficha-week-header">${escapeHTML(label)}</div>`;
+      lastGroupKey = groupKey;
+    }
+    listHtml += makeFichaListItem(p, p.id===_fichaSelectedId);
+  });
+  if(done.length){
+    listHtml += `<div class="ficha-week-header ficha-week-header-done"><i class="ti ti-trophy"></i> Terminados</div>`;
+    done.forEach(p=>{ listHtml += makeFichaSuccessItem(p, p.id===_fichaSelectedId); });
+  }
+
   box.innerHTML = `<div class="ficha-layout" data-mobile-detail="${_fichaMobileOpen?1:0}">
-    <div class="ficha-list">${sorted.map(p=>makeFichaListItem(p, p.id===_fichaSelectedId)).join("")}</div>
+    <div class="ficha-list">${listHtml}</div>
     <div class="ficha-detail">${renderFichaDetail(db.projects.find(x=>x.id===_fichaSelectedId))}</div>
   </div>`;
 
@@ -4729,7 +4903,8 @@ function renderFichaView(box, projects){
   });
   box.querySelectorAll("[data-flujo-field]").forEach(el=>{
     el.addEventListener("click",(e)=>e.stopPropagation());
-    el.addEventListener(el.type==="date"?"change":"input",()=>{ updateFlujoField(el.dataset.pid, el.dataset.stage, el.dataset.flujoField, el.value); });
+    const evt = (el.type==="date"||el.tagName==="SELECT") ? "change" : "input";
+    el.addEventListener(evt,()=>{ updateFlujoField(el.dataset.pid, el.dataset.stage, el.dataset.flujoField, el.value); if(el.tagName==="SELECT") renderDashboardPage(); });
   });
 }
 
@@ -5243,6 +5418,7 @@ function openQuoteEditorPage(q){
   content.innerHTML=`<div style="padding:16px 0 10px;">
 
     <!-- ── HEADER ── -->
+    <div style="font-size:44px;font-weight:800;color:var(--accent2);letter-spacing:.5px;line-height:1.1;margin-bottom:6px;">Cotización</div>
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
       <button class="btn icon" id="btnBackFromQuote"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg></button>
       <input id="qNameInput" value="${escapeAttr(q.name||"Cotización")}" style="flex:1;background:transparent;border:none;border-bottom:2px solid var(--border);color:var(--text);font-family:inherit;font-size:17px;font-weight:700;padding:4px 0;outline:none;">
@@ -6185,9 +6361,9 @@ function _afterIntro(){
   if(intro){ intro.style.transition="opacity .7s ease"; intro.style.opacity="0"; setTimeout(()=>{ if(intro) intro.style.display="none"; },700); }
   if(u){
     if(modal){ modal.classList.remove("show"); modal.style.display="none"; }
+    document.getElementById("homeScreen").classList.remove("show");
     document.getElementById("app").style.display="";
-    
-    buildTopbar(); showHome();
+    buildTopbar(); showApp();
   } else {
     document.getElementById("homeScreen").classList.remove("show");
     document.getElementById("app").style.display="none";
@@ -6214,9 +6390,9 @@ function bootNew(){
     }
     document.getElementById("loginModal").classList.remove("show");
     document.getElementById("loginModal").style.display="none";
+    document.getElementById("homeScreen").classList.remove("show");
     document.getElementById("app").style.display="";
-    
-    buildTopbar(); showHome();
+    buildTopbar(); showApp();
   });
   document.getElementById("loginEmail").addEventListener("keydown",(e)=>{ if(e.key==="Enter") document.getElementById("loginPass").focus(); });
   document.getElementById("loginPass").addEventListener("keydown",(e)=>{ if(e.key==="Enter") document.getElementById("btnLogin").click(); });
@@ -6236,6 +6412,8 @@ function bootNew(){
     ]);
   });
   const _btnNewProjectDash = document.getElementById("btnNewProjectDash");
+  const _btnGeneralReport = document.getElementById("btnGeneralReport");
+  if(_btnGeneralReport) _btnGeneralReport.addEventListener("click", printGeneralReport);
   if(_btnNewProjectDash) _btnNewProjectDash.addEventListener("click",()=>{
     openSheet("Nuevo proyecto",`
       <div class="field-label">Nombre del proyecto</div><div class="field"><input id="npd_name" placeholder="Ej: Showroom Leon"></div>
@@ -6403,6 +6581,148 @@ document.addEventListener('keydown', (e)=>{
 });
 
 // ── PDF SELECTOR ───────────────────────────────────────────
+// ── REPORTE GENERAL DE PROYECTOS (PDF / Impresión) ──────────
+function buildGeneralReportHTML(){
+  const emp = db.settings.empresa || {};
+  const logoSrc = emp.logoB64 || localStorage.getItem("esma_logo_b64") || "";
+  const dt = new Date().toLocaleDateString("es-MX",{year:"numeric",month:"long",day:"numeric"});
+
+  const active = db.projects.filter(p=>!p.manualDone)
+    .sort((a,b)=> String(a.deliveryDate||"9999-12-31").localeCompare(String(b.deliveryDate||"9999-12-31")));
+  const done = db.projects.filter(p=>p.manualDone)
+    .sort((a,b)=> String(b.deliveryDate||"0000-01-01").localeCompare(String(a.deliveryDate||"0000-01-01")));
+
+  function rowHTML(p){
+    const stage = stageInfo(p.stage);
+    const pct = projectProgressPct(p);
+    const costo = projectAuthorizedCosto(p.id);
+    const nextDue = projectNextDueDate(p);
+    const overdue = nextDue && nextDue < todayISO();
+    return `<tr>
+      <td style="padding:8px 10px;border-bottom:1px solid #eef2f7;font-weight:700;">${escapeHTML(p.name||"Sin nombre")}</td>
+      <td style="padding:8px 10px;border-bottom:1px solid #eef2f7;">${escapeHTML(p.client||"—")}</td>
+      <td style="padding:8px 10px;border-bottom:1px solid #eef2f7;">${escapeHTML(stage.label)}</td>
+      <td style="padding:8px 10px;border-bottom:1px solid #eef2f7;text-align:center;">${pct}%</td>
+      <td style="padding:8px 10px;border-bottom:1px solid #eef2f7;">${escapeHTML(p.deliveryDate||"—")}</td>
+      <td style="padding:8px 10px;border-bottom:1px solid #eef2f7;${overdue?"color:#dc2626;font-weight:700;":""}">${nextDue?escapeHTML(nextDue):"—"}</td>
+      <td style="padding:8px 10px;border-bottom:1px solid #eef2f7;text-align:right;font-weight:700;">${costo>0?"$"+money(costo):"—"}</td>
+    </tr>`;
+  }
+
+  let activeRows = "";
+  let lastGroup = null;
+  active.forEach(p=>{
+    const groupKey = p.deliveryDate ? weekKey(p.deliveryDate) : "sin-fecha";
+    if(groupKey !== lastGroup){
+      const label = p.deliveryDate ? weekRangeLabel(p.deliveryDate) : "Sin fecha de entrega";
+      activeRows += `<tr><td colspan="7" style="padding:10px 10px 4px;font-size:10px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:#1e3a8a;border-bottom:1px solid #cbd5e1;">${escapeHTML(label)}</td></tr>`;
+      lastGroup = groupKey;
+    }
+    activeRows += rowHTML(p);
+  });
+  if(!active.length) activeRows = `<tr><td colspan="7" style="padding:14px;text-align:center;color:#94a3b8;">Sin proyectos activos.</td></tr>`;
+
+  // Materiales faltantes (acumulado de proyectos activos)
+  const shortageMap = new Map();
+  active.forEach(p=>{
+    getProjectMaterials(p).forEach(m=>{
+      if(m.faltante>0){
+        const key = m.desc+"|"+m.uom;
+        if(!shortageMap.has(key)) shortageMap.set(key,{desc:m.desc, uom:m.uom, total:0});
+        shortageMap.get(key).total += m.faltante;
+      }
+    });
+  });
+  const shortages = [...shortageMap.values()];
+  const shortageRows = shortages.length
+    ? shortages.map(s=>`<tr>
+        <td style="padding:7px 10px;border-bottom:1px solid #eef2f7;font-weight:700;">${escapeHTML(s.desc)}</td>
+        <td style="padding:7px 10px;border-bottom:1px solid #eef2f7;text-align:right;color:#dc2626;font-weight:800;">${money(s.total)}${s.uom?" "+escapeHTML(s.uom):""}</td>
+      </tr>`).join("")
+    : `<tr><td colspan="2" style="padding:10px;text-align:center;color:#94a3b8;">No hay faltantes registrados.</td></tr>`;
+
+  // Terminados recientes (caso de éxito)
+  const doneRows = done.length
+    ? done.slice(0,15).map(p=>`<tr>
+        <td style="padding:7px 10px;border-bottom:1px solid #eef2f7;font-weight:700;">${escapeHTML(p.name||"Sin nombre")}</td>
+        <td style="padding:7px 10px;border-bottom:1px solid #eef2f7;">${escapeHTML(p.client||"—")}</td>
+        <td style="padding:7px 10px;border-bottom:1px solid #eef2f7;">${escapeHTML(p.deliveryDate||"—")}</td>
+      </tr>`).join("")
+    : `<tr><td colspan="3" style="padding:10px;text-align:center;color:#94a3b8;">Sin proyectos terminados.</td></tr>`;
+
+  return `<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Reporte General de Proyectos</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+  @page { size: letter; margin: 14mm 12mm; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Inter', Arial, sans-serif; color: #0f172a; background: #fff; font-size: 12px; }
+  .stripe { height: 6px; background: linear-gradient(90deg, #1e3a8a 0%, #2563eb 60%, #3b82f6 100%); margin-bottom: 14px; }
+  .header { display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; }
+  .header img { height:48px; object-fit:contain; }
+  .header .emp-name { font-size:16px; font-weight:900; color:#1e3a8a; }
+  .header .doc-title { text-align:right; }
+  .header .doc-title h1 { font-size:18px; font-weight:900; color:#1e3a8a; }
+  .header .doc-title div { font-size:11px; color:#64748b; margin-top:2px; }
+  table { width:100%; border-collapse:collapse; margin-bottom:18px; }
+  th { text-align:left; padding:8px 10px; background:#1e3a8a; color:#fff; font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.5px; }
+  th:first-child{ border-radius:6px 0 0 0; } th:last-child{ border-radius:0 6px 0 0; }
+  h2.section { font-size:13px; font-weight:900; color:#1e3a8a; text-transform:uppercase; letter-spacing:.5px; margin: 18px 0 8px; padding-bottom:4px; border-bottom:2px solid #1e3a8a; }
+  tr.group-row td { background:#f1f5f9; }
+  @media print { .no-print{ display:none; } }
+</style>
+</head>
+<body>
+  <div class="stripe"></div>
+  <div class="header">
+    <div style="display:flex;align-items:center;gap:10px;">
+      ${logoSrc?`<img src="${logoSrc}">`:""}
+      <div class="emp-name">${escapeHTML(emp.nombre||"ESMA INDUSTRIAL")}</div>
+    </div>
+    <div class="doc-title">
+      <h1>Reporte General de Proyectos</h1>
+      <div>Generado el ${escapeHTML(dt)}</div>
+    </div>
+  </div>
+
+  <h2 class="section">Proyectos activos (${active.length})</h2>
+  <table>
+    <thead><tr>
+      <th>Proyecto</th><th>Cliente</th><th>Etapa</th><th style="text-align:center;">Avance</th>
+      <th>Entrega</th><th>Fecha compromiso</th><th style="text-align:right;">Costo</th>
+    </tr></thead>
+    <tbody>${activeRows}</tbody>
+  </table>
+
+  <h2 class="section">Materiales faltantes por comprar</h2>
+  <table>
+    <thead><tr><th>Material</th><th style="text-align:right;">Cantidad faltante</th></tr></thead>
+    <tbody>${shortageRows}</tbody>
+  </table>
+
+  <h2 class="section">Proyectos terminados (últimos ${Math.min(done.length,15)} de ${done.length})</h2>
+  <table>
+    <thead><tr><th>Proyecto</th><th>Cliente</th><th>Entrega</th></tr></thead>
+    <tbody>${doneRows}</tbody>
+  </table>
+</body>
+</html>`;
+}
+function printGeneralReport(){
+  const iframe=document.createElement("iframe");
+  iframe.style.cssText="position:fixed;right:0;bottom:0;width:0;height:0;border:0;";
+  document.body.appendChild(iframe);
+  const doc=iframe.contentWindow.document;
+  doc.open();
+  doc.write(buildGeneralReportHTML());
+  doc.close();
+  iframe.onload=()=>{ try{ iframe.contentWindow.focus(); iframe.contentWindow.print(); } finally { setTimeout(()=>iframe.remove(),1000); } };
+  setTimeout(()=>{ try{ iframe.contentWindow.focus(); iframe.contentWindow.print(); }catch(e){} },450);
+}
+
 function openPDFSelector(projectId){
   const proj = db.projects.find(x=>x.id===projectId)||{name:"Proyecto"};
   const quotes = db.quotes.filter(x=>x.projectId===projectId);
