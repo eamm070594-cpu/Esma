@@ -331,6 +331,10 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);overscroll-b
 .casc-add-substep:hover{border-color:var(--accent);color:var(--accent2);}
 
 /* ── FICHA TÉCNICA (master-detail) ── */
+.ficha-filter{display:flex;gap:8px;margin-bottom:12px;}
+.ficha-filter-pill{font-size:12px;font-weight:700;padding:7px 16px;border-radius:99px;border:1.5px solid var(--border);background:var(--card);color:var(--muted);cursor:pointer;transition:all .12s;}
+.ficha-filter-pill:hover{border-color:var(--accent);color:var(--accent2);}
+.ficha-filter-pill.active{border-color:var(--accent);background:var(--accent-light);color:var(--accent2);}
 .ficha-layout{display:flex;gap:14px;align-items:flex-start;}
 .ficha-list{width:300px;flex-shrink:0;display:flex;flex-direction:column;gap:6px;}
 .ficha-week-header{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;padding:10px 4px 4px;}
@@ -372,6 +376,10 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);overscroll-b
 .ficha-name{font-size:17px;font-weight:700;}
 .ficha-meta{font-size:13px;color:var(--muted);margin-top:3px;}
 .ficha-dates{display:flex;gap:18px;margin-top:12px;flex-wrap:wrap;}
+.ficha-address{margin-top:12px;}
+.ficha-address-label{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:5px;}
+.ficha-address-input{width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:var(--radius2);background:var(--card);color:var(--text);font-size:13px;font-family:inherit;}
+.ficha-address-input:focus{outline:none;border-color:var(--accent);}
 .ficha-date-box{display:flex;flex-direction:column;}
 .ficha-date-label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;}
 .ficha-date-value{font-size:14px;font-weight:700;margin-top:2px;}
@@ -1632,6 +1640,7 @@ function normalizeDB(){
     if(!p.stageUpdatedAt) p.stageUpdatedAt = p.createdAt || todayISO();
     if(!Array.isArray(p.subSteps)) p.subSteps = [];
     if(typeof p.inicioDate !== 'string') p.inicioDate = '';
+    if(typeof p.deliveryAddress !== 'string') p.deliveryAddress = '';
     if(!p.activityDone || typeof p.activityDone !== 'object') p.activityDone = {};
     if(p.stage==='inicio' && !p.inicioDate) p.inicioDate = p.stageUpdatedAt || todayISO();
   });
@@ -4680,6 +4689,8 @@ function renderProjKpis(){
 // ---- Dashboard (Ficha técnica de proyectos) ----
 let _fichaSelectedId = null;
 let _fichaMobileOpen = false;
+let _fichaFilter = 'all'; // 'all' | 'curso' | 'autorizados'
+function setFichaFilter(f){ _fichaFilter = f; renderDashboardPage(); }
 
 function renderDashboardPage(){
   const box=document.getElementById("dashboardBoard"); if(!box) return;
@@ -4814,6 +4825,10 @@ function renderFichaDetail(p){
       <div class="ficha-date-box"><span class="ficha-date-label">Costo</span><span class="ficha-date-value">${costo>0?'$'+money(costo):'—'}</span></div>
       <div class="ficha-date-box"><span class="ficha-date-label">Fecha compromiso</span><span class="ficha-date-value ${dueOverdue?'overdue':''}">${nextDue?escapeHTML(nextDue):'—'}</span></div>
     </div>
+    <div class="ficha-address">
+      <label class="ficha-address-label" for="fichaAddr_${p.id}"><i class="ti ti-map-pin"></i> Dirección de entrega</label>
+      <input type="text" id="fichaAddr_${p.id}" class="ficha-address-input" data-field-address="${p.id}" value="${escapeAttr(p.deliveryAddress||'')}" placeholder="Calle, número, colonia, ciudad, CP...">
+    </div>
     <button class="btn small primary" data-open-full="${p.id}" style="margin-top:10px;">
       <i class="ti ti-file-text"></i> Ver ficha de producto y cotizaciones
     </button>
@@ -4838,7 +4853,22 @@ function renderFichaDetail(p){
   `;
 }
 
-function renderFichaView(box, projects){
+function renderFichaView(box, allProjects){
+  const filterPills = `<div class="ficha-filter">
+    <button class="ficha-filter-pill ${_fichaFilter==='all'?'active':''}" onclick="setFichaFilter('all')">Todos</button>
+    <button class="ficha-filter-pill ${_fichaFilter==='curso'?'active':''}" onclick="setFichaFilter('curso')">En curso</button>
+    <button class="ficha-filter-pill ${_fichaFilter==='autorizados'?'active':''}" onclick="setFichaFilter('autorizados')">Autorizados</button>
+  </div>`;
+
+  let projects = allProjects;
+  if(_fichaFilter==='curso') projects = allProjects.filter(p=>!p.manualDone);
+  else if(_fichaFilter==='autorizados') projects = allProjects.filter(p=>getAuthorizedQuotes(p.id).length>0);
+
+  if(!projects.length){
+    box.innerHTML = filterPills + `<div class="empty"><div class="ico" style="font-size:36px;margin-bottom:10px;">🔎</div><h3>Sin proyectos</h3><p>No hay proyectos que coincidan con este filtro.</p></div>`;
+    return;
+  }
+
   const active = projects.filter(p=>!p.manualDone)
     .sort((a,b)=> String(a.deliveryDate||"9999-12-31").localeCompare(String(b.deliveryDate||"9999-12-31")));
   const done = projects.filter(p=>p.manualDone)
@@ -4862,7 +4892,7 @@ function renderFichaView(box, projects){
     done.forEach(p=>{ listHtml += makeFichaSuccessItem(p, p.id===_fichaSelectedId); });
   }
 
-  box.innerHTML = `<div class="ficha-layout" data-mobile-detail="${_fichaMobileOpen?1:0}">
+  box.innerHTML = filterPills + `<div class="ficha-layout" data-mobile-detail="${_fichaMobileOpen?1:0}">
     <div class="ficha-list">${listHtml}</div>
     <div class="ficha-detail">${renderFichaDetail(db.projects.find(x=>x.id===_fichaSelectedId))}</div>
   </div>`;
@@ -4905,6 +4935,13 @@ function renderFichaView(box, projects){
     el.addEventListener("click",(e)=>e.stopPropagation());
     const evt = (el.type==="date"||el.tagName==="SELECT") ? "change" : "input";
     el.addEventListener(evt,()=>{ updateFlujoField(el.dataset.pid, el.dataset.stage, el.dataset.flujoField, el.value); if(el.tagName==="SELECT") renderDashboardPage(); });
+  });
+  box.querySelectorAll("[data-field-address]").forEach(el=>{
+    el.addEventListener("click",(e)=>e.stopPropagation());
+    el.addEventListener("input",()=>{
+      const p = db.projects.find(x=>x.id===el.dataset.fieldAddress); if(!p) return;
+      p.deliveryAddress = el.value; save();
+    });
   });
 }
 
@@ -5180,6 +5217,10 @@ function renderDetailFull(p, content){
           <div class="field-label" style="margin-top:0;">Descripción detallada</div>
           <div class="field"><textarea id="pNotes" rows="4" placeholder="Detalles del proyecto, especificaciones, acuerdos con el cliente, etc." style="resize:vertical;min-height:90px;">${escapeHTML(p.notes||"")}</textarea></div>
         </div>
+        <div style="margin-top:8px;">
+          <div class="field-label" style="margin-top:0;"><i class="ti ti-map-pin"></i> Dirección de entrega</div>
+          <div class="field"><input id="pDeliveryAddress" value="${escapeAttr(p.deliveryAddress||"")}" placeholder="Calle, número, colonia, ciudad, CP..."></div>
+        </div>
         <div style="display:flex;gap:8px;margin-top:10px;">
           <button class="btn" id="btnMarkDone" style="flex:1;justify-content:center;${isDone?"color:var(--amber);border-color:rgba(180,83,9,.35);":""}">${isDone?"↩ Reabrir proyecto":"✓ Marcar terminado"}</button>
           <button class="btn danger" id="btnDelP"><i class="ti ti-trash"></i> Eliminar proyecto</button>
@@ -5250,11 +5291,12 @@ function renderDetailFull(p, content){
     p.client  = document.getElementById("pClient")?.value.trim()||"";
     p.deliveryDate = document.getElementById("pDelivery")?.value||"";
     p.notes   = document.getElementById("pNotes")?.value.trim()||"";
+    p.deliveryAddress = document.getElementById("pDeliveryAddress")?.value.trim()||"";
     const ps  = document.getElementById("pPayStatus"); if(ps) p.payStatus=ps.value;
     const pa  = document.getElementById("pAnticipo");  if(pa) p.anticipo=Number(pa.value||0);
     save(); renderProjectsPage();
   }
-  ["pName","pClient","pDelivery","pNotes","pAnticipo"].forEach(id=>{
+  ["pName","pClient","pDelivery","pNotes","pAnticipo","pDeliveryAddress"].forEach(id=>{
     const el=document.getElementById(id); if(el) el.addEventListener("blur",_autoSave);
   });
   const psEl=document.getElementById("pPayStatus");
@@ -6589,24 +6631,63 @@ function buildGeneralReportHTML(){
 
   const active = db.projects.filter(p=>!p.manualDone)
     .sort((a,b)=> String(a.deliveryDate||"9999-12-31").localeCompare(String(b.deliveryDate||"9999-12-31")));
-  const done = db.projects.filter(p=>p.manualDone)
-    .sort((a,b)=> String(b.deliveryDate||"0000-01-01").localeCompare(String(a.deliveryDate||"0000-01-01")));
 
   function rowHTML(p){
     const stage = stageInfo(p.stage);
     const pct = projectProgressPct(p);
     const costo = projectAuthorizedCosto(p.id);
-    const nextDue = projectNextDueDate(p);
-    const overdue = nextDue && nextDue < todayISO();
+    const photos = loadPhotos(p.id);
+    const thumbSrc = photos.length ? (photos[0].url || photos[0].data || "") : "";
+    const photoCell = thumbSrc
+      ? `<img src="${thumbSrc}" style="width:46px;height:46px;object-fit:cover;border-radius:6px;display:block;">`
+      : `<div style="width:46px;height:46px;border-radius:6px;background:#f1f5f9;"></div>`;
     return `<tr>
-      <td style="padding:8px 10px;border-bottom:1px solid #eef2f7;font-weight:700;">${escapeHTML(p.name||"Sin nombre")}</td>
+      <td style="padding:6px 10px;border-bottom:1px solid #eef2f7;width:56px;">${photoCell}</td>
+      <td style="padding:8px 10px;border-bottom:1px solid #eef2f7;font-weight:700;">${escapeHTML(p.name||"Sin nombre")}${p.deliveryAddress?`<div style="font-size:9px;font-weight:400;color:#64748b;margin-top:2px;">📍 ${escapeHTML(p.deliveryAddress)}</div>`:''}</td>
       <td style="padding:8px 10px;border-bottom:1px solid #eef2f7;">${escapeHTML(p.client||"—")}</td>
       <td style="padding:8px 10px;border-bottom:1px solid #eef2f7;">${escapeHTML(stage.label)}</td>
       <td style="padding:8px 10px;border-bottom:1px solid #eef2f7;text-align:center;">${pct}%</td>
       <td style="padding:8px 10px;border-bottom:1px solid #eef2f7;">${escapeHTML(p.deliveryDate||"—")}</td>
-      <td style="padding:8px 10px;border-bottom:1px solid #eef2f7;${overdue?"color:#dc2626;font-weight:700;":""}">${nextDue?escapeHTML(nextDue):"—"}</td>
       <td style="padding:8px 10px;border-bottom:1px solid #eef2f7;text-align:right;font-weight:700;">${costo>0?"$"+money(costo):"—"}</td>
     </tr>`;
+  }
+
+  function activitiesHTML(p){
+    const routeActs = getProjectRouteActivities(p);
+    const subs = (p.subSteps||[]).filter(s=>s.title && s.title.trim());
+    const items = [
+      ...routeActs.map(a=>({title:a.title, done:a.done, extra:a.hours?money(a.hours)+'h':''})),
+      ...subs.map(s=>({title:s.title, done:s.done, extra:s.dueDate||''}))
+    ];
+    if(!items.length) return '';
+    const pills = items.map(it=>{
+      const done = it.done;
+      const icon = done ? '✓' : '○';
+      const color = done ? '#16a34a' : '#475569';
+      const bg = done ? '#f0fdf4' : '#f1f5f9';
+      return `<span style="display:inline-block;margin:2px 6px 2px 0;padding:2px 8px;border-radius:99px;background:${bg};font-size:10px;color:${color};white-space:nowrap;${done?'text-decoration:line-through;':''}">${icon} ${escapeHTML(it.title)}${it.extra?' · '+escapeHTML(it.extra):''}</span>`;
+    }).join('');
+    return `<tr><td></td><td colspan="6" style="padding:2px 10px 10px;border-bottom:1px solid #eef2f7;">
+      <div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:#94a3b8;margin-bottom:3px;">Actividades</div>
+      ${pills}
+    </td></tr>`;
+  }
+
+  function purchasesHTML(p){
+    const purchases = (db.purchases||[]).filter(c=>c.projectId===p.id)
+      .sort((a,b)=>String(a.date||'').localeCompare(String(b.date||'')));
+    if(!purchases.length) return '';
+    const pills = purchases.map(c=>{
+      const received = c.status==='received';
+      const icon = received ? '✓' : '○';
+      const color = received ? '#16a34a' : '#9a3412';
+      const bg = received ? '#f0fdf4' : '#fff7ed';
+      return `<span style="display:inline-block;margin:2px 6px 2px 0;padding:2px 8px;border-radius:99px;background:${bg};font-size:10px;color:${color};white-space:nowrap;${received?'text-decoration:line-through;':''}">${icon} ${escapeHTML(c.title||'Compra')}${c.date?' · '+escapeHTML(c.date):''}</span>`;
+    }).join('');
+    return `<tr><td></td><td colspan="6" style="padding:2px 10px 10px;border-bottom:1px solid #eef2f7;">
+      <div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:#94a3b8;margin-bottom:3px;">Compras</div>
+      ${pills}
+    </td></tr>`;
   }
 
   let activeRows = "";
@@ -6619,6 +6700,8 @@ function buildGeneralReportHTML(){
       lastGroup = groupKey;
     }
     activeRows += rowHTML(p);
+    activeRows += activitiesHTML(p);
+    activeRows += purchasesHTML(p);
   });
   if(!active.length) activeRows = `<tr><td colspan="7" style="padding:14px;text-align:center;color:#94a3b8;">Sin proyectos activos.</td></tr>`;
 
@@ -6641,14 +6724,6 @@ function buildGeneralReportHTML(){
       </tr>`).join("")
     : `<tr><td colspan="2" style="padding:10px;text-align:center;color:#94a3b8;">No hay faltantes registrados.</td></tr>`;
 
-  // Terminados recientes (caso de éxito)
-  const doneRows = done.length
-    ? done.slice(0,15).map(p=>`<tr>
-        <td style="padding:7px 10px;border-bottom:1px solid #eef2f7;font-weight:700;">${escapeHTML(p.name||"Sin nombre")}</td>
-        <td style="padding:7px 10px;border-bottom:1px solid #eef2f7;">${escapeHTML(p.client||"—")}</td>
-        <td style="padding:7px 10px;border-bottom:1px solid #eef2f7;">${escapeHTML(p.deliveryDate||"—")}</td>
-      </tr>`).join("")
-    : `<tr><td colspan="3" style="padding:10px;text-align:center;color:#94a3b8;">Sin proyectos terminados.</td></tr>`;
 
   return `<!doctype html>
 <html lang="es">
@@ -6691,8 +6766,8 @@ function buildGeneralReportHTML(){
   <h2 class="section">Proyectos activos (${active.length})</h2>
   <table>
     <thead><tr>
-      <th>Proyecto</th><th>Cliente</th><th>Etapa</th><th style="text-align:center;">Avance</th>
-      <th>Entrega</th><th>Fecha compromiso</th><th style="text-align:right;">Costo</th>
+      <th></th><th>Proyecto</th><th>Cliente</th><th>Etapa</th><th style="text-align:center;">Avance</th>
+      <th>Entrega</th><th style="text-align:right;">Costo</th>
     </tr></thead>
     <tbody>${activeRows}</tbody>
   </table>
@@ -6701,12 +6776,6 @@ function buildGeneralReportHTML(){
   <table>
     <thead><tr><th>Material</th><th style="text-align:right;">Cantidad faltante</th></tr></thead>
     <tbody>${shortageRows}</tbody>
-  </table>
-
-  <h2 class="section">Proyectos terminados (últimos ${Math.min(done.length,15)} de ${done.length})</h2>
-  <table>
-    <thead><tr><th>Proyecto</th><th>Cliente</th><th>Entrega</th></tr></thead>
-    <tbody>${doneRows}</tbody>
   </table>
 </body>
 </html>`;
