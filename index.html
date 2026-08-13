@@ -749,6 +749,7 @@ tbody tr:hover td{background:rgba(13,148,136,.03);}
   <!-- Firebase SDK (compat) -->
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 </head>
 <body>
 
@@ -1187,25 +1188,45 @@ let _fbDb  = null;
 let _fbReady = false;
 let _fbListener = null;
 
-function _initFirebase(){
+let _fbInitPromise = null;
+
+async function _initFirebase(){
   if(_fbReady) return;
-  try {
-    // Use Firebase compat SDK loaded via CDN
-    if(typeof firebase === 'undefined'){
-      console.warn("Firebase SDK not loaded yet");
-      return;
+  if(_fbInitPromise) return _fbInitPromise; // avoid double sign-in if called concurrently
+
+  _fbInitPromise = (async () => {
+    try {
+      // Use Firebase compat SDK loaded via CDN
+      if(typeof firebase === 'undefined'){
+        console.warn("Firebase SDK not loaded yet");
+        return;
+      }
+      if(!firebase.apps.length){
+        _fbApp = firebase.initializeApp(FIREBASE_CONFIG);
+      } else {
+        _fbApp = firebase.apps[0];
+      }
+      _fbDb = firebase.database();
+
+      // Sign in anonymously to Firebase Auth so security rules
+      // ("auth != null") can allow read/write. This is separate from
+      // the app's own email/password login screen — it just gives
+      // Firebase a real auth session under the hood.
+      const auth = firebase.auth();
+      if(!auth.currentUser){
+        await auth.signInAnonymously();
+      }
+
+      _fbReady = true;
+      console.log("Firebase Realtime Database listo (auth uid:", auth.currentUser?.uid, ")");
+    } catch(e){
+      console.error("Firebase init error:", e);
+    } finally {
+      _fbInitPromise = null;
     }
-    if(!firebase.apps.length){
-      _fbApp = firebase.initializeApp(FIREBASE_CONFIG);
-    } else {
-      _fbApp = firebase.apps[0];
-    }
-    _fbDb = firebase.database();
-    _fbReady = true;
-    console.log("Firebase Realtime Database listo");
-  } catch(e){
-    console.error("Firebase init error:", e);
-  }
+  })();
+
+  return _fbInitPromise;
 }
 
 // ── IMAGE / PHOTOS (localStorage, unchanged) ──────────────────
@@ -1753,7 +1774,7 @@ async function _fbPush(data){
 
   // If Firebase not ready, try to init and retry once
   if(!_fbReady){
-    _initFirebase();
+    await _initFirebase();
     if(!_fbReady){
       syncStatusUpdate("⚠ Sin conexión a la nube", "orange");
       _showSaveToast("⚠️ Sin conexión — dato guardado solo localmente", "warning");
@@ -1787,7 +1808,7 @@ async function _fbPush(data){
 
 // ── PULL: load from Firebase on boot ────────────────────────
 async function gsPullOnBoot(){
-  _initFirebase();
+  await _initFirebase();
   if(!_fbReady){
     syncStatusUpdate("⚠ Firebase no disponible", "orange");
     _showSaveToast("⚠️ Sin conexión a la nube — usando datos locales", "warning");
@@ -1857,7 +1878,7 @@ function _startRealtimeListener(){
 
 // ── MANUAL PUSH (button in settings) ─────────────────────────
 async function gsPush(){
-  if(!_fbReady){ _initFirebase(); }
+  if(!_fbReady){ await _initFirebase(); }
   if(!_fbReady){ _showSaveToast("❌ Sin conexión a la nube", "error"); return; }
   const dbClean = JSON.parse(JSON.stringify(db));
   dbClean.projects.forEach(p=>{ p.photos = (p.photos||[]).filter(ph=>ph.url && !ph.data); });
