@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
-<meta name="theme-color" content="#2563eb"/>
+<meta name="theme-color" content="#0d9488"/>
 <title>ESMA Industrial</title>
 <link rel="manifest" href="data:application/json,{%22name%22:%22ESMA%20Industrial%22,%22short_name%22:%22ESMA%22,%22display%22:%22standalone%22,%22start_url%22:%22.%22,%22background_color%22:%22%23ffffff%22,%22theme_color%22:%22%232563eb%22,%22icons%22:[{%22src%22:%22data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20100%20100'%3E%3Crect%20width='100'%20height='100'%20rx='20'%20fill='%232563eb'/%3E%3Ctext%20y='.9em'%20font-size='80'%20x='10'%20fill='white'%20font-family='system-ui'%20font-weight='900'%3EE%3C/text%3E%3C/svg%3E%22,%22sizes%22:%22192x192%22,%22type%22:%22image/svg+xml%22}]}">
 <meta name="apple-mobile-web-app-title" content="ESMA">
@@ -986,6 +986,7 @@ tbody tr:hover td{background:rgba(13,148,136,.03);}
       </div>
       <div class="proj-kpi-strip" id="dashKpiStrip"></div>
       <div id="dashAlert"></div>
+      <div id="dashHealthPanel"></div>
       <div id="dashboardBoard"></div>
     </div>
 
@@ -4867,12 +4868,88 @@ function renderDashboardPage(){
       : '';
   }
 
+  try{ renderHealthPanel(); }catch(e){ console.warn('health panel error', e); }
+
   if(!db.projects.length){
     box.innerHTML='<div class="empty"><div class="ico" style="font-size:40px;margin-bottom:12px;">📁</div><h3>Sin proyectos</h3><p>Crea tu primer proyecto para empezar a moverlo por las etapas.</p></div>';
     return;
   }
 
   renderFichaView(box, db.projects);
+}
+
+// ── Panel de salud del negocio: gráfica de ventas + alertas urgentes ──
+function _monthSalesTotal(monthYYYYMM){
+  let total = 0;
+  db.projects.forEach(p=>{
+    const fechaRef = p.deliveryDate || p.createdAt || "";
+    if(fechaRef.slice(0,7) !== monthYYYYMM) return;
+    db.quotes.filter(q=>q.projectId===p.id && q.status==="authorized").forEach(q=>{
+      total += quoteSellTotals(q).venta * (Number(q.qty)||1);
+    });
+  });
+  return total;
+}
+function renderHealthPanel(){
+  const el = document.getElementById("dashHealthPanel"); if(!el) return;
+  const today = todayISO();
+
+  // ── Últimos 6 meses de ventas autorizadas ──
+  const months = [];
+  const cursor = new Date(); cursor.setDate(1);
+  for(let i=5;i>=0;i--){
+    const d = new Date(cursor); d.setMonth(cursor.getMonth()-i);
+    const key = d.toISOString().slice(0,7);
+    months.push({key, label: MONTHS[d.getMonth()].slice(0,3), total: _monthSalesTotal(key)});
+  }
+  const maxVal = Math.max(1, ...months.map(m=>m.total));
+  const barW = 44, gap = 18, chartH = 110;
+  const bars = months.map((m,i)=>{
+    const h = Math.round((m.total/maxVal) * (chartH-24));
+    const x = i*(barW+gap);
+    const isCur = i === months.length-1;
+    return `<g>
+      <rect x="${x}" y="${chartH-h}" width="${barW}" height="${h}" rx="4" fill="${isCur?'var(--accent)':'var(--border)'}"></rect>
+      <text x="${x+barW/2}" y="${chartH-h-6}" text-anchor="middle" font-size="10" fill="var(--muted)" font-family="inherit">${m.total>0?money(m.total).split('.')[0]:''}</text>
+      <text x="${x+barW/2}" y="${chartH+16}" text-anchor="middle" font-size="10" fill="var(--muted)" font-family="inherit">${m.label}</text>
+    </g>`;
+  }).join("");
+  const chartWidth = months.length*(barW+gap)-gap;
+
+  // ── Alertas urgentes ──
+  const alerts = [];
+  const vencidos = db.projects.filter(p=>!projectIsDone(p.id) && p.deliveryDate && p.deliveryDate < today);
+  if(vencidos.length) alerts.push({icon:'ti-calendar-x', color:'var(--red)', text:`${vencidos.length} proyecto${vencidos.length!==1?'s':''} con fecha de entrega vencida`, items:vencidos.slice(0,3).map(p=>p.name||"Sin nombre")});
+
+  const staleQuotes = db.quotes.filter(q=>{
+    if(q.status==='authorized' || !q.createdAt) return false;
+    const dias = Math.floor((Date.now()-new Date(q.createdAt+"T00:00:00").getTime())/86400000);
+    return (q.pipelineStatus==='no_response' && dias>=3) || (q.pipelineStatus==='sent' && dias>=5);
+  });
+  if(staleQuotes.length) alerts.push({icon:'ti-clock-exclamation', color:'var(--amber)', text:`${staleQuotes.length} cotización${staleQuotes.length!==1?'es':''} sin respuesta hace días`, items:staleQuotes.slice(0,3).map(q=>q.name||"Cotización")});
+
+  const overdueSubs = countOverdueSubSteps();
+  if(overdueSubs>0) alerts.push({icon:'ti-alert-triangle', color:'var(--red)', text:`${overdueSubs} fecha${overdueSubs!==1?'s':''} compromiso vencida${overdueSubs!==1?'s':''}`, items:[]});
+
+  el.innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;">
+      <div class="card" style="padding:14px;">
+        <div style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:10px;">Ventas autorizadas · últimos 6 meses</div>
+        <svg viewBox="0 0 ${chartWidth} ${chartH+28}" width="100%" height="${chartH+28}" style="overflow:visible;">${bars}</svg>
+      </div>
+      <div class="card" style="padding:14px;">
+        <div style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:10px;">Alertas urgentes</div>
+        ${alerts.length ? alerts.map(a=>`
+          <div style="display:flex;align-items:flex-start;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);">
+            <i class="ti ${a.icon}" style="color:${a.color};font-size:16px;margin-top:1px;"></i>
+            <div style="flex:1;min-width:0;">
+              <div style="font-size:12px;font-weight:600;color:${a.color};">${a.text}</div>
+              ${a.items.length?`<div style="font-size:11px;color:var(--muted);margin-top:2px;">${a.items.map(escapeHTML).join(' · ')}</div>`:''}
+            </div>
+          </div>`).join("")
+          : `<div style="font-size:12px;color:var(--muted);padding:8px 0;">✓ Sin pendientes urgentes por ahora.</div>`}
+      </div>
+    </div>`;
 }
 
 // ---- Ficha técnica (master-detail) ----
@@ -5168,7 +5245,7 @@ function renderProjectsPage(){
       ? `<button class="btn small" data-toggle-done="${p.id}" style="color:var(--amber);border-color:rgba(180,83,9,.25);" title="Reabrir">↩ Reabrir</button>`
       : `<button class="btn small" data-toggle-done="${p.id}" title="Marcar terminado">✓ Terminar</button>`;
 
-    return `<div class="proj-row" data-id="${p.id}" style="display:grid;grid-template-columns:278px 1fr 160px 160px 140px 110px;align-items:center;padding:10px 18px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .1s;gap:0;min-height:100px;">
+    return `<div class="proj-row" data-id="${p.id}" style="display:grid;grid-template-columns:278px 1fr 160px 160px 140px 110px 40px;align-items:center;padding:10px 18px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .1s;gap:0;min-height:100px;">
       <div style="width:260px;height:164px;border-radius:8px;overflow:hidden;border:1px solid var(--border);background:var(--bg3);flex-shrink:0;">${thumb}</div>
       <div style="padding:0 16px 0 16px;min-width:0;">
         <div style="font-size:14px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHTML(p.name||"Sin nombre")}</div>
@@ -5182,17 +5259,21 @@ function renderProjectsPage(){
         ${p.__seg==="auth" && daysSince!==null ? `<span style="font-size:11px;color:${ageColor};">${daysSince} días</span>` : ""}
       </div>
       <div style="display:flex;justify-content:flex-end;">${doneBtn}</div>
+      <div style="display:flex;justify-content:center;">
+        <button class="btn small danger" data-del-proj="${p.id}" title="Eliminar proyecto" style="padding:6px 8px;"><i class="ti ti-trash"></i></button>
+      </div>
     </div>`;
   }
 
   box.innerHTML = `
     <div class="table-wrap">
-      <div style="display:grid;grid-template-columns:278px 1fr 160px 160px 140px 110px;padding:10px 18px;background:var(--bg3);border-bottom:1px solid var(--border);border-radius:var(--radius) var(--radius) 0 0;gap:0;">
+      <div style="display:grid;grid-template-columns:278px 1fr 160px 160px 140px 110px 40px;padding:10px 18px;background:var(--bg3);border-bottom:1px solid var(--border);border-radius:var(--radius) var(--radius) 0 0;gap:0;">
         <span style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;">Foto</span>
         <span style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;padding-left:16px;">Proyecto</span>
         <span style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;">Entrega</span>
         <span style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;">Total</span>
         <span style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;">Estado</span>
+        <span></span>
         <span></span>
       </div>
       ${items.map(makeRow).join("")}
@@ -5202,8 +5283,24 @@ function renderProjectsPage(){
     el.addEventListener("mouseenter",()=>{ if(!el.dataset.hover) el.style.background="rgba(13,148,136,.04)"; });
     el.addEventListener("mouseleave",()=>{ el.style.background=""; });
     el.addEventListener("click",(e)=>{
-      if(e.target.closest("[data-toggle-done]")) return;
+      if(e.target.closest("[data-toggle-done]") || e.target.closest("[data-del-proj]")) return;
       openProjectDetail(el.dataset.id,"overview");
+    });
+  });
+
+  box.querySelectorAll("[data-del-proj]").forEach(btn=>{
+    btn.addEventListener("click",(e)=>{
+      e.stopPropagation();
+      const pid=btn.dataset.delProj;
+      const proj=db.projects.find(x=>x.id===pid); if(!proj) return;
+      if(!confirm('¿Eliminar el proyecto "'+escapeHTML(proj.name||"")+'" y todos sus datos? Esta acción no se puede deshacer.')) return;
+      deleteProjectPhotos(pid);
+      db.projects  = db.projects.filter(x=>x.id!==pid);
+      db.quotes    = db.quotes.filter(x=>x.projectId!==pid);
+      db.tasks     = db.tasks.filter(x=>x.projectId!==pid);
+      db.installs  = db.installs.filter(x=>x.projectId!==pid);
+      db.purchases = db.purchases.filter(x=>x.projectId!==pid);
+      deleteProject(pid); save(); renderProjectsPage();
     });
   });
 
@@ -5309,6 +5406,9 @@ function renderDetailFull(p, content){
         </button>
         <button data-toggle-q="${q.id}" style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:8px 6px;border:none;border-right:1px solid var(--border);background:transparent;cursor:pointer;font-size:12px;font-weight:600;color:${isAuth?"var(--red)":"var(--green)"};font-family:inherit;transition:background .1s;" onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background='transparent'">
           <i class="ti ti-${isAuth?"x":"check"}"></i> ${isAuth?"Desauth":"Autorizar"}
+        </button>
+        <button data-del-q="${q.id}" style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:8px 6px;border:none;border-right:1px solid var(--border);background:transparent;cursor:pointer;font-size:12px;font-weight:600;color:var(--red);font-family:inherit;transition:background .1s;" onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background='transparent'">
+          <i class="ti ti-trash"></i> Eliminar
         </button>
         <button data-more-q="${q.id}" style="padding:8px 14px;border:none;background:transparent;cursor:pointer;font-size:12px;font-weight:600;color:var(--muted);font-family:inherit;transition:background .1s;" onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background='transparent'" title="Más opciones">
           <i class="ti ti-dots"></i>
@@ -5621,15 +5721,17 @@ function openQuoteEditorPage(q){
 
     <!-- ── HEADER ── -->
     <div style="font-size:44px;font-weight:800;color:var(--accent2);letter-spacing:.5px;line-height:1.1;margin-bottom:6px;">Cotización</div>
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap;row-gap:8px;">
       <button class="btn icon" id="btnBackFromQuote"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg></button>
-      <input id="qNameInput" value="${escapeAttr(q.name||"Cotización")}" style="flex:1;background:transparent;border:none;border-bottom:2px solid var(--border);color:var(--text);font-family:inherit;font-size:17px;font-weight:700;padding:4px 0;outline:none;">
+      <input id="qNameInput" value="${escapeAttr(q.name||"Cotización")}" style="flex:1 1 160px;min-width:140px;background:transparent;border:none;border-bottom:2px solid var(--border);color:var(--text);font-family:inherit;font-size:17px;font-weight:700;padding:4px 0;outline:none;">
       <span class="badge ${q.status==='authorized'?'green':'amber'}" style="font-size:12px;">${q.status==='authorized'?'✓ Autorizada':'Borrador'}</span>
       <span style="font-size:12px;color:var(--muted);">Folio: ${escapeHTML((q.code||q.id.slice(0,8)).toUpperCase())}</span>
-      <button class="btn small ${q.status==='authorized'?'danger':'green'}" id="btnToggleAuth">${q.status==='authorized'?'<i class="ti ti-x"></i> Desautorizar':'<i class="ti ti-check"></i> Autorizar'}</button>
-      <button class="btn small" id="btnSaveQuote"><i class="ti ti-device-floppy"></i> Guardar</button>
-      <button class="btn small" id="btnQuotePDF2"><i class="ti ti-printer"></i> PDF</button>
-      <button class="btn small danger" id="btnDeleteQuote" title="Eliminar cotización"><i class="ti ti-trash"></i></button>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn small ${q.status==='authorized'?'danger':'green'}" id="btnToggleAuth">${q.status==='authorized'?'<i class="ti ti-x"></i> Desautorizar':'<i class="ti ti-check"></i> Autorizar'}</button>
+        <button class="btn small" id="btnSaveQuote"><i class="ti ti-device-floppy"></i> Guardar</button>
+        <button class="btn small" id="btnQuotePDF2"><i class="ti ti-printer"></i> PDF</button>
+        <button class="btn small danger" id="btnDeleteQuote" title="Eliminar cotización"><i class="ti ti-trash"></i> Eliminar</button>
+      </div>
     </div>
 
     <!-- ── BARRA SECUNDARIA ── -->
@@ -6671,6 +6773,55 @@ function bootNew(){
   const logo=localStorage.getItem("esma_logo_b64")||"";
   refreshLogo(logo);
 }
+
+// ── Ícono para "Agregar a pantalla de inicio" (Android/iPhone) ──
+// Usa el logo real subido en Ajustes si existe; si no, genera uno con
+// los colores de la marca en vez del ícono genérico azul de antes.
+function _setupAppIcon(){
+  try{
+    const canvas = document.createElement('canvas');
+    canvas.width = 192; canvas.height = 192;
+    const ctx = canvas.getContext('2d');
+    const applyIcon = () => {
+      const dataUrl = canvas.toDataURL('image/png');
+      let touchIcon = document.querySelector('link[rel="apple-touch-icon"]');
+      if(!touchIcon){ touchIcon = document.createElement('link'); touchIcon.rel = 'apple-touch-icon'; document.head.appendChild(touchIcon); }
+      touchIcon.href = dataUrl;
+      const manifestLink = document.querySelector('link[rel="manifest"]');
+      if(manifestLink){
+        const manifest = { name:"ESMA Industrial", short_name:"ESMA", display:"standalone", start_url:".", background_color:"#ffffff", theme_color:"#0d9488",
+          icons:[{src:dataUrl, sizes:"192x192", type:"image/png"},{src:dataUrl, sizes:"512x512", type:"image/png"}] };
+        manifestLink.href = "data:application/json," + encodeURIComponent(JSON.stringify(manifest));
+      }
+    };
+    const drawFallback = () => {
+      const grad = ctx.createLinearGradient(0,0,192,192);
+      grad.addColorStop(0,'#0f172a'); grad.addColorStop(1,'#0d9488');
+      ctx.fillStyle = grad; ctx.fillRect(0,0,192,192);
+      ctx.fillStyle = '#fff';
+      ctx.font = '900 84px Arial, sans-serif';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('E', 96, 100);
+      applyIcon();
+    };
+    const logoB64 = localStorage.getItem("esma_logo_b64");
+    if(logoB64){
+      const img = new Image();
+      img.onload = () => {
+        ctx.fillStyle = '#ffffff'; ctx.fillRect(0,0,192,192);
+        const scale = Math.min(192/img.width, 192/img.height) * 0.85;
+        const w = img.width*scale, h = img.height*scale;
+        ctx.drawImage(img, (192-w)/2, (192-h)/2, w, h);
+        applyIcon();
+      };
+      img.onerror = drawFallback;
+      img.src = logoB64;
+    } else {
+      drawFallback();
+    }
+  }catch(e){ console.warn("No se pudo generar el ícono de la app:", e); }
+}
+document.addEventListener("DOMContentLoaded", _setupAppIcon);
 
 document.addEventListener("DOMContentLoaded", bootNew);
 
