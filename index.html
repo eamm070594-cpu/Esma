@@ -3794,21 +3794,27 @@ function buildQuotePDFHTML(p, q, extraQuotes, includeIVA, includePhoto){
   const iva = includeIVA ? subtotal * 0.16 : 0;
   const total = subtotal + iva;
 
-  // Portada: imagen grande de presentación arriba de todo (sin desglosar nada confidencial)
+  // Portada (página 1 completa): foto + logo de la empresa, nada más.
+  // La descripción, tabla y totales van hasta la página 2 (salto de página forzado).
   const heroPhoto = includePhoto ? (q.refPhoto || "") : "";
+  const coverLogoHTML = logoSrc
+    ? `<img src="${logoSrc}" alt="${escapeHTML(emp.nombre||"ESMA")}">`
+    : `<div class="cover-logo-text">${escapeHTML(emp.nombre||"ESMA INDUSTRIAL")}</div>`;
   const heroHTML = heroPhoto
-    ? `<div class="hero">
-        <img src="${heroPhoto}" alt="">
-        <div class="hero-overlay"></div>
-        <div class="hero-content">
-          <div class="hero-brand">${escapeHTML(emp.nombre||"ESMA INDUSTRIAL")}</div>
-          <div class="hero-tag">${escapeHTML(emp.titulo||"Propuesta de Servicios")}</div>
+    ? `<div class="cover-page">
+        <img class="cover-img" src="${heroPhoto}" alt="">
+        <div class="cover-overlay"></div>
+        <div class="cover-logo">${coverLogoHTML}</div>
+        <div class="cover-content">
+          <div class="cover-brand">${escapeHTML(emp.nombre||"ESMA INDUSTRIAL")}</div>
+          <div class="cover-tag">${escapeHTML(emp.titulo||"Propuesta de Servicios")}</div>
         </div>
       </div>`
-    : `<div class="hero hero-solid">
-        <div class="hero-content" style="position:static;text-align:center;">
-          <div class="hero-brand">${escapeHTML(emp.nombre||"ESMA INDUSTRIAL")}</div>
-          <div class="hero-tag">${escapeHTML(emp.titulo||"Propuesta de Servicios")}</div>
+    : `<div class="cover-page cover-solid">
+        <div class="cover-logo">${coverLogoHTML}</div>
+        <div class="cover-content" style="position:static;text-align:center;">
+          <div class="cover-brand">${escapeHTML(emp.nombre||"ESMA INDUSTRIAL")}</div>
+          <div class="cover-tag">${escapeHTML(emp.titulo||"Propuesta de Servicios")}</div>
         </div>
       </div>`;
 
@@ -3824,31 +3830,31 @@ function buildQuotePDFHTML(p, q, extraQuotes, includeIVA, includePhoto){
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: 'Inter', Arial, sans-serif; color: #0f172a; background: #fff; }
 
-  /* ── WATERMARK ── */
-  .wm { position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%) rotate(-30deg);
-    width: 55%; opacity: .18; z-index: 0; pointer-events: none; }
-
   /* ── PAGE WRAPPER ── */
   .page { padding: 0; position: relative; z-index: 1; min-height: 100vh; display: flex; flex-direction: column; }
 
-  /* ── PORTADA / HERO ── */
-  .hero { width: 100%; height: 320px; position: relative; overflow: hidden; page-break-inside: avoid; }
-  .hero img { width: 100%; height: 100%; object-fit: cover; display: block; }
-  .hero-overlay { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(15,23,42,0) 35%, rgba(15,23,42,.88) 100%); }
-  .hero-solid { background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 55%, #2563eb 100%); display: flex; align-items: center; justify-content: center; }
-  .hero-content { position: absolute; bottom: 30px; left: 24mm; right: 24mm; }
-  .hero-brand { color: #fff; font-size: 34px; font-weight: 900; letter-spacing: -.5px; text-shadow: 0 2px 12px rgba(0,0,0,.45); }
-  .hero-tag { color: rgba(255,255,255,.9); font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 2.5px; margin-top: 8px; }
+  /* ── PORTADA (página 1 completa: foto + logo, nada más) ── */
+  .cover-page { width: 100%; height: 11in; position: relative; overflow: hidden;
+    page-break-after: always; break-after: page; }
+  .cover-page img.cover-img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .cover-overlay { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(15,23,42,.05) 0%, rgba(15,23,42,.1) 45%, rgba(15,23,42,.92) 100%); }
+  .cover-solid { background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 55%, #2563eb 100%); display: flex; align-items: center; justify-content: center; }
+  .cover-logo { position: absolute; top: 40px; left: 24mm; display: flex; align-items: center; gap: 10px; }
+  .cover-logo img { height: 46px; object-fit: contain; filter: drop-shadow(0 2px 10px rgba(0,0,0,.5)); }
+  .cover-logo-text { color: #fff; font-size: 18px; font-weight: 900; letter-spacing: -.3px; text-shadow: 0 2px 8px rgba(0,0,0,.5); }
+  .cover-content { position: absolute; bottom: 50px; left: 24mm; right: 24mm; }
+  .cover-brand { color: #fff; font-size: 40px; font-weight: 900; letter-spacing: -.5px; text-shadow: 0 2px 14px rgba(0,0,0,.5); }
+  .cover-tag { color: rgba(255,255,255,.92); font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: 3px; margin-top: 10px; }
 
   /* ── ACCENT STRIPE ── */
   .stripe { height: 7px; background: linear-gradient(90deg, #1e3a8a 0%, #2563eb 60%, #3b82f6 100%); }
 
-  /* ── HEADER ── */
-  .header { display: flex; justify-content: space-between; align-items: flex-start;
-    padding: 20px 24mm 18px; border-bottom: 1px solid #e2e8f0; }
-  .logo-area { display: flex; flex-direction: column; gap: 6px; }
-  .logo-area img { height: 220px; object-fit: contain; }
-  .logo-area .emp-name { font-size: 18px; font-weight: 900; color: #1e3a8a; letter-spacing: -.3px; }
+  /* ── HEADER (página 2 en adelante: compacto, la marca ya vive en la portada) ── */
+  .header { display: flex; justify-content: space-between; align-items: center;
+    padding: 16px 24mm; border-bottom: 1px solid #e2e8f0; }
+  .logo-area { display: flex; align-items: center; gap: 10px; }
+  .logo-area img { height: 34px; object-fit: contain; }
+  .logo-area .emp-name { font-size: 15px; font-weight: 900; color: #1e3a8a; letter-spacing: -.3px; }
   .header-right { text-align: right; }
   .doc-badge { display: inline-block; background: #1e3a8a; color: #fff; font-size: 10px;
     font-weight: 800; letter-spacing: 1.5px; text-transform: uppercase;
@@ -3912,10 +3918,9 @@ function buildQuotePDFHTML(p, q, extraQuotes, includeIVA, includePhoto){
 </style>
 </head>
 <body>
-${logoSrc ? `<img class="wm" src="${logoSrc}" alt="">` : ""}
+${heroHTML}
 
 <div class="page">
-  ${heroHTML}
   <div class="stripe"></div>
 
   <!-- HEADER -->
