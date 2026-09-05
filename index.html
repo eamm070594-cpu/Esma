@@ -430,6 +430,23 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);overscroll-b
   .ficha-layout[data-mobile-detail="1"] .ficha-list{display:none;}
   .ficha-layout:not([data-mobile-detail="1"]) .ficha-detail{display:none;}
   .ficha-back{display:flex;}
+
+  /* Encabezados de página: título y botones se acomodan en su propia fila
+     en vez de salirse de la pantalla en celular. */
+  .page-header{flex-wrap:wrap;row-gap:10px;}
+  .page-header > *:last-child:not(:only-child){flex-wrap:wrap;width:100%;display:flex;gap:8px;}
+  .page-header > *:last-child:not(:only-child) .btn,
+  .page-header > button.btn:last-child:not(:only-child){flex:1;justify-content:center;min-width:0;white-space:normal;}
+
+  /* Ficha del proyecto: rejillas de columnas fijas que se cortaban en celular. */
+  .detail-kpi-grid{grid-template-columns:repeat(2,1fr)!important;}
+  .detail-info-photo-grid{grid-template-columns:1fr!important;}
+  .detail-fields-grid{grid-template-columns:1fr!important;}
+
+  /* Editor de cotización: columna fija de 260px hacía que la tabla de la
+     derecha se saliera de la pantalla — se apilan en una sola columna. */
+  .quote-editor-grid{grid-template-columns:1fr!important;}
+  .quote-editor-left-col{position:static!important;}
 }
 .dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
 .dot.green{background:var(--green);}
@@ -3103,32 +3120,11 @@ function openQuoteEditor(q){
       const extraQ = extraIds.map(id=>db.quotes.find(x=>x.id===id)).filter(Boolean);
       const includeIVA = box.querySelector("#chkIVA").checked;
       overlay.remove();
-      const iframe = document.createElement("iframe");
-      iframe.style.cssText="position:fixed;right:0;bottom:0;width:0;height:0;border:0;";
-      document.body.appendChild(iframe);
-      const doc = iframe.contentWindow.document;
-      doc.open(); doc.write(buildQuotePDFHTML(proj, q, extraQ, includeIVA)); doc.close();
-      iframe.onload = ()=>{ try{ iframe.contentWindow.focus(); iframe.contentWindow.print(); } finally { setTimeout(()=>iframe.remove(),1000); }};
-      setTimeout(()=>{ try{ iframe.contentWindow.focus(); iframe.contentWindow.print(); }catch(e){} }, 450);
+      _printHTML(buildQuotePDFHTML(proj, q, extraQ, includeIVA));
     };
   });
   on($("btnQuotePDF"),"click", ()=>{
-    // Generación "sin popups": iframe oculto + print => Guardar como PDF
-    const iframe = document.createElement("iframe");
-    iframe.style.position="fixed";
-    iframe.style.right="0";
-    iframe.style.bottom="0";
-    iframe.style.width="0";
-    iframe.style.height="0";
-    iframe.style.border="0";
-    document.body.appendChild(iframe);
-    const doc = iframe.contentWindow.document;
-    doc.open();
-    doc.write(buildQuotePDFHTML(db.projects.find(x=>x.id===q.projectId)||{name:""}, q));
-    doc.close();
-    iframe.onload = ()=>{ try{ iframe.contentWindow.focus(); iframe.contentWindow.print(); } finally { setTimeout(()=>iframe.remove(), 1000); } };
-    // fallback (algunos navegadores no disparan onload por document.write)
-    setTimeout(()=>{ try{ iframe.contentWindow.focus(); iframe.contentWindow.print(); } catch(e){} }, 450);
+    _printHTML(buildQuotePDFHTML(db.projects.find(x=>x.id===q.projectId)||{name:""}, q));
   });
 
   if($("qMarginPct")){
@@ -4731,10 +4727,7 @@ function _renderSecCotizaciones(filtersEl, contentEl){
       // Group by project for PDF — use first quote's project
       const firstQ = selected[0];
       const proj = db.projects.find(x=>x.id===firstQ.projectId)||{name:"Cotizaciones"};
-      const iframe=document.createElement("iframe"); iframe.style.cssText="position:fixed;right:0;bottom:0;width:0;height:0;border:0;"; document.body.appendChild(iframe);
-      const doc=iframe.contentWindow.document; doc.open(); doc.write(buildQuotePDFHTML(proj, selected[0], selected.slice(1))); doc.close();
-      iframe.onload=()=>{ try{ iframe.contentWindow.focus(); iframe.contentWindow.print(); } finally { setTimeout(()=>iframe.remove(),1000); }};
-      setTimeout(()=>{ try{ iframe.contentWindow.focus(); iframe.contentWindow.print(); }catch(e){} },450);
+      _printHTML(buildQuotePDFHTML(proj, selected[0], selected.slice(1)));
     });
 
     // Checkboxes
@@ -5467,7 +5460,7 @@ function renderDetailFull(p, content){
     <div id="photoUploading" style="display:none;font-size:12px;color:var(--muted);padding:4px 0 8px;"><i class="ti ti-upload"></i> Subiendo fotos...</div>
 
     <!-- KPIs -->
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px;">
+    <div class="detail-kpi-grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px;">
       <div class="kpi-box" style="padding:10px 12px;">
         <div class="kl">Total autorizado</div>
         <div class="kv" style="font-size:18px;color:var(--accent);">$${money(authTotal)}</div>
@@ -5488,9 +5481,9 @@ function renderDetailFull(p, content){
     </div>
 
     <!-- Datos + Fotos -->
-    <div style="display:grid;grid-template-columns:1fr 260px;gap:10px;margin-bottom:10px;align-items:start;">
+    <div class="detail-info-photo-grid" style="display:grid;grid-template-columns:1fr 260px;gap:10px;margin-bottom:10px;align-items:start;">
       <div class="card" style="padding:12px 14px;">
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+        <div class="detail-fields-grid" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
           <div>
             <div class="field-label" style="margin-top:0;">Nombre del proyecto</div>
             <div class="field"><input id="pName" value="${escapeAttr(p.name||"")}"></div>
@@ -5810,10 +5803,10 @@ function openQuoteEditorPage(q){
     </div>
 
     <!-- ── LAYOUT DOS COLUMNAS ── -->
-    <div style="display:grid;grid-template-columns:260px 1fr;gap:16px;align-items:start;">
+    <div class="quote-editor-grid" style="display:grid;grid-template-columns:260px 1fr;gap:16px;align-items:start;">
 
       <!-- COLUMNA IZQUIERDA: Foto + Desglose -->
-      <div style="position:sticky;top:0;">
+      <div class="quote-editor-left-col" style="position:sticky;top:0;">
 
         <!-- Foto de referencia -->
         <div class="card" style="padding:0;overflow:hidden;margin-bottom:12px;">
@@ -7240,16 +7233,25 @@ function buildGeneralReportHTML(){
 </body>
 </html>`;
 }
+// Genera e imprime un documento HTML como PDF. Usa una pestaña nueva en vez
+// de un iframe oculto porque Safari en iOS no soporta imprimir el contenido
+// de un iframe — con una pestaña/ventana real sí funciona en todos lados.
+function _printHTML(html){
+  const win = window.open('', '_blank');
+  if(!win){
+    alert("El navegador bloqueó la ventana para generar el PDF. Permite ventanas emergentes para este sitio e intenta de nuevo.");
+    return;
+  }
+  win.document.open();
+  win.document.write(html);
+  win.document.close();
+  let printed = false;
+  const doPrint = () => { if(printed) return; printed = true; try{ win.focus(); win.print(); }catch(e){} };
+  win.onload = doPrint;
+  setTimeout(doPrint, 600);
+}
 function printGeneralReport(){
-  const iframe=document.createElement("iframe");
-  iframe.style.cssText="position:fixed;right:0;bottom:0;width:0;height:0;border:0;";
-  document.body.appendChild(iframe);
-  const doc=iframe.contentWindow.document;
-  doc.open();
-  doc.write(buildGeneralReportHTML());
-  doc.close();
-  iframe.onload=()=>{ try{ iframe.contentWindow.focus(); iframe.contentWindow.print(); } finally { setTimeout(()=>iframe.remove(),1000); } };
-  setTimeout(()=>{ try{ iframe.contentWindow.focus(); iframe.contentWindow.print(); }catch(e){} },450);
+  _printHTML(buildGeneralReportHTML());
 }
 
 function openPDFSelector(projectId){
@@ -7309,17 +7311,9 @@ function openPDFSelector(projectId){
       save();
       const selQuotes = selected.map(id=>db.quotes.find(x=>x.id===id)).filter(Boolean);
       closeSheet();
-      setTimeout(()=>{
-        const iframe=document.createElement("iframe");
-        iframe.style.cssText="position:fixed;right:0;bottom:0;width:0;height:0;border:0;";
-        document.body.appendChild(iframe);
-        const doc=iframe.contentWindow.document;
-        doc.open();
-        doc.write(buildQuotePDFHTML(proj, selQuotes[0], selQuotes.slice(1), includeIVA, includePhoto));
-        doc.close();
-        iframe.onload=()=>{ try{ iframe.contentWindow.focus(); iframe.contentWindow.print(); } finally { setTimeout(()=>iframe.remove(),1000); }};
-        setTimeout(()=>{ try{ iframe.contentWindow.focus(); iframe.contentWindow.print(); }catch(e){} },450);
-      }, 300);
+      // Se genera de inmediato (no en un setTimeout) para que Safari en iOS no
+      // bloquee la ventana nueva — solo funciona si abre justo en el clic.
+      _printHTML(buildQuotePDFHTML(proj, selQuotes[0], selQuotes.slice(1), includeIVA, includePhoto));
     }}
   ]);
 
@@ -8243,13 +8237,7 @@ function printBOM(bom){
     <div style="margin-top:20px;font-size:11px;color:#888;">Generado por ESMA Industrial · ${bomToPrint.length} material${bomToPrint.length!==1?'es':''} a comprar${bom.length-bomToPrint.length>0?' · '+(bom.length-bomToPrint.length)+' cubierto'+(bom.length-bomToPrint.length!==1?'s':'')+' con stock':''}</div>
   </body></html>`;
 
-  const iframe = document.createElement('iframe');
-  iframe.style.cssText='position:fixed;right:0;bottom:0;width:0;height:0;border:0;';
-  document.body.appendChild(iframe);
-  const doc = iframe.contentWindow.document;
-  doc.open(); doc.write(html); doc.close();
-  iframe.onload = ()=>{ try{ iframe.contentWindow.focus(); iframe.contentWindow.print(); } finally { setTimeout(()=>iframe.remove(),1000); }};
-  setTimeout(()=>{ try{ iframe.contentWindow.focus(); iframe.contentWindow.print(); }catch(e){} }, 450);
+  _printHTML(html);
 }
 
 
