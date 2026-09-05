@@ -750,6 +750,7 @@ tbody tr:hover td{background:rgba(13,148,136,.03);}
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 </head>
 <body>
 
@@ -858,9 +859,9 @@ tbody tr:hover td{background:rgba(13,148,136,.03);}
       <div style="height:16px"></div>
       <div style="display:flex;gap:8px;">
         <button class="btn primary" id="btnLogin" style="flex:1;justify-content:center;">Entrar</button>
-        <button class="btn" id="btnSeedDemo">Demo</button>
+        <button class="btn" id="btnSeedDemo" title="Borra todos los datos reales y los reemplaza con datos de ejemplo">Borrar y cargar ejemplo</button>
       </div>
-      <div style="font-size:12px;color:var(--muted);margin-top:10px;">Demo: admin@esma / 1234</div>
+      <div style="font-size:12px;color:var(--red);margin-top:10px;">⚠️ "Borrar y cargar ejemplo" borra TODOS los datos reales. No es un modo de prueba: usa tu correo y contraseña reales para entrar.</div>
       <div style="font-size:12px;color:var(--red);margin-top:6px;display:none" id="loginMsg"></div>
     </div>
   </div>
@@ -1185,6 +1186,7 @@ const FB_PATH = "esma_db";  // ruta raíz en Realtime Database
 
 let _fbApp = null;
 let _fbDb  = null;
+let firestore = null;
 let _fbReady = false;
 let _fbListener = null;
 
@@ -1192,7 +1194,7 @@ let _fbInitPromise = null;
 
 async function _initFirebase(){
   if(_fbReady) return;
-  if(_fbInitPromise) return _fbInitPromise; // avoid double sign-in if called concurrently
+  if(_fbInitPromise) return _fbInitPromise;
 
   _fbInitPromise = (async () => {
     try {
@@ -1207,18 +1209,14 @@ async function _initFirebase(){
         _fbApp = firebase.apps[0];
       }
       _fbDb = firebase.database();
+      firestore = firebase.firestore();
 
-      // Sign in anonymously to Firebase Auth so security rules
-      // ("auth != null") can allow read/write. This is separate from
-      // the app's own email/password login screen — it just gives
-      // Firebase a real auth session under the hood.
-      const auth = firebase.auth();
-      if(!auth.currentUser){
-        await auth.signInAnonymously();
-      }
+      // NOTA: ya no se usa inicio de sesión anónimo. El acceso real (a Realtime
+      // Database y a Firestore) requiere que el usuario inicie sesión con su
+      // correo/contraseña real — ver login()/_restoreFirebaseSession().
 
       _fbReady = true;
-      console.log("Firebase Realtime Database listo (auth uid:", auth.currentUser?.uid, ")");
+      console.log("Firebase listo (app + database + firestore inicializados)");
     } catch(e){
       console.error("Firebase init error:", e);
     } finally {
@@ -1303,7 +1301,7 @@ function advanceProjectStage(pid){
   p.stage = PROJECT_STAGES[idx+1].id;
   p.stageUpdatedAt = todayISO();
   if(p.stage==='inicio' && !p.inicioDate) p.inicioDate = todayISO();
-  save(); renderDashboardPage();
+  saveProject(p); save(); renderDashboardPage();
 }
 function setProjectStage(pid, stageId){
   const p = db.projects.find(x=>x.id===pid); if(!p) return;
@@ -1314,7 +1312,7 @@ function setProjectStage(pid, stageId){
   p.stage = stageId;
   p.stageUpdatedAt = todayISO();
   if(p.stage==='inicio' && !p.inicioDate) p.inicioDate = todayISO();
-  save(); renderDashboardPage();
+  saveProject(p); save(); renderDashboardPage();
 }
 
 // ── Vínculo Etapas principales ↔ Flujo de producción ──
@@ -1493,25 +1491,25 @@ function addSubStep(pid){
   const p = db.projects.find(x=>x.id===pid); if(!p) return;
   if(!Array.isArray(p.subSteps)) p.subSteps = [];
   p.subSteps.push({id:uid(), title:'', dueDate:'', done:false});
-  save(); renderDashboardPage();
+  saveProject(p); renderDashboardPage();
   setTimeout(()=>{ const els=document.querySelectorAll(`[data-field-sub][data-pid="${pid}"]`); const el=els[els.length-1]; if(el) el.focus(); },50);
 }
 function updateSubStep(pid, subId, field, value){
   const p = db.projects.find(x=>x.id===pid); if(!p) return;
   const s = (p.subSteps||[]).find(x=>x.id===subId); if(!s) return;
   s[field] = value;
-  save();
+  saveProject(p);
 }
 function toggleSubStep(pid, subId){
   const p = db.projects.find(x=>x.id===pid); if(!p) return;
   const s = (p.subSteps||[]).find(x=>x.id===subId); if(!s) return;
   s.done = !s.done;
-  save(); renderDashboardPage();
+  saveProject(p); renderDashboardPage();
 }
 function deleteSubStep(pid, subId){
   const p = db.projects.find(x=>x.id===pid); if(!p) return;
   p.subSteps = (p.subSteps||[]).filter(x=>x.id!==subId);
-  save(); renderDashboardPage();
+  saveProject(p); renderDashboardPage();
 }
 function isSubStepOverdue(s){
   if(s.done || !s.dueDate) return false;
@@ -1545,7 +1543,7 @@ function toggleRouteActivity(pid, key){
   const p = db.projects.find(x=>x.id===pid); if(!p) return;
   if(!p.activityDone) p.activityDone = {};
   p.activityDone[key] = !p.activityDone[key];
-  save(); renderDashboardPage();
+  saveProject(p); renderDashboardPage();
 }
 function getMaterialStock(desc){
   const stock = db.settings.stockItems || {};
@@ -1917,7 +1915,13 @@ function applyRemoteData(data){
   }
   // Preserve local session
   const session = db?.settings?.session || {userId:""};
+  // projects/quotes ya viven en Firestore (ver subscribeFirestoreRealtime) —
+  // no dejar que el bloque viejo de Realtime Database los sobrescriba.
+  const keepProjects = db?.projects;
+  const keepQuotes = db?.quotes;
   db = data;
+  if(keepProjects) db.projects = keepProjects;
+  if(keepQuotes) db.quotes = keepQuotes;
   if(db.settings) db.settings.session = session;
   normalizeDB();
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(db)); } catch(e){}
@@ -1932,6 +1936,82 @@ function applyRemoteData(data){
   } catch(e){}
 }
 
+// ── FIRESTORE: Proyectos y Cotizaciones (Etapa 2 de la migración) ──────
+function _cleanForFirestore(obj){
+  // Firestore rechaza "undefined" — quita esas llaves antes de escribir.
+  return JSON.parse(JSON.stringify(obj));
+}
+async function saveProject(p){
+  try{
+    const { id, ...rest } = _cleanForFirestore(p);
+    await firestore.collection('projects').doc(id).set(rest, {merge:true});
+  }catch(e){ console.error("saveProject error:", e); _showSaveToast("❌ No se pudo guardar el proyecto en la nube.", "error"); }
+}
+async function deleteProject(id){
+  try{
+    deleteProjectPhotos(id);
+    const batch = firestore.batch();
+    for(const col of ['quotes','tasks','installs','purchases','planItems']){
+      const snap = await firestore.collection(col).where('projectId','==',id).get();
+      snap.forEach(d=>batch.delete(d.ref));
+    }
+    const flujoSnap = await firestore.collection('projects').doc(id).collection('flujo').get();
+    flujoSnap.forEach(d=>batch.delete(d.ref));
+    batch.delete(firestore.collection('projects').doc(id));
+    await batch.commit();
+  }catch(e){ console.error("deleteProject error:", e); _showSaveToast("❌ No se pudo borrar el proyecto en la nube.", "error"); }
+}
+async function saveQuote(q){
+  try{
+    const { id, ...rest } = _cleanForFirestore(q);
+    // No guardar fotos de referencia demasiado pesadas (límite de Firestore: 1MB por documento)
+    if(rest.refPhoto && typeof rest.refPhoto === 'string' && rest.refPhoto.length > 900000){
+      console.warn("refPhoto demasiado grande, no se guardó en Firestore para la cotización", id);
+      rest.refPhoto = null;
+    }
+    await firestore.collection('quotes').doc(id).set(rest, {merge:true});
+  }catch(e){ console.error("saveQuote error:", e); _showSaveToast("❌ No se pudo guardar la cotización en la nube.", "error"); }
+}
+async function deleteQuote(id){
+  try{ await firestore.collection('quotes').doc(id).delete(); }
+  catch(e){ console.error("deleteQuote error:", e); _showSaveToast("❌ No se pudo borrar la cotización en la nube.", "error"); }
+}
+async function saveFlujoStage(pid, stageId){
+  try{
+    const flujo = db.flujos[pid]; if(!flujo) return;
+    const s = flujo.find(x=>x.stageId===stageId); if(!s) return;
+    await firestore.collection('projects').doc(pid).collection('flujo').doc(stageId).set({
+      status: s.status||'pending', assignee: s.assignee||'', startDate: s.startDate||null,
+      endDate: s.endDate||null, notes: s.notes||'', active: s.active !== false,
+    }, {merge:true});
+  }catch(e){ console.error("saveFlujoStage error:", e); }
+}
+
+function _mergeFirestoreDocChange(arr, change){
+  if(change.type === 'removed'){
+    const i = arr.findIndex(x=>x.id===change.doc.id);
+    if(i>=0) arr.splice(i,1);
+    return;
+  }
+  const data = { id: change.doc.id, ...change.doc.data() };
+  const i = arr.findIndex(x=>x.id===data.id);
+  if(i>=0) arr[i] = data; else arr.unshift(data);
+}
+let _firestoreListenersStarted = false;
+function subscribeFirestoreRealtime(){
+  if(_firestoreListenersStarted || !firestore) return;
+  _firestoreListenersStarted = true;
+  firestore.collection('projects').onSnapshot(snap=>{
+    snap.docChanges().forEach(c=>_mergeFirestoreDocChange(db.projects, c));
+    try{ renderProjectsPage(); }catch(e){}
+    try{ renderDashboardPage(); }catch(e){}
+    try{ buildTopbar(); }catch(e){}
+  }, err=>console.error("Firestore projects listener error:", err));
+  firestore.collection('quotes').onSnapshot(snap=>{
+    snap.docChanges().forEach(c=>_mergeFirestoreDocChange(db.quotes, c));
+    try{ renderDashboardPage(); }catch(e){}
+  }, err=>console.error("Firestore quotes listener error:", err));
+}
 
 // Auto-pull cada 60s si no hubo cambios locales recientes y no hay sync en curso
 setInterval(()=>{ if(GS_URL && !_syncBusy && (Date.now()-(_lastSaveTime||0))>90000) gsPullOnBoot(); }, 60000);
@@ -1940,16 +2020,44 @@ setInterval(()=>{ if(GS_URL && !_syncBusy && (Date.now()-(_lastSaveTime||0))>900
 let _autoSyncTimer = null;
 function startAutoSync(){ /* handled by setInterval above */ }
 
-function currentUser(){
-  const id = db.settings.session?.userId;
-  return db.settings.users.find(u=>u.id===id) || null;
+// ── AUTENTICACIÓN REAL (Firebase Auth + Firestore, reemplaza el login por
+// contraseña en texto plano que vivía en db.settings.users) ──────────────
+let _currentProfile = null;
+function currentUser(){ return _currentProfile; }
+
+async function _restoreFirebaseSession(){
+  await _initFirebase();
+  return new Promise(resolve=>{
+    let resolved = false;
+    firebase.auth().onAuthStateChanged(async (user)=>{
+      if(resolved) return; // solo nos interesa el estado inicial al arrancar
+      resolved = true;
+      if(user && user.email){
+        try{
+          const snap = await firestore.collection('users').doc(user.uid).get();
+          _currentProfile = snap.exists ? {id:snap.id, ...snap.data()} : {id:user.uid, email:user.email, name:user.email, role:'user'};
+        }catch(e){ console.error("Error leyendo perfil:", e); _currentProfile = null; }
+      } else {
+        _currentProfile = null;
+      }
+      resolve();
+    });
+  });
 }
-function login(email, pass){
-  const u = db.settings.users.find(x=>x.email.toLowerCase()===String(email||"").toLowerCase() && x.pass===String(pass||""));
-  if(!u) return null;
-  db.settings.session.userId = u.id; save(); return u;
+
+async function login(email, pass){
+  try{
+    await _initFirebase();
+    const cred = await firebase.auth().signInWithEmailAndPassword(String(email||"").trim(), String(pass||""));
+    const snap = await firestore.collection('users').doc(cred.user.uid).get();
+    _currentProfile = snap.exists ? {id:snap.id, ...snap.data()} : {id:cred.user.uid, email:cred.user.email, name:cred.user.email, role:'user'};
+    return _currentProfile;
+  }catch(e){
+    console.error("Login error:", e);
+    return null;
+  }
 }
-function logout(){ db.settings.session.userId=""; save(); location.reload(); }
+function logout(){ firebase.auth().signOut().catch(()=>{}); _currentProfile = null; location.reload(); }
 
 let seg="noauth", sortMode="delivery", searchTerm="", selectedProjectId="", mainTab="overview", drawerMode="calendar";
 let salesCursor=new Date(); salesCursor.setDate(1);
@@ -2011,8 +2119,8 @@ function renderQuoteBreakdown(q){
   const t = quoteSellTotals(q);
   const qty = Math.max(1, Number(q.qty||1));
   const cd = t.mp + t.ruta; // costo directo sin extras
-  const mpPct  = cd > 0 ? ((t.mp  / cd) * 100).toFixed(1)+"%" : "";
-  const rutaPct = cd > 0 ? ((t.ruta / cd) * 100).toFixed(1)+"%" : "";
+  const mpPct  = cd > 0 ? "("+((t.mp  / cd) * 100).toFixed(1)+"%)" : "";
+  const rutaPct = cd > 0 ? "("+((t.ruta / cd) * 100).toFixed(1)+"%)" : "";
   $("bdCosto").textContent = "$"+money(cd);
   $("bdMP").textContent    = "$"+money(t.mp);
   $("bdRuta").textContent  = "$"+money(t.ruta);
@@ -2563,6 +2671,9 @@ function createQuote(projectId){
   const q={id:uid(), projectId, code: folio, name:"Cotización "+folio, qty:1, status:"draft", saleType:"manufactured", marginPct:25, createdAt:todayISO(), products:[], routes:[], extras:[]};
   db.quotes.unshift(q);
   _onQuoteCreated(projectId);
+  saveQuote(q);
+  const proj = db.projects.find(x=>x.id===projectId);
+  if(proj) saveProject(proj);
   save(); return q;
 }
 function routeByName(name){ return (db.settings.routeDB||[]).find(r=>r.name===name)||null; }
@@ -2657,29 +2768,55 @@ function createMatPicker(currentValue, onChange){
       });
     }
   }
+  function positionDropdown(){
+    const r = input.getBoundingClientRect();
+    dropdown.style.position = "fixed";
+    dropdown.style.left = r.left+"px";
+    dropdown.style.width = r.width+"px";
+    dropdown.style.right = "auto";
+    // Flip above the input if there isn't enough room below
+    const maxH = 240;
+    if(window.innerHeight - r.bottom < maxH && r.top > maxH){
+      dropdown.style.top = "auto";
+      dropdown.style.bottom = (window.innerHeight - r.top + 4)+"px";
+    } else {
+      dropdown.style.bottom = "auto";
+      dropdown.style.top = (r.bottom+4)+"px";
+    }
+  }
+  function closeDrop(){
+    dropdown.classList.remove("open");
+    if(dropdown.parentNode) dropdown.parentNode.removeChild(dropdown);
+    window.removeEventListener("scroll", positionDropdown, true);
+    window.removeEventListener("resize", positionDropdown);
+  }
   function selectVal(val){
     input.value=val;
-    dropdown.classList.remove("open");
+    closeDrop();
     onChange(val);
   }
   function openDrop(){
+    document.body.appendChild(dropdown);
+    positionDropdown();
     dropdown.classList.add("open");
     searchEl.value="";
     renderList("");
     setTimeout(()=>searchEl.focus(),30);
+    window.addEventListener("scroll", positionDropdown, true);
+    window.addEventListener("resize", positionDropdown);
   }
   input.addEventListener("click", openDrop);
   input.addEventListener("focus", openDrop);
   searchEl.addEventListener("input",()=>renderList(searchEl.value));
-  searchEl.addEventListener("keydown",(e)=>{ if(e.key==="Escape"){ dropdown.classList.remove("open"); } });
+  searchEl.addEventListener("keydown",(e)=>{ if(e.key==="Escape"){ closeDrop(); } });
   addBtn.addEventListener("click",(e)=>{
     e.preventDefault(); e.stopPropagation();
     const prefill=searchEl.value.trim()||input.value.trim();
-    dropdown.classList.remove("open");
+    closeDrop();
     showAddMaterialModal(prefill,(newMat)=>selectVal(newMat.desc));
   });
   document.addEventListener("mousedown",(e)=>{
-    if(!wrapper.contains(e.target)) dropdown.classList.remove("open");
+    if(!wrapper.contains(e.target) && !dropdown.contains(e.target)) closeDrop();
   },{capture:true});
   return wrapper;
 }
@@ -3969,6 +4106,9 @@ function exportAuthorizedQuotesCSV(){
 function openEmails(){ openDrawer("db"); alert("En esta versión solo guardas correos (admin). No se envían correos desde el HTML."); }
 
 function seedDemo(){
+  const advertencia = "⚠️ ADVERTENCIA ⚠️\n\nEsto BORRARÁ TODA la información real guardada (todos los proyectos, cotizaciones, usuarios, etc.) y la reemplazará con datos de ejemplo. Esta acción también sobrescribirá los datos en la nube y NO se puede deshacer.\n\nEscribe BORRAR (en mayúsculas) para confirmar que quieres continuar.";
+  const confirmacion = prompt(advertencia);
+  if(confirmacion !== "BORRAR") return;
   db=defaultDB();
   const p1={id:uid(), name:"Showroom León", client:"Cliente X", createdAt:todayISO(), deliveryDate:todayISO(), notes:"Zona abierta + cabinas"};
   const p2={id:uid(), name:"Oficinas corporativas", client:"Empresa Y", createdAt:todayISO(), deliveryDate:"", notes:"Propuesta 3 variantes"};
@@ -4025,11 +4165,10 @@ function projectName(pid){
 }
 
 function goToProject(pid, tab){
+  // Unificado con la vista moderna (antes usaba renderMain, una vista vieja
+  // que no está conectada a Firestore).
   showApp();
-  selectedProjectId = pid;
-  mainTab = tab || "overview";
-  renderProjectsList();
-  renderMain();
+  openProjectDetail(pid, tab||"overview");
 }
 
 function renderSecCompras(filtersEl, contentEl, addBtn){
@@ -4961,7 +5100,7 @@ function renderFichaView(box, allProjects){
     el.addEventListener("click",(e)=>e.stopPropagation());
     el.addEventListener("input",()=>{
       const p = db.projects.find(x=>x.id===el.dataset.fieldAddress); if(!p) return;
-      p.deliveryAddress = el.value; save();
+      p.deliveryAddress = el.value; saveProject(p);
     });
   });
 }
@@ -5077,14 +5216,14 @@ function renderProjectsPage(){
       if(isDoneNow){
         proj.manualDone=false;
         db.tasks=db.tasks.filter(x=>!(x.projectId===pid && x.title==="Cierre de proyecto"));
-        save(); renderProjectsPage();
+        saveProject(proj); save(); renderProjectsPage();
       } else {
         if(!confirm('\xbfMarcar "'+escapeHTML(proj.name)+'" como terminado?')) return;
         const t=db.tasks.filter(x=>x.projectId===pid);
         if(!t.length) db.tasks.push({id:uid(),projectId:pid,date:todayISO(),title:"Cierre de proyecto",done:true});
         db.tasks.filter(x=>x.projectId===pid).forEach(x=>x.done=true);
         proj.manualDone=true;
-        save(); renderProjectsPage();
+        saveProject(proj); save(); renderProjectsPage();
       }
     });
   });
@@ -5315,7 +5454,7 @@ function renderDetailFull(p, content){
     p.deliveryAddress = document.getElementById("pDeliveryAddress")?.value.trim()||"";
     const ps  = document.getElementById("pPayStatus"); if(ps) p.payStatus=ps.value;
     const pa  = document.getElementById("pAnticipo");  if(pa) p.anticipo=Number(pa.value||0);
-    save(); renderProjectsPage();
+    saveProject(p); renderProjectsPage();
   }
   ["pName","pClient","pDelivery","pNotes","pAnticipo","pDeliveryAddress"].forEach(id=>{
     const el=document.getElementById(id); if(el) el.addEventListener("blur",_autoSave);
@@ -5335,7 +5474,7 @@ function renderDetailFull(p, content){
     db.tasks     = db.tasks.filter(x=>x.projectId!==p.id);
     db.installs  = db.installs.filter(x=>x.projectId!==p.id);
     db.purchases = db.purchases.filter(x=>x.projectId!==p.id);
-    save(); showPage("projects");
+    deleteProject(p.id); save(); showPage("projects");
   });
   document.getElementById("btnMarkDone").addEventListener("click",()=>{
     if(isDone){
@@ -5349,7 +5488,7 @@ function renderDetailFull(p, content){
       p.manualDone=true;
       _syncFlujoForCompletion(p.id);
     }
-    save(); renderProjectsPage(); renderProjectDetail();
+    saveProject(p); save(); renderProjectsPage(); renderProjectDetail();
   });
 
   // ── Botón cotización del header ──
@@ -5375,9 +5514,9 @@ function renderDetailFull(p, content){
   const pdfAllBtn = document.getElementById("btnPDFAll");
   if(pdfAllBtn) pdfAllBtn.addEventListener("click",()=>{ openPDFSelector(p.id); });
   content.querySelectorAll("[data-edit-q]").forEach(b=>b.addEventListener("click",()=>{ const q=db.quotes.find(x=>x.id===b.dataset.editQ); if(q) openQuoteEditorPage(q); }));
-  content.querySelectorAll("[data-toggle-q]").forEach(b=>b.addEventListener("click",()=>{ const q=db.quotes.find(x=>x.id===b.dataset.toggleQ); if(!q) return; q.status=q.status==="authorized"?"draft":"authorized"; if(q.status==="authorized"){ q.authorizedAt=todayISO(); _onQuoteAuthorized(q.projectId); } else delete q.authorizedAt; save(); renderProjectsPage(); renderDetailFull(p,content); }));
-  content.querySelectorAll("[data-del-q]").forEach(b=>b.addEventListener("click",()=>{ if(!confirm("¿Eliminar cotización?")) return; db.quotes=db.quotes.filter(x=>x.id!==b.dataset.delQ); save(); renderProjectsPage(); renderDetailFull(p,content); }));
-  content.querySelectorAll("[data-dup-q]").forEach(b=>b.addEventListener("click",()=>{ const q=db.quotes.find(x=>x.id===b.dataset.dupQ); if(!q) return; const copy=JSON.parse(JSON.stringify(q)); copy.id=uid(); copy.status="draft"; copy.createdAt=todayISO(); copy.name=(q.name||"Cotización")+" (copia)"; copy.code=""; db.quotes.push(copy); save(); renderProjectsPage(); renderDetailFull(p,content); openQuoteEditorPage(copy); }));
+  content.querySelectorAll("[data-toggle-q]").forEach(b=>b.addEventListener("click",()=>{ const q=db.quotes.find(x=>x.id===b.dataset.toggleQ); if(!q) return; q.status=q.status==="authorized"?"draft":"authorized"; if(q.status==="authorized"){ q.authorizedAt=todayISO(); _onQuoteAuthorized(q.projectId); } else delete q.authorizedAt; saveQuote(q); saveProject(p); save(); renderProjectsPage(); renderDetailFull(p,content); }));
+  content.querySelectorAll("[data-del-q]").forEach(b=>b.addEventListener("click",()=>{ if(!confirm("¿Eliminar cotización?")) return; db.quotes=db.quotes.filter(x=>x.id!==b.dataset.delQ); deleteQuote(b.dataset.delQ); save(); renderProjectsPage(); renderDetailFull(p,content); }));
+  content.querySelectorAll("[data-dup-q]").forEach(b=>b.addEventListener("click",()=>{ const q=db.quotes.find(x=>x.id===b.dataset.dupQ); if(!q) return; const copy=JSON.parse(JSON.stringify(q)); copy.id=uid(); copy.status="draft"; copy.createdAt=todayISO(); copy.name=(q.name||"Cotización")+" (copia)"; copy.code=""; db.quotes.push(copy); saveQuote(copy); save(); renderProjectsPage(); renderDetailFull(p,content); openQuoteEditorPage(copy); }));
   content.querySelectorAll("[data-pdf-q]").forEach(b=>b.addEventListener("click",(e)=>{ e.stopPropagation(); const q=db.quotes.find(x=>x.id===b.dataset.pdfQ); if(!q) return; openPDFSelector(q.projectId, q.id); }));
 
   // Menú "más opciones" (3 puntos)
@@ -5415,19 +5554,19 @@ function renderDetailFull(p, content){
         item.addEventListener("mouseleave",()=>item.style.background="");
       });
       // Actions
-      menu.querySelector("[data-act='auth']").addEventListener("click",()=>{ menu.remove(); q.status=isAuth?"draft":"authorized"; if(q.status==="authorized") q.authorizedAt=todayISO(); else delete q.authorizedAt; save(); renderProjectsPage(); renderDetailFull(p,content); });
-      menu.querySelector("[data-act='dup']").addEventListener("click",()=>{ menu.remove(); const copy=JSON.parse(JSON.stringify(q)); copy.id=uid(); copy.status="draft"; copy.createdAt=todayISO(); copy.name=(q.name||"Cotización")+" (copia)"; copy.code=""; db.quotes.push(copy); save(); renderProjectsPage(); renderDetailFull(p,content); openQuoteEditorPage(copy); });
-      menu.querySelector("[data-act='refphoto']").addEventListener("click",()=>{ menu.remove(); const inp=document.createElement("input"); inp.type="file"; inp.accept="image/*"; inp.onchange=()=>{ const file=inp.files?.[0]; if(!file) return; const reader=new FileReader(); reader.onload=(ev)=>{ q.refPhoto=ev.target.result; save(); renderDetailFull(p,content); }; reader.readAsDataURL(file); }; inp.click(); });
-      const delRefBtn=menu.querySelector("[data-act='delref']"); if(delRefBtn) delRefBtn.addEventListener("click",()=>{ menu.remove(); q.refPhoto=""; save(); renderDetailFull(p,content); });
-      menu.querySelector("[data-act='del']").addEventListener("click",()=>{ menu.remove(); if(!confirm("¿Eliminar cotización?")) return; db.quotes=db.quotes.filter(x=>x.id!==qid); save(); renderProjectsPage(); renderDetailFull(p,content); });
+      menu.querySelector("[data-act='auth']").addEventListener("click",()=>{ menu.remove(); q.status=isAuth?"draft":"authorized"; if(q.status==="authorized") q.authorizedAt=todayISO(); else delete q.authorizedAt; saveQuote(q); save(); renderProjectsPage(); renderDetailFull(p,content); });
+      menu.querySelector("[data-act='dup']").addEventListener("click",()=>{ menu.remove(); const copy=JSON.parse(JSON.stringify(q)); copy.id=uid(); copy.status="draft"; copy.createdAt=todayISO(); copy.name=(q.name||"Cotización")+" (copia)"; copy.code=""; db.quotes.push(copy); saveQuote(copy); save(); renderProjectsPage(); renderDetailFull(p,content); openQuoteEditorPage(copy); });
+      menu.querySelector("[data-act='refphoto']").addEventListener("click",()=>{ menu.remove(); const inp=document.createElement("input"); inp.type="file"; inp.accept="image/*"; inp.onchange=()=>{ const file=inp.files?.[0]; if(!file) return; const reader=new FileReader(); reader.onload=(ev)=>{ q.refPhoto=ev.target.result; saveQuote(q); save(); renderDetailFull(p,content); }; reader.readAsDataURL(file); }; inp.click(); });
+      const delRefBtn=menu.querySelector("[data-act='delref']"); if(delRefBtn) delRefBtn.addEventListener("click",()=>{ menu.remove(); q.refPhoto=""; saveQuote(q); save(); renderDetailFull(p,content); });
+      menu.querySelector("[data-act='del']").addEventListener("click",()=>{ menu.remove(); if(!confirm("¿Eliminar cotización?")) return; db.quotes=db.quotes.filter(x=>x.id!==qid); deleteQuote(qid); save(); renderProjectsPage(); renderDetailFull(p,content); });
       // Close on outside click
       setTimeout(()=>{ document.addEventListener("click",()=>menu.remove(),{once:true}); },50);
     });
   });
 
   // Foto de referencia por cotización (lista)
-  content.querySelectorAll("[data-ref-photo-q]").forEach(lbl=>{ lbl.addEventListener("click",()=>{ const q=db.quotes.find(x=>x.id===lbl.dataset.refPhotoQ); if(!q) return; const inp=document.createElement("input"); inp.type="file"; inp.accept="image/*"; inp.onchange=()=>{ const file=inp.files?.[0]; if(!file) return; const reader=new FileReader(); reader.onload=(ev)=>{ q.refPhoto=ev.target.result; save(); renderDetailFull(p,content); }; reader.readAsDataURL(file); }; inp.click(); }); });
-  content.querySelectorAll("[data-del-ref-q]").forEach(btn=>{ btn.addEventListener("click",(e)=>{ e.stopPropagation(); const q=db.quotes.find(x=>x.id===btn.dataset.delRefQ); if(!q) return; q.refPhoto=""; save(); renderDetailFull(p,content); }); });
+  content.querySelectorAll("[data-ref-photo-q]").forEach(lbl=>{ lbl.addEventListener("click",()=>{ const q=db.quotes.find(x=>x.id===lbl.dataset.refPhotoQ); if(!q) return; const inp=document.createElement("input"); inp.type="file"; inp.accept="image/*"; inp.onchange=()=>{ const file=inp.files?.[0]; if(!file) return; const reader=new FileReader(); reader.onload=(ev)=>{ q.refPhoto=ev.target.result; saveQuote(q); save(); renderDetailFull(p,content); }; reader.readAsDataURL(file); }; inp.click(); }); });
+  content.querySelectorAll("[data-del-ref-q]").forEach(btn=>{ btn.addEventListener("click",(e)=>{ e.stopPropagation(); const q=db.quotes.find(x=>x.id===btn.dataset.delRefQ); if(!q) return; q.refPhoto=""; saveQuote(q); save(); renderDetailFull(p,content); }); });
   content.querySelectorAll("[data-ref-view-q]").forEach(img=>{ img.addEventListener("click",()=>{ const lb=document.createElement("div"); lb.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.95);z-index:9999;display:flex;align-items:center;justify-content:center;cursor:zoom-out;"; lb.innerHTML='<img src="'+img.src+'" style="max-width:95vw;max-height:95vh;border-radius:12px;object-fit:contain;">'; lb.onclick=()=>lb.remove(); document.body.appendChild(lb); }); });
 
   // ── Fotos del proyecto ──
@@ -5447,10 +5586,10 @@ function renderDetailFull(p, content){
       }
       if(ind) ind.style.display="none";
       if(_wasEmpty && p.photos.length>0) _onPhotoAdded(p.id);
-      savePhotos(p.id,p.photos); save(); renderDetailFull(p,content);
+      savePhotos(p.id,p.photos); saveProject(p); save(); renderDetailFull(p,content);
     });
   }
-  content.querySelectorAll("[data-del-photo]").forEach(btn=>btn.addEventListener("click",()=>{ const idx=Number(btn.dataset.delPhoto); p.photos=p.photos||[]; p.photos.splice(idx,1); savePhotos(p.id,p.photos); save(); renderDetailFull(p,content); }));
+  content.querySelectorAll("[data-del-photo]").forEach(btn=>btn.addEventListener("click",()=>{ const idx=Number(btn.dataset.delPhoto); p.photos=p.photos||[]; p.photos.splice(idx,1); savePhotos(p.id,p.photos); saveProject(p); save(); renderDetailFull(p,content); }));
   content.querySelectorAll("img[data-photo-src]").forEach(img=>img.addEventListener("click",()=>{ const lb=document.createElement("div"); lb.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.95);z-index:9999;display:flex;align-items:center;justify-content:center;cursor:zoom-out;"; lb.innerHTML='<img src="'+img.dataset.photoSrc+'" style="max-width:95vw;max-height:95vh;border-radius:12px;object-fit:contain;">'; lb.onclick=()=>lb.remove(); document.body.appendChild(lb); }));
 }
 
@@ -5474,7 +5613,7 @@ function openQuoteEditorPage(q){
   // Auto-assign project's first photo as ref photo if quote has none
   if(!q.refPhoto){
     const projectPhotos=loadPhotos(p.id);
-    if(projectPhotos.length){ q.refPhoto=projectPhotos[0].url||projectPhotos[0].data||""; save(); }
+    if(projectPhotos.length){ q.refPhoto=projectPhotos[0].url||projectPhotos[0].data||""; saveQuote(q); save(); }
   }
   const routeOpts=(db.settings.routeDB||[]).map(r=>`<option value="${escapeAttr(r.name)}">${escapeHTML(r.name)} \u00b7 $${money(r.costPerHour||0)}/h</option>`).join("");
 
@@ -5490,6 +5629,7 @@ function openQuoteEditorPage(q){
       <button class="btn small ${q.status==='authorized'?'danger':'green'}" id="btnToggleAuth">${q.status==='authorized'?'<i class="ti ti-x"></i> Desautorizar':'<i class="ti ti-check"></i> Autorizar'}</button>
       <button class="btn small" id="btnSaveQuote"><i class="ti ti-device-floppy"></i> Guardar</button>
       <button class="btn small" id="btnQuotePDF2"><i class="ti ti-printer"></i> PDF</button>
+      <button class="btn small danger" id="btnDeleteQuote" title="Eliminar cotización"><i class="ti ti-trash"></i></button>
     </div>
 
     <!-- ── BARRA SECUNDARIA ── -->
@@ -5541,8 +5681,8 @@ function openQuoteEditorPage(q){
         <div class="card" style="padding:14px;">
           <div style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:10px;">Desglose de precio</div>
           <div style="display:flex;flex-direction:column;gap:0;">
-            <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px;"><span style="color:var(--muted);">Materiales</span><span id="bdMP">$0.00</span></div>
-            <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px;"><span style="color:var(--muted);">Ruta / M.O.</span><span id="bdRuta">$0.00</span></div>
+            <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px;"><span style="color:var(--muted);">Materiales <span id="bdMP_pct" style="color:var(--accent);font-weight:600;"></span></span><span id="bdMP">$0.00</span></div>
+            <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px;"><span style="color:var(--muted);">Ruta / M.O. <span id="bdRuta_pct" style="color:var(--accent);font-weight:600;"></span></span><span id="bdRuta">$0.00</span></div>
             <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px;"><span style="color:var(--muted);">Costo directo</span><span id="bdCosto" style="font-weight:600;">$0.00</span></div>
             <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px;align-items:center;">
               <span style="color:var(--muted);">Admin <input id="adminPctInput" type="number" step="0.1" style="width:38px;background:var(--bg3);border:1px solid var(--border);border-radius:5px;color:var(--text);font-family:inherit;text-align:center;padding:1px 3px;font-size:11px;">%</span>
@@ -5610,12 +5750,19 @@ function openQuoteEditorPage(q){
     </div>
   </div>`;
 
-  document.getElementById("btnBackFromQuote").addEventListener("click",()=>{ q.name=document.getElementById("qNameInput").value.trim()||"Cotización"; save(); currentProjectId=q.projectId; showPage("project-detail"); renderProjectDetail(); });
-  document.getElementById("qNameInput").addEventListener("blur",()=>{ q.name=document.getElementById("qNameInput").value.trim()||"Cotización"; save(); });
-  document.getElementById("qNameInput").addEventListener("keydown",(e)=>{ if(e.key==="Enter"){ e.preventDefault(); q.name=document.getElementById("qNameInput").value.trim()||"Cotización"; save(); document.getElementById("qNameInput").blur(); } });
-  document.getElementById("btnToggleAuth").addEventListener("click",()=>{ q.status=q.status==="authorized"?"draft":"authorized"; if(q.status==="authorized"){ q.authorizedAt=todayISO(); _onQuoteAuthorized(q.projectId); } else delete q.authorizedAt; save(); renderProjectsPage(); openQuoteEditorPage(q); });
-  document.getElementById("btnSaveQuote").addEventListener("click",()=>{ q.name=document.getElementById("qNameInput").value.trim()||"Cotización"; save(); const btn=document.getElementById("btnSaveQuote"); btn.innerHTML='<i class="ti ti-check"></i> Guardado'; setTimeout(()=>{ if(btn) btn.innerHTML='<i class="ti ti-device-floppy"></i> Guardar'; },1500); });
+  document.getElementById("btnBackFromQuote").addEventListener("click",()=>{ q.name=document.getElementById("qNameInput").value.trim()||"Cotización"; saveQuote(q); currentProjectId=q.projectId; showPage("project-detail"); renderProjectDetail(); });
+  document.getElementById("qNameInput").addEventListener("blur",()=>{ q.name=document.getElementById("qNameInput").value.trim()||"Cotización"; saveQuote(q); });
+  document.getElementById("qNameInput").addEventListener("keydown",(e)=>{ if(e.key==="Enter"){ e.preventDefault(); q.name=document.getElementById("qNameInput").value.trim()||"Cotización"; saveQuote(q); document.getElementById("qNameInput").blur(); } });
+  document.getElementById("btnToggleAuth").addEventListener("click",()=>{ q.status=q.status==="authorized"?"draft":"authorized"; if(q.status==="authorized"){ q.authorizedAt=todayISO(); _onQuoteAuthorized(q.projectId); } else delete q.authorizedAt; saveQuote(q); saveProject(p); save(); renderProjectsPage(); openQuoteEditorPage(q); });
+  document.getElementById("btnSaveQuote").addEventListener("click",()=>{ q.name=document.getElementById("qNameInput").value.trim()||"Cotización"; saveQuote(q); const btn=document.getElementById("btnSaveQuote"); btn.innerHTML='<i class="ti ti-check"></i> Guardado'; setTimeout(()=>{ if(btn) btn.innerHTML='<i class="ti ti-device-floppy"></i> Guardar'; },1500); });
   document.getElementById("btnQuotePDF2").addEventListener("click",()=>{ openPDFSelector(q.projectId); });
+  document.getElementById("btnDeleteQuote").addEventListener("click",()=>{
+    if(!confirm("¿Eliminar esta cotización? Esta acción no se puede deshacer.")) return;
+    db.quotes = db.quotes.filter(x=>x.id!==q.id);
+    deleteQuote(q.id); save();
+    currentProjectId=q.projectId;
+    showPage("project-detail"); renderProjectDetail();
+  });
 
   // Foto de referencia en el editor
   function _loadRefPhotoInput(inputId){
@@ -5623,7 +5770,7 @@ function openQuoteEditorPage(q){
     inp.addEventListener("change",()=>{
       const file=inp.files?.[0]; if(!file) return;
       const reader=new FileReader();
-      reader.onload=(ev)=>{ q.refPhoto=ev.target.result; save(); openQuoteEditorPage(q); };
+      reader.onload=(ev)=>{ q.refPhoto=ev.target.result; saveQuote(q); openQuoteEditorPage(q); };
       reader.readAsDataURL(file);
     });
   }
@@ -5632,7 +5779,7 @@ function openQuoteEditorPage(q){
   const refImg=document.getElementById("refPhotoImg");
   if(refImg) refImg.addEventListener("click",()=>{ const lb=document.createElement("div"); lb.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.95);z-index:9999;display:flex;align-items:center;justify-content:center;cursor:zoom-out;"; lb.innerHTML='<img src="'+refImg.src+'" style="max-width:95vw;max-height:95vh;border-radius:12px;object-fit:contain;">'; lb.onclick=()=>lb.remove(); document.body.appendChild(lb); });
   const delRef=document.getElementById("btnDelRefPhoto");
-  if(delRef) delRef.addEventListener("click",()=>{ q.refPhoto=""; save(); openQuoteEditorPage(q); });
+  if(delRef) delRef.addEventListener("click",()=>{ q.refPhoto=""; saveQuote(q); openQuoteEditorPage(q); });
 
   function renderLines(){
     const prod=q.products||[];
@@ -5647,7 +5794,7 @@ function openQuoteEditorPage(q){
           r.matPick=val; const mm=materialByDesc(val);
           if(mm){ r.unitPrice=Number(mm.cost||0); if(!r.desc) r.desc=mm.desc; const upi=tr.querySelector('input[data-f="unitPrice"]'); if(upi) upi.value=r.unitPrice; const di=tr.querySelector('input[data-f="desc"]'); if(di&&!di.value) di.value=r.desc; }
           const imp=tr.querySelector(".tdImp"); if(imp) imp.textContent="$"+money(Number(r.qty||0)*Number(r.unitPrice||0));
-          save(); renderQuoteBreakdown(q);
+          saveQuote(q); renderQuoteBreakdown(q);
         });
         cell.appendChild(picker);
       });
@@ -5674,9 +5821,9 @@ function openQuoteEditorPage(q){
           const f=el.dataset.f; if(!f) return;
           const arr=(kind==="prod")?q.products:(kind==="routes")?q.routes:q.extras;
           const row=arr.find(x=>x.id===id); if(!row) return;
-          if(kind==="prod"){ if(el.type==="number") row[f]=Number(el.value||0); else row[f]=el.value; const r=arr.find(x=>x.id===id); if(r){ const imp=tr.querySelector(".tdImp"); if(imp) imp.textContent="$"+money(Number(r.qty||0)*Number(r.unitPrice||0)); } save(); renderQuoteBreakdown(q); }
-          else if(kind==="routes"){ if(f==="routeName"){ row.routeName=el.value; const rm=routeByName(row.routeName); if(rm) row.rate=Number(rm.costPerHour||0); } else if(el.type==="number") row[f]=Number(el.value||0); else row[f]=el.value; save(); renderLines(); }
-          else { if(el.type==="number") row[f]=Number(el.value||0); else row[f]=el.value; save(); renderLines(); }
+          if(kind==="prod"){ if(el.type==="number") row[f]=Number(el.value||0); else row[f]=el.value; const r=arr.find(x=>x.id===id); if(r){ const imp=tr.querySelector(".tdImp"); if(imp) imp.textContent="$"+money(Number(r.qty||0)*Number(r.unitPrice||0)); } saveQuote(q); renderQuoteBreakdown(q); }
+          else if(kind==="routes"){ if(f==="routeName"){ row.routeName=el.value; const rm=routeByName(row.routeName); if(rm) row.rate=Number(rm.costPerHour||0); } else if(el.type==="number") row[f]=Number(el.value||0); else row[f]=el.value; saveQuote(q); renderLines(); }
+          else { if(el.type==="number") row[f]=Number(el.value||0); else row[f]=el.value; saveQuote(q); renderLines(); }
         };
         if(el.tagName==="SELECT") el.addEventListener("change",commit);
         else { el.addEventListener("blur",commit); el.addEventListener("keydown",(e)=>{ if(e.key==="Enter"){e.preventDefault();el.blur();} }); }
@@ -5685,15 +5832,15 @@ function openQuoteEditorPage(q){
         if(btn.dataset.act==="delProd") q.products=q.products.filter(x=>x.id!==id);
         if(btn.dataset.act==="delRoute") q.routes=q.routes.filter(x=>x.id!==id);
         if(btn.dataset.act==="delExtra") q.extras=q.extras.filter(x=>x.id!==id);
-        save(); renderLines();
+        saveQuote(q); renderLines();
       }));
     });
   }
 
-  document.getElementById("addProd").addEventListener("click",()=>{ q.products=q.products||[]; q.products.push({id:uid(),matPick:"",desc:"",qty:1,unitPrice:0}); save(); renderLines(); });
-  document.getElementById("addRoute").addEventListener("click",()=>{ q.routes=q.routes||[]; const first=db.settings.routeDB[0]?.name||""; const rate=first?(routeByName(first)?.costPerHour||0):0; q.routes.push({id:uid(),routeName:first,hours:1,rate:Number(rate||0)}); save(); renderLines(); });
-  document.getElementById("addExtra").addEventListener("click",()=>{ q.extras=q.extras||[]; q.extras.push({id:uid(),label:"",amount:0}); save(); renderLines(); });
-  document.getElementById("qMarginPct").addEventListener("blur",()=>{ q.marginPct=Number(document.getElementById("qMarginPct").value||0); save(); renderQuoteBreakdown(q); });
+  document.getElementById("addProd").addEventListener("click",()=>{ q.products=q.products||[]; q.products.push({id:uid(),matPick:"",desc:"",qty:1,unitPrice:0}); saveQuote(q); renderLines(); });
+  document.getElementById("addRoute").addEventListener("click",()=>{ q.routes=q.routes||[]; const first=db.settings.routeDB[0]?.name||""; const rate=first?(routeByName(first)?.costPerHour||0):0; q.routes.push({id:uid(),routeName:first,hours:1,rate:Number(rate||0)}); saveQuote(q); renderLines(); });
+  document.getElementById("addExtra").addEventListener("click",()=>{ q.extras=q.extras||[]; q.extras.push({id:uid(),label:"",amount:0}); saveQuote(q); renderLines(); });
+  document.getElementById("qMarginPct").addEventListener("blur",()=>{ q.marginPct=Number(document.getElementById("qMarginPct").value||0); saveQuote(q); renderQuoteBreakdown(q); });
   document.getElementById("adminPctInput").addEventListener("blur",()=>{ db.settings.adminPercent=Number(document.getElementById("adminPctInput").value||0); save(); renderQuoteBreakdown(q); });
 
   // ── Pipeline status ──
@@ -5701,14 +5848,14 @@ function openQuoteEditorPage(q){
   if(pipelineEl){
     pipelineEl.addEventListener("change", () => {
       q.pipelineStatus = pipelineEl.value || null;
-      save();
+      saveQuote(q);
     });
   }
 
   // ── Qty multiplier ──
   const qQtyEl = document.getElementById("qQtyInput");
   if(qQtyEl){
-    const commitQty = () => { q.qty = Math.max(1, Number(qQtyEl.value||1)); save(); renderQuoteBreakdown(q); };
+    const commitQty = () => { q.qty = Math.max(1, Number(qQtyEl.value||1)); saveQuote(q); renderQuoteBreakdown(q); };
     qQtyEl.addEventListener("blur", commitQty);
     qQtyEl.addEventListener("change", commitQty);
     qQtyEl.addEventListener("keydown",(e)=>{ if(e.key==="Enter"){ e.preventDefault(); qQtyEl.blur(); }});
@@ -5741,7 +5888,7 @@ function openQuoteEditorPage(q){
       q.routes   = JSON.parse(JSON.stringify(tpl.routes||[])).map(r=>({...r,id:uid()}));
       q.extras   = JSON.parse(JSON.stringify(tpl.extras||[])).map(r=>({...r,id:uid()}));
       q.marginPct = tpl.marginPct ?? q.marginPct ?? 25;
-      save(); renderLines();
+      saveQuote(q); renderLines();
       const btn=document.getElementById("btnLoadTemplate");
       if(btn){ btn.textContent="✅ Cargada"; setTimeout(()=>{ if(btn) btn.textContent="📂 Plantilla"; },2000); }
     });
@@ -6412,17 +6559,18 @@ function openToolsMenu(){
 
 // Override syncStatusUpdate
 
-function _afterIntro(){
+async function _afterIntro(){
   // Called after intro finishes — show login form or go straight to app
   load();
-  _initFirebase();
-  gsPullOnBoot();
+  await _restoreFirebaseSession(); // ¿ya había una sesión real guardada por el navegador?
   const u=currentUser();
   const modal=document.getElementById("loginModal");
   const intro=document.getElementById("loginIntro");
   // Fade out intro
   if(intro){ intro.style.transition="opacity .7s ease"; intro.style.opacity="0"; setTimeout(()=>{ if(intro) intro.style.display="none"; },700); }
   if(u){
+    gsPullOnBoot();
+    subscribeFirestoreRealtime();
     if(modal){ modal.classList.remove("show"); modal.style.display="none"; }
     document.getElementById("homeScreen").classList.remove("show");
     document.getElementById("app").style.display="";
@@ -6441,16 +6589,21 @@ function bootNew(){
   document.getElementById("app").style.display="none";
   setTimeout(_afterIntro, 2800);
 
-  document.getElementById("btnLogin").addEventListener("click",()=>{
+  document.getElementById("btnLogin").addEventListener("click",async ()=>{
     load();
+    const btn = document.getElementById("btnLogin");
     const email=document.getElementById("loginEmail").value.trim();
     const pass=document.getElementById("loginPass").value;
-    const u2=login(email,pass);
+    btn.disabled = true;
+    const u2 = await login(email,pass);
+    btn.disabled = false;
     if(!u2){
       const m=document.getElementById("loginMsg");
       if(m){ m.style.display=""; m.textContent="Usuario o contraseña incorrectos."; }
       return;
     }
+    gsPullOnBoot();
+    subscribeFirestoreRealtime();
     document.getElementById("loginModal").classList.remove("show");
     document.getElementById("loginModal").style.display="none";
     document.getElementById("homeScreen").classList.remove("show");
@@ -6471,7 +6624,7 @@ function bootNew(){
       <div class="field-label">Fecha de entrega</div><div class="field"><input id="np_delivery" type="date" value="${todayISO()}"></div>
     `,[
       {label:"Cancelar",cls:"btn",action:closeSheet},
-      {label:"Crear",cls:"btn primary",action:()=>{ const name=document.getElementById("np_name").value.trim(); if(!name){ alert("Escribe el nombre"); return; } const p={id:uid(),name,client:document.getElementById("np_client").value.trim(),createdAt:todayISO(),deliveryDate:document.getElementById("np_delivery").value||"",notes:"",stage:'cotizacion',stageUpdatedAt:todayISO()}; db.projects.unshift(p); save(); closeSheet(); renderProjectsPage(); openProjectDetail(p.id,"overview"); }}
+      {label:"Crear",cls:"btn primary",action:()=>{ const name=document.getElementById("np_name").value.trim(); if(!name){ alert("Escribe el nombre"); return; } const p={id:uid(),name,client:document.getElementById("np_client").value.trim(),createdAt:todayISO(),deliveryDate:document.getElementById("np_delivery").value||"",notes:"",stage:'cotizacion',stageUpdatedAt:todayISO()}; db.projects.unshift(p); saveProject(p); save(); closeSheet(); renderProjectsPage(); openProjectDetail(p.id,"overview"); }}
     ]);
   });
   const _btnNewProjectDash = document.getElementById("btnNewProjectDash");
@@ -6484,7 +6637,7 @@ function bootNew(){
       <div class="field-label">Fecha de entrega</div><div class="field"><input id="npd_delivery" type="date" value="${todayISO()}"></div>
     `,[
       {label:"Cancelar",cls:"btn",action:closeSheet},
-      {label:"Crear",cls:"btn primary",action:()=>{ const name=document.getElementById("npd_name").value.trim(); if(!name){ alert("Escribe el nombre"); return; } const p={id:uid(),name,client:document.getElementById("npd_client").value.trim(),createdAt:todayISO(),deliveryDate:document.getElementById("npd_delivery").value||"",notes:"",stage:'cotizacion',stageUpdatedAt:todayISO()}; db.projects.unshift(p); save(); closeSheet(); renderDashboardPage(); openProjectDetail(p.id,"overview"); }}
+      {label:"Crear",cls:"btn primary",action:()=>{ const name=document.getElementById("npd_name").value.trim(); if(!name){ alert("Escribe el nombre"); return; } const p={id:uid(),name,client:document.getElementById("npd_client").value.trim(),createdAt:todayISO(),deliveryDate:document.getElementById("npd_delivery").value||"",notes:"",stage:'cotizacion',stageUpdatedAt:todayISO()}; db.projects.unshift(p); saveProject(p); save(); closeSheet(); renderDashboardPage(); openProjectDetail(p.id,"overview"); }}
     ]);
   });
 
@@ -6824,9 +6977,9 @@ function openPDFSelector(projectId){
   const quotesHtml = quotes.map(q=>{
     const t = quoteSellTotals(q);
     return `<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);">
-      <input type="checkbox" data-pdf-q="${q.id}" checked style="width:18px;height:18px;accent-color:var(--accent);flex-shrink:0;">
+      <input type="checkbox" data-pdf-q="${q.id}" data-pdf-photo="${escapeAttr(q.refPhoto||"")}" checked style="width:18px;height:18px;accent-color:var(--accent);flex-shrink:0;">
       <div style="flex:1;min-width:0;">
-        <div style="font-size:13px;font-weight:700;">${escapeHTML(q.name||"Cotización")}</div>
+        <div style="font-size:13px;font-weight:700;">${escapeHTML(q.name||"Cotización")}${q.refPhoto?' <span title="Esta cotización tiene foto de referencia">📸</span>':''}</div>
         <div style="font-size:11px;color:var(--muted);">${q.status==="authorized"?'✅ Autorizada':'📝 Borrador'} · $${money(t.venta*(Number(q.qty)||1))}${Number(q.qty||1)>1?' (×'+Number(q.qty)+')':''}</div>
       </div>
       <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
@@ -6851,6 +7004,7 @@ function openPDFSelector(projectId){
           <input type="checkbox" id="pdfIncludePhoto" checked style="width:18px;height:18px;accent-color:var(--accent);">
           📸 Incluir foto de referencia
         </label>
+        <div id="pdfPhotoPreview" style="margin-top:10px;"></div>
       </div>` : ''}
     </div>
   `, [
@@ -6882,6 +7036,35 @@ function openPDFSelector(projectId){
       }, 300);
     }}
   ]);
+
+  function _updatePdfPhotoPreview(){
+    // Mirrors the actual PDF logic: only the FIRST checked quote's photo is ever used.
+    const previewEl = document.getElementById("pdfPhotoPreview");
+    const includeEl = document.getElementById("pdfIncludePhoto");
+    if(!previewEl) return;
+    if(includeEl && !includeEl.checked){ previewEl.innerHTML=""; return; }
+    const checkedEls = [...document.querySelectorAll("input[data-pdf-q]:checked")];
+    if(!checkedEls.length){
+      previewEl.innerHTML = `<div style="font-size:11px;color:var(--muted);">Selecciona al menos una cotización.</div>`;
+      return;
+    }
+    const firstChecked = checkedEls[0];
+    const photo = firstChecked.dataset.pdfPhoto;
+    const firstQ = quotes.find(q=>q.id===firstChecked.dataset.pdfQ);
+    const firstName = escapeHTML(firstQ?firstQ.name||"Cotización":"—");
+    if(!photo){
+      previewEl.innerHTML = `<div style="font-size:11px;color:var(--muted);">La primera cotización seleccionada (<b>${firstName}</b>) no tiene foto — no se incluirá ninguna imagen, aunque otras seleccionadas sí tengan.</div>`;
+      return;
+    }
+    previewEl.innerHTML = `<div style="display:flex;align-items:center;gap:10px;">
+      <img src="${escapeAttr(photo)}" style="width:48px;height:48px;object-fit:cover;border-radius:8px;border:1px solid var(--border);">
+      <div style="font-size:11px;color:var(--muted);">Se usará la foto de: <b>${firstName}</b></div>
+    </div>`;
+  }
+  document.querySelectorAll("input[data-pdf-q]").forEach(el=>el.addEventListener("change", _updatePdfPhotoPreview));
+  const pdfIncludeEl = document.getElementById("pdfIncludePhoto");
+  if(pdfIncludeEl) pdfIncludeEl.addEventListener("change", _updatePdfPhotoPreview);
+  _updatePdfPhotoPreview();
 }
 
 // ── BOM — BILL OF MATERIALS ────────────────────────────────
