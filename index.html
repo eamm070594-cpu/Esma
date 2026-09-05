@@ -3771,20 +3771,76 @@ function buildQuotePDFHTML(p, q, extraQuotes, includeIVA, includePhoto){
   // Build rows with qty
   let rowsHTML = "";
   let grandTotal = 0;
+  const showDetailedItems = allQuotes.length === 1;
 
   allQuotes.forEach((cot, ci) => {
     const t = quoteSellTotals(cot);
     const cotName = escapeHTML(cot.name || ("Cotización "+(ci+1)));
     const qty = Math.max(1, Number(cot.qty||1));
-    const unitPrice = t.venta;
-    const totalConQty = unitPrice * qty;
-    grandTotal += totalConQty;
-    rowsHTML += `<tr>
-      <td style="padding:9px 12px;border-bottom:1px solid #eef2f7;">${cotName}</td>
-      <td style="padding:9px 12px;border-bottom:1px solid #eef2f7;text-align:center;font-weight:600;">${qty}</td>
-      <td style="padding:9px 12px;border-bottom:1px solid #eef2f7;text-align:right;">$${money(unitPrice)}</td>
-      <td style="padding:9px 12px;border-bottom:1px solid #eef2f7;text-align:right;font-weight:700;">$${money(totalConQty)}</td>
-    </tr>`;
+
+    if(showDetailedItems){
+      // Factor que reparte administración + utilidad sobre cada línea de forma
+      // proporcional, para que sumen exactamente el precio de venta — sin
+      // mostrarle al cliente el costo/margen interno de cada producto.
+      const baseCosto = t.mp + t.ruta;
+      const factor = baseCosto > 0 ? t.ventaSinExtras / baseCosto : 1;
+
+      (cot.products||[]).forEach(pr=>{
+        const pqty = Number(pr.qty||0);
+        const unitPrice = Number(pr.unitPrice||0) * factor;
+        const lineTotal = pqty * unitPrice;
+        const dims = [pr.ancho&&`${pr.ancho} cm ancho`, pr.largo&&`${pr.largo} cm largo`, pr.alto&&`${pr.alto} cm alto`].filter(Boolean).join(' · ');
+        rowsHTML += `<tr><td colspan="4" style="padding:0;border-bottom:1px solid #eef2f7;">
+          <div style="display:flex;gap:12px;padding:10px 12px;align-items:flex-start;">
+            ${pr.photo?`<img src="${escapeAttr(pr.photo)}" style="width:64px;height:64px;object-fit:cover;border-radius:6px;flex-shrink:0;">`:''}
+            <div style="flex:1;min-width:0;">
+              <div style="font-weight:700;font-size:12px;color:#0f172a;">${escapeHTML(pr.desc||pr.matPick||'Producto')}</div>
+              ${dims?`<div style="font-size:10px;color:#64748b;margin-top:2px;">${escapeHTML(dims)}</div>`:''}
+              ${pr.descLarga?`<div style="font-size:10.5px;color:#64748b;margin-top:3px;line-height:1.5;">${escapeHTML(pr.descLarga)}</div>`:''}
+            </div>
+            <div style="text-align:right;flex-shrink:0;min-width:100px;">
+              <div style="font-size:10.5px;color:#64748b;">Cant. ${pqty}</div>
+              <div style="font-size:10.5px;color:#64748b;">$${money(unitPrice)} c/u</div>
+              <div style="font-weight:800;font-size:13px;color:#1e3a8a;margin-top:2px;">$${money(lineTotal)}</div>
+            </div>
+          </div>
+        </td></tr>`;
+      });
+      (cot.routes||[]).forEach(rt=>{
+        const hrs = Number(rt.hours||0);
+        const unitPrice = Number(rt.rate||0) * factor;
+        const lineTotal = hrs * unitPrice;
+        rowsHTML += `<tr>
+          <td style="padding:9px 12px;border-bottom:1px solid #eef2f7;">Mano de obra: ${escapeHTML(rt.routeName||'Ruta')}</td>
+          <td style="padding:9px 12px;border-bottom:1px solid #eef2f7;text-align:center;">${hrs}h</td>
+          <td style="padding:9px 12px;border-bottom:1px solid #eef2f7;text-align:right;">$${money(unitPrice)}</td>
+          <td style="padding:9px 12px;border-bottom:1px solid #eef2f7;text-align:right;font-weight:700;">$${money(lineTotal)}</td>
+        </tr>`;
+      });
+      (cot.extras||[]).forEach(ex=>{
+        const lineTotal = Number(ex.amount||0);
+        rowsHTML += `<tr>
+          <td style="padding:9px 12px;border-bottom:1px solid #eef2f7;">${escapeHTML(ex.label||'Extra')}</td>
+          <td style="padding:9px 12px;border-bottom:1px solid #eef2f7;text-align:center;">—</td>
+          <td style="padding:9px 12px;border-bottom:1px solid #eef2f7;text-align:right;">—</td>
+          <td style="padding:9px 12px;border-bottom:1px solid #eef2f7;text-align:right;font-weight:700;">$${money(lineTotal)}</td>
+        </tr>`;
+      });
+      grandTotal += t.venta * qty;
+      if(qty > 1){
+        rowsHTML += `<tr><td colspan="4" style="padding:8px 12px;text-align:right;font-size:11px;color:#64748b;border-bottom:2px solid #e2e8f0;">Subtotal × ${qty} unidades: <b style="color:#1e3a8a;">$${money(t.venta*qty)}</b></td></tr>`;
+      }
+    } else {
+      const unitPrice = t.venta;
+      const totalConQty = unitPrice * qty;
+      grandTotal += totalConQty;
+      rowsHTML += `<tr>
+        <td style="padding:9px 12px;border-bottom:1px solid #eef2f7;">${cotName}</td>
+        <td style="padding:9px 12px;border-bottom:1px solid #eef2f7;text-align:center;font-weight:600;">${qty}</td>
+        <td style="padding:9px 12px;border-bottom:1px solid #eef2f7;text-align:right;">$${money(unitPrice)}</td>
+        <td style="padding:9px 12px;border-bottom:1px solid #eef2f7;text-align:right;font-weight:700;">$${money(totalConQty)}</td>
+      </tr>`;
+    }
   });
 
   const subtotal = grandTotal;
@@ -3847,7 +3903,7 @@ function buildQuotePDFHTML(p, q, extraQuotes, includeIVA, includePhoto){
   .body { padding: 20px 24mm; flex: 1; }
 
   /* ── INFO GRID ── */
-  .info-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 22px; }
+  .info-grid { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 12px; margin-bottom: 22px; }
   .info-box { border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 14px; }
   .info-box .lbl { font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; color: #94a3b8; margin-bottom: 4px; }
   .info-box .val { font-size: 13px; font-weight: 700; color: #0f172a; }
@@ -3943,7 +3999,11 @@ ${logoSrc ? `<img class="wm" src="${logoSrc}" alt="">` : ""}
       </div>
       <div class="info-box">
         <div class="lbl">Entrega estimada</div>
-        <div class="val">${escapeHTML(p.deliveryDate||"3–4 semanas")}</div>
+        <div class="val">${escapeHTML(p.deliveryDate||"2–3 semanas")}</div>
+      </div>
+      <div class="info-box">
+        <div class="lbl">Asesor</div>
+        <div class="val">${escapeHTML(currentUser()?.name || emp.nombre || "—")}</div>
       </div>
     </div>
 
@@ -3974,11 +4034,9 @@ ${logoSrc ? `<img class="wm" src="${logoSrc}" alt="">` : ""}
 
     <!-- TERMS -->
     <div class="terms">
-      <b>Condiciones de pago y entrega:</b><br>
-      • Se requiere un anticipo del <b>50%</b> para iniciar la fabricación.<br>
-      • El saldo restante (50%) se liquida contra entrega.<br>
-      • Tiempo de fabricación: <b>3 a 4 semanas</b> a partir de la confirmación y anticipo.<br>
-      • Cotización válida por <b>30 días</b> a partir de la fecha de emisión.
+      <b>Términos y condiciones:</b><br>
+      ${(emp.terminos||TERMINOS_DEFAULT).split("\n").map(line=>escapeHTML(line)).join("<br>")}<br>
+      • Esta cotización tiene una vigencia de <b>${Number(emp.vigenciaDias||15)} días</b> a partir de la fecha de emisión.
     </div>
 
     <!-- FIRMA -->
@@ -5819,7 +5877,7 @@ function openQuoteEditorPage(q){
             <button class="btn small primary" id="addProd"><i class="ti ti-plus"></i> Agregar</button>
           </div>
           <div class="table-wrap" style="border:none;border-radius:0;">
-            <table><thead><tr><th>Material</th><th>Descripción</th><th>Cant.</th><th>Costo unit.</th><th>Total</th><th></th></tr></thead>
+            <table><thead><tr><th>Material</th><th>Descripción</th><th>Cant.</th><th>Costo unit.</th><th>Total</th><th></th><th></th></tr></thead>
             <tbody id="tbProd"></tbody></table>
           </div>
         </div>
@@ -5886,9 +5944,12 @@ function openQuoteEditorPage(q){
   function renderLines(){
     const prod=q.products||[];
     if(!prod.length){
-      document.getElementById("tbProd").innerHTML='<tr><td colspan="6" style="color:var(--muted);padding:12px;font-size:13px;">Sin productos.</td></tr>';
+      document.getElementById("tbProd").innerHTML='<tr><td colspan="7" style="color:var(--muted);padding:12px;font-size:13px;">Sin productos.</td></tr>';
     } else {
-      document.getElementById("tbProd").innerHTML=prod.map(r=>`<tr data-id="${r.id}"><td class="mpCell" style="min-width:160px;"></td><td><input data-f="desc" value="${escapeAttr(r.desc||"")}" placeholder="Descripcion..." style="background:transparent;border:none;color:var(--text);font-family:inherit;font-size:13px;width:100%;min-width:100px;"></td><td><input data-f="qty" type="number" step="0.01" value="${Number(r.qty||0)}" style="background:transparent;border:none;color:var(--text);font-family:inherit;width:55px;"></td><td><input data-f="unitPrice" type="number" step="0.01" value="${Number(r.unitPrice||0)}" style="background:transparent;border:none;color:var(--text);font-family:inherit;width:75px;"></td><td class="tdImp" style="font-weight:700;color:var(--accent2);white-space:nowrap;">$${money(Number(r.qty||0)*Number(r.unitPrice||0))}</td><td><button class="btn small danger" data-act="delProd">\u2715</button></td></tr>`).join("");
+      document.getElementById("tbProd").innerHTML=prod.map(r=>{
+        const hasDetail = !!(r.photo || r.ancho || r.largo || r.alto || r.descLarga);
+        return `<tr data-id="${r.id}"><td class="mpCell" style="min-width:160px;"></td><td><input data-f="desc" value="${escapeAttr(r.desc||"")}" placeholder="Descripcion..." style="background:transparent;border:none;color:var(--text);font-family:inherit;font-size:13px;width:100%;min-width:100px;"></td><td><input data-f="qty" type="number" step="0.01" value="${Number(r.qty||0)}" style="background:transparent;border:none;color:var(--text);font-family:inherit;width:55px;"></td><td><input data-f="unitPrice" type="number" step="0.01" value="${Number(r.unitPrice||0)}" style="background:transparent;border:none;color:var(--text);font-family:inherit;width:75px;"></td><td class="tdImp" style="font-weight:700;color:var(--accent2);white-space:nowrap;">$${money(Number(r.qty||0)*Number(r.unitPrice||0))}</td><td><button class="btn small ${hasDetail?'primary':''}" data-act="detailProd" title="Foto y dimensiones para el PDF"><i class="ti ti-photo"></i></button></td><td><button class="btn small danger" data-act="delProd">\u2715</button></td></tr>`;
+      }).join("");
       document.querySelectorAll("#tbProd tr[data-id]").forEach(tr=>{
         const r=prod.find(x=>x.id===tr.dataset.id); if(!r) return;
         const cell=tr.querySelector(".mpCell"); if(!cell) return;
@@ -5931,11 +5992,66 @@ function openQuoteEditorPage(q){
         else { el.addEventListener("blur",commit); el.addEventListener("keydown",(e)=>{ if(e.key==="Enter"){e.preventDefault();el.blur();} }); }
       });
       tr.querySelectorAll("button[data-act]").forEach(btn=>btn.addEventListener("click",()=>{
+        if(btn.dataset.act==="detailProd"){ openProductDetailModal(id); return; }
         if(btn.dataset.act==="delProd") q.products=q.products.filter(x=>x.id!==id);
         if(btn.dataset.act==="delRoute") q.routes=q.routes.filter(x=>x.id!==id);
         if(btn.dataset.act==="delExtra") q.extras=q.extras.filter(x=>x.id!==id);
         saveQuote(q); renderLines();
       }));
+    });
+  }
+
+  function openProductDetailModal(prodId){
+    const r = (q.products||[]).find(x=>x.id===prodId); if(!r) return;
+    const previewSrc = r.photo || "";
+    openSheet("Detalles del producto — para el PDF", `
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        <div>
+          <div class="field-label" style="margin-top:0;">Foto del producto</div>
+          <div id="pdModalPhotoWrap" style="width:100%;aspect-ratio:4/3;background:var(--bg3);border-radius:10px;overflow:hidden;display:flex;align-items:center;justify-content:center;">
+            ${previewSrc ? `<img src="${escapeAttr(previewSrc)}" style="width:100%;height:100%;object-fit:cover;">` : `<i class="ti ti-photo" style="font-size:32px;color:var(--muted);opacity:.4;"></i>`}
+          </div>
+          <label class="btn small" style="margin-top:8px;cursor:pointer;"><i class="ti ti-upload"></i> ${previewSrc?'Cambiar foto':'Subir foto'}<input type="file" id="pdModalPhotoInput" accept="image/*" style="display:none;"></label>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+          <div><div class="field-label" style="margin-top:0;">Ancho (cm)</div><div class="field"><input id="pdModalAncho" type="number" step="0.1" value="${r.ancho||""}"></div></div>
+          <div><div class="field-label" style="margin-top:0;">Largo (cm)</div><div class="field"><input id="pdModalLargo" type="number" step="0.1" value="${r.largo||""}"></div></div>
+          <div><div class="field-label" style="margin-top:0;">Alto (cm)</div><div class="field"><input id="pdModalAlto" type="number" step="0.1" value="${r.alto||""}"></div></div>
+        </div>
+        <div>
+          <div class="field-label" style="margin-top:0;">Descripción para el PDF (opcional)</div>
+          <div class="field"><textarea id="pdModalDescLarga" rows="3" placeholder="Materiales, acabados, características...">${escapeHTML(r.descLarga||"")}</textarea></div>
+        </div>
+      </div>
+    `, [
+      {label:"Cancelar", cls:"btn", action: closeSheet},
+      {label:"Guardar", cls:"btn primary", action: async ()=>{
+        const fileInput = document.getElementById("pdModalPhotoInput");
+        const file = fileInput?.files?.[0];
+        if(file){
+          try{
+            const base64 = await new Promise((res,rej)=>{ const img=new Image(); const objUrl=URL.createObjectURL(file); img.onload=()=>{ const MAX=800; const scale=Math.min(1,MAX/Math.max(img.width,img.height)); const canvas=document.createElement("canvas"); canvas.width=Math.round(img.width*scale); canvas.height=Math.round(img.height*scale); canvas.getContext("2d").drawImage(img,0,0,canvas.width,canvas.height); URL.revokeObjectURL(objUrl); res(canvas.toDataURL("image/jpeg",0.8)); }; img.onerror=rej; img.src=objUrl; });
+            r.photo = await uploadToImgbb(base64);
+          }catch(err){ alert("Error al subir foto: "+err.message); }
+        }
+        r.ancho = document.getElementById("pdModalAncho").value.trim();
+        r.largo = document.getElementById("pdModalLargo").value.trim();
+        r.alto = document.getElementById("pdModalAlto").value.trim();
+        r.descLarga = document.getElementById("pdModalDescLarga").value.trim();
+        saveQuote(q);
+        closeSheet();
+        renderLines();
+      }}
+    ]);
+    const photoInput = document.getElementById("pdModalPhotoInput");
+    if(photoInput) photoInput.addEventListener("change",()=>{
+      const file = photoInput.files?.[0]; if(!file) return;
+      const reader = new FileReader();
+      reader.onload = (ev)=>{
+        const wrap = document.getElementById("pdModalPhotoWrap");
+        if(wrap) wrap.innerHTML = `<img src="${ev.target.result}" style="width:100%;height:100%;object-fit:cover;">`;
+      };
+      reader.readAsDataURL(file);
     });
   }
 
@@ -6270,6 +6386,13 @@ function renderSalesPage(){
 }
 
 // ---- Settings ----
+const TERMINOS_DEFAULT = `Condiciones comerciales:
+- Anticipo: se requiere un pago del 50% del total para ingresar el pedido e iniciar la fabricación.
+- Pago final: el 50% restante se liquida contra entrega o antes de programar la instalación.
+- Tiempo de entrega: 2 a 3 semanas a partir de la confirmación del anticipo (sujeto a la complejidad del proyecto).
+- Garantía: varía según el tipo de producto — consulta con tu asesor la garantía aplicable a tu pedido.
+- Los precios están expresados en pesos mexicanos (MXN).`;
+
 function renderSettingsPage(){
   const content=document.getElementById("settingsContent"); if(!content) return;
   const emp=db.settings.empresa||{};
@@ -6292,6 +6415,9 @@ function renderSettingsPage(){
       <div class="field-label">Email</div><div class="field"><input id="empEmail" value="${escapeAttr(emp.email||"")}" placeholder="contacto@esma.com"></div>
       <div class="field-label">Direccion</div><div class="field"><input id="empDir" value="${escapeAttr(emp.direccion||"")}"></div>
       <div class="field-label">Titulo PDF</div><div class="field"><input id="empTitulo" value="${escapeAttr(emp.titulo||"Propuesta de Servicios")}"></div>
+      <div class="field-label">Vigencia de la cotización (días)</div><div class="field"><input id="empVigenciaDias" type="number" min="1" value="${Number(emp.vigenciaDias||15)}"></div>
+      <div class="field-label">Términos y condiciones (aparece al final del PDF)</div>
+      <div class="field"><textarea id="empTerminos" rows="6" placeholder="Anticipo, garantía, tiempos de entrega, condiciones de instalación...">${escapeHTML(emp.terminos||TERMINOS_DEFAULT)}</textarea></div>
       <div style="height:12px;"></div>
       <button class="btn primary" id="btnSaveEmp" style="width:100%;justify-content:center;">\u{1F4BE} Guardar empresa</button>
     </div>
@@ -6338,7 +6464,7 @@ function renderSettingsPage(){
 
   `;
 
-  document.getElementById("btnSaveEmp").addEventListener("click",()=>{ db.settings.empresa={...emp,nombre:document.getElementById("empNombre").value.trim()||"ESMA INDUSTRIAL",tel:document.getElementById("empTel").value.trim(),email:document.getElementById("empEmail").value.trim(),direccion:document.getElementById("empDir").value.trim(),titulo:document.getElementById("empTitulo").value.trim()||"Propuesta de Servicios",logoB64:db.settings.empresa?.logoB64||""}; save(); refreshLogo(db.settings.empresa.logoB64); const ht=document.getElementById("homeTitle"); if(ht) ht.textContent=db.settings.empresa.nombre; buildTopbar(); alert("\u2705 Guardado"); });
+  document.getElementById("btnSaveEmp").addEventListener("click",()=>{ db.settings.empresa={...emp,nombre:document.getElementById("empNombre").value.trim()||"ESMA INDUSTRIAL",tel:document.getElementById("empTel").value.trim(),email:document.getElementById("empEmail").value.trim(),direccion:document.getElementById("empDir").value.trim(),titulo:document.getElementById("empTitulo").value.trim()||"Propuesta de Servicios",vigenciaDias:Number(document.getElementById("empVigenciaDias").value||15),terminos:document.getElementById("empTerminos").value.trim()||TERMINOS_DEFAULT,logoB64:db.settings.empresa?.logoB64||""}; save(); refreshLogo(db.settings.empresa.logoB64); const ht=document.getElementById("homeTitle"); if(ht) ht.textContent=db.settings.empresa.nombre; buildTopbar(); alert("\u2705 Guardado"); });
   document.getElementById("btnSaveGsUrl").addEventListener("click",()=>{ const val=(document.getElementById("gsUrlInput")?.value||"").trim(); if(!val){ alert("Pega la URL"); return; } GS_URL=val; localStorage.setItem(GS_KEY,GS_URL); alert("\u2705 URL guardada"); });
   document.getElementById("btnGsPush").addEventListener("click",gsPush);
   document.getElementById("btnGsPull").addEventListener("click",gsPullOnBoot);
