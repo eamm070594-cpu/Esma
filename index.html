@@ -3794,29 +3794,42 @@ function buildQuotePDFHTML(p, q, extraQuotes, includeIVA, includePhoto){
   const iva = includeIVA ? subtotal * 0.16 : 0;
   const total = subtotal + iva;
 
-  // Portada (página 1 completa): foto + logo de la empresa, nada más.
-  // La descripción, tabla y totales van hasta la página 2 (salto de página forzado).
+  // Portada (página 1): logo grande + datos de la cotización + foto con
+  // márgenes y fondo difuminado (para que quepa cualquier proporción de foto
+  // sin verse recortada ni con espacios vacíos feos).
   const heroPhoto = includePhoto ? (q.refPhoto || "") : "";
+  const vigenciaDias = Number(emp.vigenciaDias||15);
+  const vigenciaDate = (()=>{
+    const base = q.createdAt ? new Date(q.createdAt+"T00:00:00") : new Date();
+    base.setDate(base.getDate()+vigenciaDias);
+    return base.toLocaleDateString("es-MX",{year:"numeric",month:"long",day:"numeric"});
+  })();
   const coverLogoHTML = logoSrc
     ? `<img src="${logoSrc}" alt="${escapeHTML(emp.nombre||"ESMA")}">`
     : `<div class="cover-logo-text">${escapeHTML(emp.nombre||"ESMA INDUSTRIAL")}</div>`;
-  const heroHTML = heroPhoto
-    ? `<div class="cover-page">
-        <img class="cover-img" src="${heroPhoto}" alt="">
-        <div class="cover-overlay"></div>
-        <div class="cover-logo">${coverLogoHTML}</div>
-        <div class="cover-content">
-          <div class="cover-brand">${escapeHTML(emp.nombre||"ESMA INDUSTRIAL")}</div>
-          <div class="cover-tag">${escapeHTML(emp.titulo||"Propuesta de Servicios")}</div>
-        </div>
-      </div>`
-    : `<div class="cover-page cover-solid">
-        <div class="cover-logo">${coverLogoHTML}</div>
-        <div class="cover-content" style="position:static;text-align:center;">
-          <div class="cover-brand">${escapeHTML(emp.nombre||"ESMA INDUSTRIAL")}</div>
-          <div class="cover-tag">${escapeHTML(emp.titulo||"Propuesta de Servicios")}</div>
-        </div>
-      </div>`;
+  const coverInfoHTML = `<div class="cover-info-row">
+      <div>
+        <div><b>Cotización:</b> ${escapeHTML((q.code||q.id.slice(0,8)).toUpperCase())}</div>
+        <div><b>Vigencia:</b> ${escapeHTML(vigenciaDate)}</div>
+        <div><b>Asesor:</b> ${escapeHTML(currentUser()?.name || emp.nombre || "—")}</div>
+      </div>
+      <div style="text-align:right;">
+        <div><b>Cliente:</b> ${escapeHTML(p.client||"—")}</div>
+        <div><b>Proyecto:</b> ${escapeHTML(p.name||"—")}</div>
+        <div><b>Entrega estimada:</b> ${escapeHTML(p.deliveryDate||"2–3 semanas")}</div>
+      </div>
+    </div>`;
+  const heroHTML = `<div class="cover-page">
+      <div class="cover-logo-row">${coverLogoHTML}</div>
+      ${coverInfoHTML}
+      ${heroPhoto
+        ? `<div class="cover-photo-wrap">
+            <div class="cover-photo-blur" style="background-image:url('${heroPhoto}');"></div>
+            <img class="cover-photo-img" src="${heroPhoto}" alt="">
+          </div>`
+        : `<div class="cover-solid"><div class="cover-brand">${escapeHTML(emp.nombre||"ESMA INDUSTRIAL")}</div></div>`
+      }
+    </div>`;
 
 
   return `<!doctype html>
@@ -3833,18 +3846,24 @@ function buildQuotePDFHTML(p, q, extraQuotes, includeIVA, includePhoto){
   /* ── PAGE WRAPPER ── */
   .page { padding: 0; position: relative; z-index: 1; min-height: 100vh; display: flex; flex-direction: column; }
 
-  /* ── PORTADA (página 1 completa: foto + logo, nada más) ── */
-  .cover-page { width: 100%; height: 11in; position: relative; overflow: hidden;
-    page-break-after: always; break-after: page; }
-  .cover-page img.cover-img { width: 100%; height: 100%; object-fit: cover; display: block; }
-  .cover-overlay { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(15,23,42,.05) 0%, rgba(15,23,42,.1) 45%, rgba(15,23,42,.92) 100%); }
-  .cover-solid { background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 55%, #2563eb 100%); display: flex; align-items: center; justify-content: center; }
-  .cover-logo { position: absolute; top: 40px; left: 24mm; display: flex; align-items: center; gap: 10px; }
-  .cover-logo img { height: 46px; object-fit: contain; filter: drop-shadow(0 2px 10px rgba(0,0,0,.5)); }
-  .cover-logo-text { color: #fff; font-size: 18px; font-weight: 900; letter-spacing: -.3px; text-shadow: 0 2px 8px rgba(0,0,0,.5); }
-  .cover-content { position: absolute; bottom: 50px; left: 24mm; right: 24mm; }
-  .cover-brand { color: #fff; font-size: 40px; font-weight: 900; letter-spacing: -.5px; text-shadow: 0 2px 14px rgba(0,0,0,.5); }
-  .cover-tag { color: rgba(255,255,255,.92); font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: 3px; margin-top: 10px; }
+  /* ── PORTADA (página 1: logo grande + datos + foto con márgenes) ── */
+  .cover-page { width: 100%; height: 11in; position: relative; overflow: hidden; background: #fff;
+    page-break-after: always; break-after: page; display: flex; flex-direction: column; }
+  .cover-logo-row { position: relative; z-index: 2; padding: 42px 24mm 18px; }
+  .cover-logo-row img { max-height: 92px; max-width: 260px; object-fit: contain; display: block; }
+  .cover-logo-row .cover-logo-text { font-size: 30px; font-weight: 900; color: #0f172a; letter-spacing: -.5px; }
+  .cover-info-row { position: relative; z-index: 2; display: flex; justify-content: space-between;
+    padding: 0 24mm 26px; font-size: 11px; color: #334155; line-height: 2; }
+  .cover-info-row b { color: #0f172a; font-weight: 800; }
+  .cover-photo-wrap { position: relative; flex: 1; margin: 0 24mm 20px; border-radius: 16px; overflow: hidden;
+    box-shadow: 0 12px 32px rgba(15,23,42,.18); background: #eef2f7; }
+  .cover-photo-blur { position: absolute; inset: -20px; background-size: cover; background-position: center;
+    filter: blur(28px) saturate(1.15); transform: scale(1.1); opacity: .55; }
+  .cover-photo-wrap img.cover-photo-img { position: relative; z-index: 1; width: 100%; height: 100%; object-fit: contain; display: block; }
+  .cover-solid { flex: 1; margin: 0 24mm 20px; border-radius: 16px;
+    background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 55%, #2563eb 100%);
+    display: flex; align-items: center; justify-content: center; }
+  .cover-solid .cover-brand { color: #fff; font-size: 34px; font-weight: 900; text-align: center; }
 
   /* ── ACCENT STRIPE ── */
   .stripe { height: 7px; background: linear-gradient(90deg, #1e3a8a 0%, #2563eb 60%, #3b82f6 100%); }
@@ -3863,7 +3882,7 @@ function buildQuotePDFHTML(p, q, extraQuotes, includeIVA, includePhoto){
   .doc-date { font-size: 11px; color: #64748b; margin-top: 3px; }
 
   /* ── BODY ── */
-  .body { padding: 20px 24mm; flex: 1; }
+  .body { padding: 20px 24mm 60px; flex: 1; }
 
   /* ── INFO GRID ── */
   .info-grid { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 12px; margin-bottom: 22px; }
@@ -3908,9 +3927,11 @@ function buildQuotePDFHTML(p, q, extraQuotes, includeIVA, includePhoto){
   .sig-box .sig-name { font-size: 12px; font-weight: 600; color: #1e293b; margin-top: 4px; }
 
   /* ── FOOTER ── */
-  .footer { padding: 12px 24mm; border-top: 1px solid #e2e8f0; display: flex;
-    justify-content: space-between; align-items: center; font-size: 9.5px; color: #94a3b8; }
-  .footer .accent { color: #2563eb; font-weight: 700; }
+  /* position:fixed hace que se repita en cada hoja al imprimir/generar el PDF
+     (igual que la marca de agua antes) — no solo al final del documento. */
+  .footer { position: fixed; bottom: 0; left: 0; right: 0; background: #fff;
+    padding: 10px 24mm; border-top: 1px solid #e2e8f0; text-align: center; font-size: 9px; color: #94a3b8; line-height: 1.6; }
+  .footer b { color: #475569; font-weight: 700; }
 
   @media print {
     body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
@@ -3949,26 +3970,6 @@ ${heroHTML}
       ${emp.web ? `<span>Web:</span> ${escapeHTML(emp.web)}` : ""}
       ${emp.direccion ? ` &nbsp;·&nbsp; ${escapeHTML(emp.direccion)}` : ""}
     </div>` : ""}
-
-    <!-- INFO GRID -->
-    <div class="info-grid">
-      <div class="info-box">
-        <div class="lbl">Cliente</div>
-        <div class="val">${escapeHTML(p.client||"—")}</div>
-      </div>
-      <div class="info-box">
-        <div class="lbl">Proyecto</div>
-        <div class="val">${escapeHTML(p.name||"—")}</div>
-      </div>
-      <div class="info-box">
-        <div class="lbl">Entrega estimada</div>
-        <div class="val">${escapeHTML(p.deliveryDate||"2–3 semanas")}</div>
-      </div>
-      <div class="info-box">
-        <div class="lbl">Asesor</div>
-        <div class="val">${escapeHTML(currentUser()?.name || emp.nombre || "—")}</div>
-      </div>
-    </div>
 
     <!-- TABLE -->
     <table>
@@ -4018,10 +4019,12 @@ ${heroHTML}
 
   </div>
 
-  <!-- FOOTER -->
+  <!-- FOOTER (se repite en cada hoja) -->
   <div class="footer">
-    <span>${escapeHTML(emp.nombre||"ESMA INDUSTRIAL")} &nbsp;·&nbsp; Documento generado digitalmente</span>
-    <span class="accent">Folio #${escapeHTML((q.code||q.id.slice(0,8)).toUpperCase())}</span>
+    <b>${escapeHTML(emp.nombre||"ESMA INDUSTRIAL")}</b>
+    ${emp.direccion?` &nbsp;·&nbsp; ${escapeHTML(emp.direccion)}`:""}
+    ${emp.tel?` &nbsp;·&nbsp; ${escapeHTML(emp.tel)}`:""}
+    &nbsp;·&nbsp; Folio #${escapeHTML((q.code||q.id.slice(0,8)).toUpperCase())}
   </div>
 </div>
 
