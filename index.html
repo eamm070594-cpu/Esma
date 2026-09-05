@@ -761,6 +761,14 @@ tbody tr:hover td{background:rgba(13,148,136,.03);}
 .plan-detail-row:last-child{border-bottom:none;}
 .plan-area-dot{width:10px;height:10px;border-radius:3px;flex-shrink:0;margin-top:3px;}
 @media(max-width:600px){.plan-week-grid{grid-template-columns:repeat(7,1fr);gap:2px;}.plan-chip{font-size:9px;padding:3px 4px;}}
+
+/* ── Vista previa de PDF sobre la app (ver _printHTML) ── */
+/* Al imprimir, se oculta TODO menos la capa del PDF, para que solo salga
+   eso en el PDF/impresión, no el resto de la app. */
+@media print {
+  body > *:not(#_pdfOverlay) { display: none !important; }
+  #_pdfOverlayToolbar { display: none !important; }
+}
 </style>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/tabler-icons.min.css">
   <!-- Firebase SDK (compat) -->
@@ -7233,22 +7241,114 @@ function buildGeneralReportHTML(){
 </body>
 </html>`;
 }
-// Genera e imprime un documento HTML como PDF. Usa una pestaña nueva en vez
-// de un iframe oculto porque Safari en iOS no soporta imprimir el contenido
-// de un iframe — con una pestaña/ventana real sí funciona en todos lados.
-function _printHTML(html){
-  const win = window.open('', '_blank');
-  if(!win){
-    alert("El navegador bloqueó la ventana para generar el PDF. Permite ventanas emergentes para este sitio e intenta de nuevo.");
-    return;
+// Antepone un "scope" (ej. "#_pdfOverlay") a cada selector de un bloque CSS,
+// respetando @import/@page tal cual y recorriendo @media. Se usa para poder
+// mostrar el HTML del PDF (que trae su propio <style>) DENTRO de la misma
+// página sin que sus clases (.header, .card, .page, etc.) choquen con las
+// de la app.
+function _scopeCSS(css, scope){
+  function findMatchingBrace(str, openIdx){
+    let depth = 0;
+    for(let j=openIdx; j<str.length; j++){
+      if(str[j]==='{') depth++;
+      else if(str[j]==='}'){ depth--; if(depth===0) return j; }
+    }
+    return str.length-1;
   }
-  win.document.open();
-  win.document.write(html);
-  win.document.close();
-  let printed = false;
-  const doPrint = () => { if(printed) return; printed = true; try{ win.focus(); win.print(); }catch(e){} };
-  win.onload = doPrint;
-  setTimeout(doPrint, 600);
+  function parse(str){
+    let out = '', i = 0;
+    while(i < str.length){
+      while(i<str.length && /\s/.test(str[i])) i++;
+      if(i>=str.length || str[i]==='}') break;
+      if(str.startsWith('/*', i)){
+        // Comentarios se copian tal cual, sin interpretar su contenido
+        // (si no, un "{" o "}" adentro de un comentario descuadra todo).
+        const end = str.indexOf('*/', i+2);
+        const stop = end===-1 ? str.length : end+2;
+        out += str.slice(i, stop) + '\n'; i = stop; continue;
+      }
+      if(str.startsWith('@import', i)){
+        // No cortar en el primer ";" nada más — la URL puede traer ";" adentro
+        // (ej. Google Fonts: ...wght@400;500;600...) — hay que respetar los
+        // paréntesis de url(...) y solo terminar en un ";" que esté afuera.
+        let j = i, depth = 0;
+        while(j < str.length){
+          if(str[j]==='(') depth++;
+          else if(str[j]===')') depth--;
+          else if(str[j]===';' && depth===0) break;
+          j++;
+        }
+        out += str.slice(i, j+1) + '\n'; i = j+1; continue;
+      }
+      if(str.startsWith('@page', i)){
+        const bs = str.indexOf('{', i); const be = findMatchingBrace(str, bs);
+        out += str.slice(i, be+1) + '\n'; i = be+1; continue;
+      }
+      if(str.startsWith('@media', i)){
+        const bs = str.indexOf('{', i);
+        const header = str.slice(i, bs+1);
+        const inner = parse(str.slice(bs+1));
+        const be = findMatchingBrace(str, bs);
+        out += header + '\n' + inner + '\n}\n'; i = be+1; continue;
+      }
+      const bs = str.indexOf('{', i);
+      if(bs===-1) break;
+      const selectors = str.slice(i, bs).trim();
+      const be = findMatchingBrace(str, bs);
+      const body = str.slice(bs+1, be);
+      const scoped = selectors.split(',').map(s=>{
+        s = s.trim();
+        if(s==='*') return scope+' *';
+        if(s==='body' || s==='html') return scope;
+        return scope+' '+s;
+      }).join(', ');
+      out += scoped + ' {' + body + '}\n';
+      i = be+1;
+    }
+    return out;
+  }
+  return parse(css);
+}
+
+// Muestra el HTML del PDF DENTRO de la misma página (no en pestaña/ventana
+// nueva). Esto es necesario porque en iPhone, cuando la app está "instalada"
+// (agregada a pantalla de inicio), no hay pestañas ni botón de atrás — si se
+// abre una ventana nueva para el PDF, no hay forma de regresar a la app. Con
+// esto, el PDF aparece como una capa encima de la app con un botón "Cerrar"
+// siempre visible, y el botón "Imprimir / Guardar" llama a window.print() de
+// la página principal (que sí funciona en Safari de iOS, a diferencia de
+// imprimir desde un iframe).
+function _printHTML(html){
+  const old = document.getElementById('_pdfOverlay'); if(old) old.remove();
+  const oldStyle = document.getElementById('_pdfOverlayStyle'); if(oldStyle) oldStyle.remove();
+
+  const styleMatch = html.match(/<style[^>]*>([\s\S]*?)<\/style>/);
+  const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/);
+  const titleMatch = html.match(/<title[^>]*>([\s\S]*?)<\/title>/);
+
+  const styleTag = document.createElement('style');
+  styleTag.id = '_pdfOverlayStyle';
+  styleTag.textContent = styleMatch ? _scopeCSS(styleMatch[1], '#_pdfOverlay') : '';
+  document.head.appendChild(styleTag);
+
+  const overlay = document.createElement('div');
+  overlay.id = '_pdfOverlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:#525659;z-index:99999;overflow:auto;';
+  overlay.innerHTML = bodyMatch ? bodyMatch[1] : html;
+
+  const toolbar = document.createElement('div');
+  toolbar.id = '_pdfOverlayToolbar';
+  toolbar.style.cssText = 'position:sticky;top:0;background:#1e293b;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;gap:8px;z-index:2;';
+  toolbar.innerHTML = `<span style="color:#fff;font-weight:700;font-size:13px;">${titleMatch?escapeHTML(titleMatch[1]):'Vista previa del PDF'}</span>
+    <div style="display:flex;gap:8px;">
+      <button id="_pdfOverlayPrint" style="background:#0d9488;color:#fff;border:none;padding:8px 16px;border-radius:8px;font-weight:700;cursor:pointer;font-size:13px;">🖨 Imprimir / Guardar PDF</button>
+      <button id="_pdfOverlayClose" style="background:#475569;color:#fff;border:none;padding:8px 16px;border-radius:8px;font-weight:700;cursor:pointer;font-size:13px;">✕ Cerrar</button>
+    </div>`;
+  overlay.insertBefore(toolbar, overlay.firstChild);
+
+  document.body.appendChild(overlay);
+  document.getElementById('_pdfOverlayClose').addEventListener('click', ()=>{ overlay.remove(); styleTag.remove(); });
+  document.getElementById('_pdfOverlayPrint').addEventListener('click', ()=>{ window.print(); });
 }
 function printGeneralReport(){
   _printHTML(buildGeneralReportHTML());
