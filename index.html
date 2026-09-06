@@ -768,6 +768,14 @@ tbody tr:hover td{background:rgba(13,148,136,.03);}
 @media print {
   body > *:not(#_pdfOverlay) { display: none !important; }
   #_pdfOverlayToolbar { display: none !important; }
+  /* position:fixed en #_pdfOverlay hace que Chrome recorte la impresión a
+     una sola página (bug conocido con contenido fijo/absoluto al paginar).
+     Al imprimir lo pasamos a flujo normal para que sí pagine completo. */
+  #_pdfOverlay { position: static !important; inset: auto !important; overflow: visible !important; height: auto !important; background: #fff !important; }
+  /* html/body están fijados a height:100%;overflow:hidden (shell de la app
+     de una sola pantalla) — eso también recorta la impresión a esa altura
+     aunque el overlay ya esté libre. Hay que liberarlos también. */
+  html, body { height: auto !important; overflow: visible !important; }
 }
 </style>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/tabler-icons.min.css">
@@ -1672,6 +1680,12 @@ function normalizeDB(){
   if(!db.settings.stockItems) db.settings.stockItems = {};
   if(!db.settings.empresa) db.settings.empresa = {nombre:"ESMA INDUSTRIAL", tel:"", email:"", web:"", redes:"", direccion:"", logoB64:"", titulo:"Propuesta de Servicios"};
   else { db.settings.empresa.titulo = db.settings.empresa.titulo || "Propuesta de Servicios"; }
+  // Instagram/Facebook reales de ESMA — solo si el campo sigue vacío, para no
+  // pisar algo que el usuario ya haya escrito o cambiado en Ajustes. "web"
+  // se deja vacío a propósito: ESMA aún no tiene página — cuando la tengan,
+  // basta con llenar ese campo en Ajustes y aparece sola en la cotización.
+  if(!db.settings.empresa.instagramUrl) db.settings.empresa.instagramUrl = "https://www.instagram.com/esma_industrial/";
+  if(!db.settings.empresa.facebookUrl) db.settings.empresa.facebookUrl = "https://www.facebook.com/share/19DCwQRxJ1/";
   // Preferir el logo ya sincronizado (nube); localStorage es solo respaldo
   // para cuando todavía no hay nada sincronizado en este dispositivo.
   db.settings.empresa.logoB64 = db.settings.empresa.logoB64 || localStorage.getItem("esma_logo_b64") || "";
@@ -2522,16 +2536,21 @@ function renderQuotes(p){
   $("mainContent").querySelectorAll("button[data-act]").forEach(b=>on(b,"click", ()=>{
     const q=db.quotes.find(x=>x.id===b.dataset.id); if(!q) return;
     if(b.dataset.act==="edit") openQuoteEditor(q);
-    if(b.dataset.act==="toggle"){ q.status=(q.status==="authorized")?"draft":"authorized"; if(q.status==="authorized") q.authorizedAt=todayISO(); else delete q.authorizedAt; save(); renderProjectsList(); renderMain(); }
+    if(b.dataset.act==="toggle"){
+      q.status=(q.status==="authorized")?"draft":"authorized";
+      if(q.status==="authorized"){ q.authorizedAt=todayISO(); _onQuoteAuthorized(q.projectId); const proj=db.projects.find(x=>x.id===q.projectId); if(proj) saveProject(proj); }
+      else delete q.authorizedAt;
+      saveQuote(q); save(); renderProjectsList(); renderMain();
+    }
     if(b.dataset.act==="duplicate"){
       const copy=JSON.parse(JSON.stringify(q));
       copy.id=uid(); copy.status="draft"; copy.createdAt=todayISO();
       copy.name=(q.name||q.createdAt||"Cotización")+" (copia)";
       copy.code="";
-      db.quotes.push(copy); save(); renderProjectsList(); renderMain();
+      db.quotes.push(copy); saveQuote(copy); save(); renderProjectsList(); renderMain();
       openQuoteEditor(copy);
     }
-    if(b.dataset.act==="delQuote"){ if(!confirm("¿Eliminar esta cotización?")) return; db.quotes=db.quotes.filter(x=>x.id!==q.id); save(); renderProjectsList(); renderMain(); }
+    if(b.dataset.act==="delQuote"){ if(!confirm("¿Eliminar esta cotización?")) return; db.quotes=db.quotes.filter(x=>x.id!==q.id); deleteQuote(q.id); save(); renderProjectsList(); renderMain(); }
   }));
 }
 
@@ -2970,7 +2989,7 @@ function openQuoteEditor(q){
             const di=tr.querySelector('input[data-f="desc"]'); if(di&&!di.value) di.value=r.desc;
           }
           const imp=tr.querySelector(".tdImp"); if(imp) imp.innerHTML=`<b>$${money(Number(r.qty||0)*Number(r.unitPrice||0))}</b>`;
-          save(); $("qTotal").textContent="$"+money(quoteTotal(q)); renderQuoteBreakdown(q); renderProjectsList();
+          saveQuote(q); save(); $("qTotal").textContent="$"+money(quoteTotal(q)); renderQuoteBreakdown(q); renderProjectsList();
         });
         cell.appendChild(picker);
       });
@@ -3018,18 +3037,18 @@ function openQuoteEditor(q){
             if(el.type==="number") row[f]=Number(el.value||0); else row[f]=el.value;
             // Actualizar importe sin re-render (preserva picker)
             const imp=tr.querySelector(".tdImp"); if(imp) imp.innerHTML=`<b>$${money(Number(row.qty||0)*Number(row.unitPrice||0))}</b>`;
-            save(); $("qTotal").textContent="$"+money(quoteTotal(q)); renderQuoteBreakdown(q); renderProjectsList();
+            saveQuote(q); save(); $("qTotal").textContent="$"+money(quoteTotal(q)); renderQuoteBreakdown(q); renderProjectsList();
           } else if(kind==="routes"){
-            if(f==="routeName"){ row.routeName=el.value; const rm=routeByName(row.routeName); if(rm) row.rate=Number(rm.costPerHour||0); save(); renderLines(); }
+            if(f==="routeName"){ row.routeName=el.value; const rm=routeByName(row.routeName); if(rm) row.rate=Number(rm.costPerHour||0); saveQuote(q); save(); renderLines(); }
             else { if(el.type==="number") row[f]=Number(el.value||0); else row[f]=el.value;
               // Update route importe in-place
               const imp=tr.querySelector(".tdImp"); if(imp) imp.innerHTML=`<b>$${money(Number(row.hours||0)*Number(row.rate||0))}</b>`;
-              save(); $("qTotal").textContent="$"+money(quoteTotal(q)); renderQuoteBreakdown(q); renderProjectsList();
+              saveQuote(q); save(); $("qTotal").textContent="$"+money(quoteTotal(q)); renderQuoteBreakdown(q); renderProjectsList();
             }
           } else {
             // extras — update in-place, no re-render
             if(el.type==="number") row[f]=Number(el.value||0); else row[f]=el.value;
-            save(); $("qTotal").textContent="$"+money(quoteTotal(q)); renderQuoteBreakdown(q); renderProjectsList();
+            saveQuote(q); save(); $("qTotal").textContent="$"+money(quoteTotal(q)); renderQuoteBreakdown(q); renderProjectsList();
           }
         };
         if(el.tagName==="SELECT"){ on(el,"change",commit); }
@@ -3039,20 +3058,20 @@ function openQuoteEditor(q){
         if(btn.dataset.act==="delProd") q.products=q.products.filter(x=>x.id!==id);
         if(btn.dataset.act==="delRoute") q.routes=q.routes.filter(x=>x.id!==id);
         if(btn.dataset.act==="delExtra") q.extras=q.extras.filter(x=>x.id!==id);
-        save(); renderLines(); renderProjectsList();
+        saveQuote(q); save(); renderLines(); renderProjectsList();
       }));
     });
   }
 
-  on($("addProd"),"click", ()=>{ q.products=q.products||[]; q.products.push({id:uid(), matPick:"", desc:"", qty:1, unitPrice:0}); save(); renderLines(); });
-  on($("addRoute"),"click", ()=>{ q.routes=q.routes||[]; const first=db.settings.routeDB[0]?.name||""; const rate=first?(routeByName(first)?.costPerHour||0):0; q.routes.push({id:uid(), routeName:first, hours:1, rate:Number(rate||0)}); save(); renderLines(); });
-  on($("addExtra"),"click", ()=>{ q.extras=q.extras||[]; q.extras.push({id:uid(), label:"", amount:0}); save(); renderLines(); });
+  on($("addProd"),"click", ()=>{ q.products=q.products||[]; q.products.push({id:uid(), matPick:"", desc:"", qty:1, unitPrice:0}); saveQuote(q); save(); renderLines(); });
+  on($("addRoute"),"click", ()=>{ q.routes=q.routes||[]; const first=db.settings.routeDB[0]?.name||""; const rate=first?(routeByName(first)?.costPerHour||0):0; q.routes.push({id:uid(), routeName:first, hours:1, rate:Number(rate||0)}); saveQuote(q); save(); renderLines(); });
+  on($("addExtra"),"click", ()=>{ q.extras=q.extras||[]; q.extras.push({id:uid(), label:"", amount:0}); saveQuote(q); save(); renderLines(); });
 
-  on($("qNameInput"),"blur", ()=>{ q.name=$("qNameInput").value.trim()||"Cotización"; save(); });
-  on($("qQtyInput"),"blur", ()=>{ q.qty=Math.max(1,Number($("qQtyInput").value||1)); save(); renderLines(); });
+  on($("qNameInput"),"blur", ()=>{ q.name=$("qNameInput").value.trim()||"Cotización"; saveQuote(q); save(); });
+  on($("qQtyInput"),"blur", ()=>{ q.qty=Math.max(1,Number($("qQtyInput").value||1)); saveQuote(q); save(); renderLines(); });
   on($("qQtyInput"),"keydown",(e)=>{ if(e.key==="Enter"){ e.preventDefault(); $("qQtyInput").blur(); }});
-  on($("btnToggleAuth"),"click", ()=>{ q.status=(q.status==="authorized")?"draft":"authorized"; if(q.status==="authorized"){ q.authorizedAt=todayISO(); _onQuoteAuthorized(q.projectId); } else delete q.authorizedAt; save(); renderProjectsList(); renderMain(); });
-  on($("btnBackQuotes"),"click", ()=>{ q.name=$("qNameInput").value.trim()||"Cotización"; save(); mainTab="quotes"; renderMain(); });
+  on($("btnToggleAuth"),"click", ()=>{ q.status=(q.status==="authorized")?"draft":"authorized"; if(q.status==="authorized"){ q.authorizedAt=todayISO(); _onQuoteAuthorized(q.projectId); } else delete q.authorizedAt; saveQuote(q); saveProject(p); save(); renderProjectsList(); renderMain(); });
+  on($("btnBackQuotes"),"click", ()=>{ q.name=$("qNameInput").value.trim()||"Cotización"; saveQuote(q); save(); mainTab="quotes"; renderMain(); });
 
   // ── Guardar como plantilla ──
   on($("btnSaveTemplate"),"click", ()=>{
@@ -3087,13 +3106,13 @@ function openQuoteEditor(q){
       q.routes   = JSON.parse(JSON.stringify(tpl.routes||[])).map(r=>({...r, id:uid()}));
       q.extras   = JSON.parse(JSON.stringify(tpl.extras||[])).map(r=>({...r, id:uid()}));
       q.marginPct = tpl.marginPct ?? q.marginPct ?? 25;
-      save();
+      saveQuote(q); save();
       renderLines();
       const btn = $("btnLoadTemplate");
       if(btn){ btn.textContent="✅ Plantilla cargada"; setTimeout(()=>{ if(btn) btn.textContent="📂 Usar plantilla"; },2000); }
     });
   });
-  on($("btnSaveQuoteOld"),"click", ()=>{ q.name=$("qNameInput").value.trim()||"Cotización"; save(); const btn=$("btnSaveQuoteOld"); if(btn){ btn.textContent="✅ Guardado"; setTimeout(()=>{ if(btn) btn.textContent="💾 Guardar"; },1500); } });
+  on($("btnSaveQuoteOld"),"click", ()=>{ q.name=$("qNameInput").value.trim()||"Cotización"; saveQuote(q); save(); const btn=$("btnSaveQuoteOld"); if(btn){ btn.textContent="✅ Guardado"; setTimeout(()=>{ if(btn) btn.textContent="💾 Guardar"; },1500); } });
   on($("btnQuotePDF2"),"click", ()=>{
     const proj = db.projects.find(x=>x.id===q.projectId)||{name:""};
     const sibling = db.quotes.filter(x=>x.projectId===q.projectId && x.id!==q.id);
@@ -3137,7 +3156,7 @@ function openQuoteEditor(q){
 
   if($("qMarginPct")){
     $("qMarginPct").value = Number(q.marginPct ?? 25);
-    on($("qMarginPct"),"blur", ()=>{ q.marginPct = Number($("qMarginPct").value||0); save(); renderLines(); });
+    on($("qMarginPct"),"blur", ()=>{ q.marginPct = Number($("qMarginPct").value||0); saveQuote(q); save(); renderLines(); });
     on($("qMarginPct"),"keydown",(e)=>{ if(e.key==="Enter"){ e.preventDefault(); $("qMarginPct").blur(); }});
   }
 
@@ -3863,10 +3882,10 @@ function buildQuotePDFHTML(p, q, extraQuotes, includeIVA, includePhoto){
   /* position:absolute dentro de .page (no fixed en toda la página) para que
      no se dibuje también sobre la foto de portada. */
   .wm { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%) rotate(-30deg);
-    width: 55%; opacity: .18; z-index: 0; pointer-events: none; }
+    width: 55%; opacity: .18; z-index: -1; pointer-events: none; }
 
   /* ── PAGE WRAPPER ── */
-  .page { padding: 0; position: relative; z-index: 1; min-height: 100vh; display: flex; flex-direction: column; }
+  .page { padding: 0; position: relative; z-index: 1; min-height: 100vh; display: flex; flex-direction: column; background: #fff; }
 
   /* ── PORTADA (página 1: datos de la cotización + foto de marca ESMA fija) ── */
   .cover-page { width: 100%; height: 11in; position: relative; overflow: hidden; background: #fff;
@@ -3886,10 +3905,10 @@ function buildQuotePDFHTML(p, q, extraQuotes, includeIVA, includePhoto){
   .stripe { height: 7px; background: linear-gradient(90deg, #1e3a8a 0%, #2563eb 60%, #3b82f6 100%); }
 
   /* ── HEADER (página 2 en adelante) ── */
-  .header { display: flex; justify-content: space-between; align-items: flex-start;
+  .header { display: flex; justify-content: space-between; align-items: center;
     padding: 20px 24mm 18px; border-bottom: 1px solid #e2e8f0; }
   .logo-area { display: flex; flex-direction: column; gap: 6px; }
-  .logo-area img { height: 280px; max-width: 420px; object-fit: contain; }
+  .logo-area img { height: 200px; max-width: 420px; object-fit: contain; }
   .logo-area .emp-name { font-size: 18px; font-weight: 900; color: #1e3a8a; letter-spacing: -.3px; }
   .header-right { text-align: right; }
   .doc-badge { display: inline-block; background: #1e3a8a; color: #fff; font-size: 10px;
@@ -3910,13 +3929,26 @@ function buildQuotePDFHTML(p, q, extraQuotes, includeIVA, includePhoto){
   /* ── COMPANY CONTACT ── */
   .emp-contact { font-size: 10.5px; color: #64748b; line-height: 1.7; margin-bottom: 18px; }
   .emp-contact span { color: #1e3a8a; font-weight: 600; }
+  .contact-bar { display: flex; justify-content: space-between; align-items: center; gap: 18px;
+    padding: 14px 18px; background: #f8faff; border: 1px solid #e2e8f0; border-radius: 10px; margin-bottom: 22px;
+    page-break-inside: avoid; break-inside: avoid; }
+  .contact-info { display: flex; flex-direction: column; gap: 7px; }
+  .contact-item { display: flex; align-items: center; gap: 7px; font-size: 10.5px; color: #475569; }
+  .contact-item svg { width: 13px; height: 13px; color: #1e3a8a; flex-shrink: 0; }
+  .contact-qrs { display: flex; gap: 18px; flex-shrink: 0; }
+  .qr-item { position: relative; display: block; flex-shrink: 0; }
+  .qr-item img { width: 78px; height: 78px; border-radius: 8px; border: 1px solid #e2e8f0; display: block; background: #fff; }
+  .qr-badge { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+    width: 24px; height: 24px; border-radius: 50%; background: #fff; box-shadow: 0 0 0 3px #fff;
+    display: flex; align-items: center; justify-content: center; overflow: hidden; }
+  .qr-badge svg { width: 24px; height: 24px; display: block; }
 
   /* ── TABLE ── */
   table { width: 100%; border-collapse: collapse; margin-bottom: 0; font-size: 12px; }
   thead { display: table-header-group; } /* repite el encabezado si la tabla llega a partirse entre hojas */
   tr { page-break-inside: avoid; break-inside: avoid; } /* nunca corta una fila a la mitad */
   .tbl-head { background: #1e3a8a; }
-  .tbl-head th { color: #fff; padding: 10px 12px; font-size: 10px; font-weight: 800;
+  .tbl-head th { background: #1e3a8a; color: #fff; padding: 10px 12px; font-size: 10px; font-weight: 800;
     letter-spacing: .8px; text-transform: uppercase; }
   .tbl-head th:not(:first-child) { text-align: right; }
   .tbl-head th:nth-child(2) { text-align: center; }
@@ -3985,15 +4017,37 @@ ${heroHTML}
   <!-- BODY -->
   <div class="body">
 
-    <!-- CONTACT LINE -->
+    <!-- CONTACT BAR (datos de contacto + QR de redes) -->
     ${(()=>{
-      const parts = [];
-      if(emp.tel) parts.push(`<span>Tel:</span> ${escapeHTML(emp.tel)}`);
-      if(emp.email) parts.push(`<span>Email:</span> ${escapeHTML(emp.email)}`);
-      if(emp.web) parts.push(`<span>Web:</span> ${escapeHTML(emp.web)}`);
-      if(emp.redes) parts.push(`<span>Redes:</span> ${escapeHTML(emp.redes)}`);
-      if(emp.direccion) parts.push(escapeHTML(emp.direccion));
-      return parts.length ? `<div class="emp-contact">${parts.join(" &nbsp;·&nbsp; ")}</div>` : "";
+      const ic = {
+        tel: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92Z"/></svg>`,
+        mail: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m2 6 10 7 10-7"/></svg>`,
+        pin: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 7-8 12-8 12s-8-5-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>`,
+        globe: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15 15 0 0 1 0 20 15 15 0 0 1 0-20Z"/></svg>`
+      };
+      // Logos oficiales (simplificados) de Instagram y Facebook, para el
+      // sello al centro del QR — no solo el nombre en texto.
+      const brand = {
+        instagram: `<svg viewBox="0 0 24 24"><defs><linearGradient id="igg" x1="0%" y1="100%" x2="100%" y2="0%"><stop offset="0%" stop-color="#FFDD55"/><stop offset="50%" stop-color="#FF543E"/><stop offset="100%" stop-color="#C837AB"/></linearGradient></defs><rect x="1.5" y="1.5" width="21" height="21" rx="6" fill="url(#igg)"/><circle cx="12" cy="12" r="5.2" fill="none" stroke="#fff" stroke-width="1.8"/><circle cx="17.6" cy="6.4" r="1.3" fill="#fff"/></svg>`,
+        facebook: `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="12" fill="#1877F2"/><path fill="#fff" d="M15.5 12.5h-2.2v7h-3v-7H8.7V10h1.6V8.6c0-2 1-3.2 3.3-3.2h2v2.5h-1.3c-.9 0-1 .3-1 1V10h2.4l-.3 2.5Z"/></svg>`
+      };
+      const infoItems = [];
+      if(emp.tel) infoItems.push(`<div class="contact-item">${ic.tel}${escapeHTML(emp.tel)}</div>`);
+      if(emp.email) infoItems.push(`<div class="contact-item">${ic.mail}${escapeHTML(emp.email)}</div>`);
+      if(emp.web) infoItems.push(`<div class="contact-item">${ic.globe}${escapeHTML(emp.web)}</div>`);
+      if(emp.direccion) infoItems.push(`<div class="contact-item">${ic.pin}${escapeHTML(emp.direccion)}</div>`);
+
+      const qr = (data, size) => `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(data)}`;
+      const qrItems = [];
+      if(emp.instagramUrl) qrItems.push(`<div class="qr-item"><img src="${qr(emp.instagramUrl,220)}" alt="QR Instagram"><span class="qr-badge">${brand.instagram}</span></div>`);
+      if(emp.facebookUrl) qrItems.push(`<div class="qr-item"><img src="${qr(emp.facebookUrl,220)}" alt="QR Facebook"><span class="qr-badge">${brand.facebook}</span></div>`);
+      if(emp.web) qrItems.push(`<div class="qr-item"><img src="${qr(emp.web,220)}" alt="QR Sitio web"><span class="qr-badge">${ic.globe.replace('currentColor','#1e3a8a')}</span></div>`);
+      if(!infoItems.length && !qrItems.length) return "";
+
+      return `<div class="contact-bar">
+        ${infoItems.length ? `<div class="contact-info">${infoItems.join("")}</div>` : "<div></div>"}
+        ${qrItems.length ? `<div class="contact-qrs">${qrItems.join("")}</div>` : ""}
+      </div>`;
     })()}
 
     <!-- TABLE -->
@@ -5713,7 +5767,7 @@ function renderDetailFull(p, content){
         item.addEventListener("mouseleave",()=>item.style.background="");
       });
       // Actions
-      menu.querySelector("[data-act='auth']").addEventListener("click",()=>{ menu.remove(); q.status=isAuth?"draft":"authorized"; if(q.status==="authorized") q.authorizedAt=todayISO(); else delete q.authorizedAt; saveQuote(q); save(); renderProjectsPage(); renderDetailFull(p,content); });
+      menu.querySelector("[data-act='auth']").addEventListener("click",()=>{ menu.remove(); q.status=isAuth?"draft":"authorized"; if(q.status==="authorized"){ q.authorizedAt=todayISO(); _onQuoteAuthorized(q.projectId); saveProject(p); } else delete q.authorizedAt; saveQuote(q); save(); renderProjectsPage(); renderDetailFull(p,content); });
       menu.querySelector("[data-act='dup']").addEventListener("click",()=>{ menu.remove(); const copy=JSON.parse(JSON.stringify(q)); copy.id=uid(); copy.status="draft"; copy.createdAt=todayISO(); copy.name=(q.name||"Cotización")+" (copia)"; copy.code=""; db.quotes.push(copy); saveQuote(copy); save(); renderProjectsPage(); renderDetailFull(p,content); openQuoteEditorPage(copy); });
       menu.querySelector("[data-act='refphoto']").addEventListener("click",()=>{ menu.remove(); const inp=document.createElement("input"); inp.type="file"; inp.accept="image/*"; inp.onchange=()=>{ const file=inp.files?.[0]; if(!file) return; const reader=new FileReader(); reader.onload=(ev)=>{ q.refPhoto=ev.target.result; saveQuote(q); save(); renderDetailFull(p,content); }; reader.readAsDataURL(file); }; inp.click(); });
       const delRefBtn=menu.querySelector("[data-act='delref']"); if(delRefBtn) delRefBtn.addEventListener("click",()=>{ menu.remove(); q.refPhoto=""; saveQuote(q); save(); renderDetailFull(p,content); });
@@ -7348,7 +7402,36 @@ function _printHTML(html){
 
   document.body.appendChild(overlay);
   document.getElementById('_pdfOverlayClose').addEventListener('click', ()=>{ overlay.remove(); styleTag.remove(); });
-  document.getElementById('_pdfOverlayPrint').addEventListener('click', ()=>{ window.print(); });
+  document.getElementById('_pdfOverlayPrint').addEventListener('click', ()=>{
+    // position:fixed en #_pdfOverlay hace que Chrome/Safari recorten la
+    // impresión a una sola página (bug conocido: el contenido dentro de un
+    // elemento con posición fija no pagina, solo se ve lo que cabe en la
+    // "página 1"). Lo pasamos a flujo normal justo antes de imprimir y lo
+    // regresamos a como estaba al terminar, para que el preview en pantalla
+    // no cambie.
+    // El shell de la app fija html/body a height:100%;overflow:hidden (para
+    // que la app se comporte como una sola pantalla). Eso también recorta
+    // la impresión a lo que cabe en esa altura — aunque el overlay del PDF
+    // ya esté en flujo normal, su papá (body) lo sigue tapando. Hay que
+    // liberar html/body también, no solo el overlay.
+    const prevCss = overlay.style.cssText;
+    const prevHtmlCss = document.documentElement.style.cssText;
+    const prevBodyCss = document.body.style.cssText;
+    let restored = false;
+    const restore = ()=>{
+      if(restored) return; restored = true;
+      overlay.style.cssText = prevCss;
+      document.documentElement.style.cssText = prevHtmlCss;
+      document.body.style.cssText = prevBodyCss;
+      window.removeEventListener('afterprint', restore);
+    };
+    overlay.style.cssText = 'position:static;inset:auto;overflow:visible;background:#fff;z-index:99999;';
+    document.documentElement.style.cssText += ';height:auto !important;overflow:visible !important;';
+    document.body.style.cssText += ';height:auto !important;overflow:visible !important;';
+    window.addEventListener('afterprint', restore);
+    setTimeout(()=>{ window.print(); }, 30);
+    setTimeout(restore, 15000);
+  });
 }
 function printGeneralReport(){
   _printHTML(buildGeneralReportHTML());
@@ -7406,7 +7489,7 @@ function openPDFSelector(projectId){
       // Save qty values back to quotes
       document.querySelectorAll("input[data-pdf-qty]").forEach(el=>{
         const q = db.quotes.find(x=>x.id===el.dataset.pdfQty);
-        if(q){ q.qty = Math.max(1, parseInt(el.value)||1); }
+        if(q){ q.qty = Math.max(1, parseInt(el.value)||1); saveQuote(q); }
       });
       save();
       const selQuotes = selected.map(id=>db.quotes.find(x=>x.id===id)).filter(Boolean);
