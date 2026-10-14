@@ -5713,7 +5713,9 @@ function renderProjectsPage(){
         ${tasksTotal>0?`<div style="font-size:11px;color:var(--muted);margin-top:4px;">${tasksDone}/${tasksTotal} tareas</div>`:""}
       </div>
       <div style="font-size:13px;color:var(--muted);">${p.deliveryDate||"—"}</div>
-      <div style="font-size:14px;font-weight:600;color:var(--text);">$${money(p.__authTotal)}</div>
+      ${p.__authTotal>0
+        ? `<div style="font-size:14px;font-weight:600;color:var(--text);">$${money(p.__authTotal)}</div>`
+        : `<div style="font-size:14px;font-weight:600;color:var(--muted);">$${money(p.__quoteTotal)}</div><div style="font-size:10px;color:var(--muted);">cotizado</div>`}
       <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-start;">
         ${statusBadge(p.__seg)}
         ${p.__seg==="auth" && daysSince!==null ? `<span style="font-size:11px;color:${ageColor};">${daysSince} días</span>` : ""}
