@@ -918,8 +918,8 @@ tbody tr:hover td{background:rgba(13,148,136,.03);}
     <button class="s-tile-full active" id="snav-hoy" onclick="showPage('hoy')" style="background:linear-gradient(90deg,rgba(37,99,235,.35),rgba(37,99,235,.08));font-weight:800;">
       <i class="ti ti-target-arrow s-ico"></i>Hoy · Vender
     </button>
-    <button class="s-tile-full" id="snav-dashboard" onclick="showPage('dashboard');this.classList.add('active')">
-      <i class="ti ti-layout-kanban s-ico"></i>Tablero de proyectos
+    <button class="s-tile-full" id="snav-dashboard" onclick="showPage('tablero')">
+      <i class="ti ti-layout-kanban s-ico"></i>Tablero
     </button>
 
     <!-- TRABAJO: Tiles grid -->
@@ -1011,7 +1011,16 @@ tbody tr:hover td{background:rgba(13,148,136,.03);}
       <div id="hoyContent"></div>
     </div>
 
-    <!-- PAGE: DASHBOARD (TABLERO) -->
+    <!-- PAGE: TABLERO (embudo comercial) -->
+    <div class="page" id="page-tablero">
+      <div class="page-header">
+        <div><h1>Tablero</h1><div class="sub">Tus proyectos por etapa, de cotizar a entregar. Lo urgente arriba.</div></div>
+        <button class="btn primary" onclick="document.getElementById('btnNewProject').click()">＋ Nuevo proyecto</button>
+      </div>
+      <div id="tableroContent"></div>
+    </div>
+
+    <!-- PAGE: DASHBOARD (flujo de producción, se abre desde la ficha) -->
     <div class="page" id="page-dashboard">
       <div class="page-header">
         <div>
@@ -1039,21 +1048,13 @@ tbody tr:hover td{background:rgba(13,148,136,.03);}
         <button class="btn primary" id="btnNewProject"><i class="ti ti-plus"></i> Nuevo proyecto</button>
       </div>
 
-      <!-- KPI STRIP -->
-      <div class="proj-kpi-strip" id="projKpiStrip"></div>
-
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
-        <div class="field" style="flex:1;">
-          <i class="ti ti-search ico" style="color:var(--muted);"></i>
-          <input id="searchProjects" placeholder="Buscar proyecto o cliente...">
-        </div>
+      <div id="projV2"></div>
+      <div style="display:none;">
+        <div class="proj-kpi-strip" id="projKpiStrip"></div>
+        <input id="searchProjects">
+        <div class="tabs" id="projTabs"><div class="tab active" data-seg="noauth">En curso</div><div class="tab" data-seg="auth">Autorizados</div><div class="tab" data-seg="done">Terminados</div></div>
+        <div id="projectsList"></div>
       </div>
-      <div class="tabs" id="projTabs">
-        <div class="tab active" data-seg="noauth">En curso</div>
-        <div class="tab" data-seg="auth">Autorizados</div>
-        <div class="tab" data-seg="done">Terminados</div>
-      </div>
-      <div id="projectsList"></div>
     </div>
 
     <!-- PAGE: DETALLE PROYECTO -->
@@ -1177,7 +1178,7 @@ tbody tr:hover td{background:rgba(13,148,136,.03);}
     <div class="nav-dd-item" onclick="closeAllDropdowns();mNavGo('sales')"><i class="ti ti-chart-line dd-ico"></i>Ventas</div>
     <div class="nav-dd-item" style="display:none" onclick="closeAllDropdowns();mShowSection('costos')"><i class="ti ti-scale dd-ico"></i>Costos / PE</div>
     <div class="nav-dd-item" style="display:none" onclick="closeAllDropdowns();mNavGo('agenda')"><i class="ti ti-calendar dd-ico"></i>Agenda</div>
-    <div class="nav-dd-item" onclick="closeAllDropdowns();mNavGo('dashboard')"><i class="ti ti-layout-kanban dd-ico"></i>Tablero de proyectos</div>
+    <div class="nav-dd-item" onclick="closeAllDropdowns();mNavGo('tablero')"><i class="ti ti-layout-kanban dd-ico"></i>Tablero</div>
     <div class="nav-dd-item" style="display:none" onclick="closeAllDropdowns();mShowSection('compras')"><i class="ti ti-shopping-cart dd-ico"></i>Compras</div>
     <div class="nav-dd-item" style="display:none" onclick="closeAllDropdowns();mShowSection('instalaciones')"><i class="ti ti-tool dd-ico"></i>Instalaciones</div>
     <div class="nav-dd-item" style="display:none" onclick="closeAllDropdowns();mShowSection('tareas')"><i class="ti ti-check dd-ico"></i>Tareas</div>
@@ -1977,7 +1978,7 @@ function applyRemoteData(data){
   try { buildTopbar(); } catch(e){}
   try { renderProjectsPage(); } catch(e){}
   try { renderDashboardPage(); } catch(e){}
-  try{ if(currentPage==="hoy") renderHoyPage(); }catch(e){}
+  try{ if(currentPage==="hoy") renderHoyPage(); if(currentPage==="tablero") renderTableroPage(); }catch(e){}
   try {
     if(typeof currentPage !== "undefined"){
       if(currentPage==="settings") renderSettingsPage();
@@ -2055,13 +2056,13 @@ function subscribeFirestoreRealtime(){
     snap.docChanges().forEach(c=>_mergeFirestoreDocChange(db.projects, c));
     try{ renderProjectsPage(); }catch(e){}
     try{ renderDashboardPage(); }catch(e){}
-    try{ if(currentPage==="hoy") renderHoyPage(); }catch(e){}
+    try{ if(currentPage==="hoy") renderHoyPage(); if(currentPage==="tablero") renderTableroPage(); }catch(e){}
     try{ buildTopbar(); }catch(e){}
   }, err=>console.error("Firestore projects listener error:", err));
   firestore.collection('quotes').onSnapshot(snap=>{
     snap.docChanges().forEach(c=>_mergeFirestoreDocChange(db.quotes, c));
     try{ renderDashboardPage(); }catch(e){}
-    try{ if(currentPage==="hoy") renderHoyPage(); }catch(e){}
+    try{ if(currentPage==="hoy") renderHoyPage(); if(currentPage==="tablero") renderTableroPage(); }catch(e){}
   }, err=>console.error("Firestore quotes listener error:", err));
 }
 
@@ -4953,13 +4954,14 @@ function showPage(name){
   if(pg) pg.classList.add("active");
   // mobile bottom nav active
   document.querySelectorAll(".nav-item").forEach(n=>n.classList.remove("active"));
-  const mMap = {hoy:"mnav-hoy",dashboard:"mnav-dashboard",projects:"mnav-projects",agenda:"mnav-more",sales:"mnav-more",settings:"mnav-more",bom:"mnav-more",plan:"mnav-more"};
+  const mMap = {hoy:"mnav-hoy",tablero:"mnav-more",dashboard:"mnav-dashboard",projects:"mnav-projects",agenda:"mnav-more",sales:"mnav-more",settings:"mnav-more",bom:"mnav-more",plan:"mnav-more"};
   const mBtn = document.getElementById(mMap[name]||"");
   if(mBtn) mBtn.classList.add("active");
   // sidebar active
   document.querySelectorAll(".s-nav-item,.s-sub-item,.s-tile,.s-tile-full").forEach(n=>n.classList.remove("active"));
   const sMap = {
     hoy:"snav-hoy",
+    tablero:"snav-dashboard",
     dashboard:"snav-dashboard",
     projects:"snav-projects",
     agenda:"snav-agenda",
@@ -4974,6 +4976,7 @@ function showPage(name){
   if(scr) scr.scrollTop = 0;
   _pushNav(name, {});
   if(name==="hoy") renderHoyPage();
+  if(name==="tablero") renderTableroPage();
   if(name==="dashboard") renderDashboardPage();
   if(name==="projects") renderProjectsPage();
   if(name==="agenda"){ renderCalendarPage(); renderResumenPage(); switchAgendaTab("cal"); }
@@ -5649,7 +5652,166 @@ function renderFichaView(box, allProjects){
   });
 }
 
+// ── PROYECTOS v2: lista de trabajo por prioridad + tablero (embudo) ──
+// Etapa comercial de cada proyecto y su siguiente acción. Prioridad: menor = más urgente.
+const ETAPAS = {
+  cotizar:   {label:"Por cotizar", color:"#64748b", bg:"rgba(100,116,139,.13)"},
+  cotizado:  {label:"Cotizado",    color:"#2563eb", bg:"rgba(37,99,235,.12)"},
+  vendido:   {label:"Vendido",     color:"#16a34a", bg:"rgba(22,163,74,.13)"},
+  entregado: {label:"Entregado",   color:"#7c3aed", bg:"rgba(124,58,237,.12)"},
+  perdido:   {label:"Perdido",     color:"#dc2626", bg:"rgba(220,38,38,.10)"},
+};
+const TONOS = {red:"var(--red)", amber:"var(--amber)", green:"var(--green)", accent:"var(--accent)", muted:"var(--muted)"};
+
+function _fechaCorta(iso){ if(!iso) return ""; return new Date(iso.slice(0,10)+"T12:00:00").toLocaleDateString("es-MX",{day:"numeric",month:"short"}); }
+
+function _pm(p){
+  const hoy=todayISO();
+  const qs=db.quotes.filter(q=>q.projectId===p.id);
+  const auth=qs.filter(q=>q.status==="authorized");
+  const open=qs.filter(q=>q.status!=="authorized" && q.pipelineStatus!=="lost" && _hoyQuoteTotal(q)>0);
+  const lost=qs.filter(q=>q.pipelineStatus==="lost");
+  const suma=a=>a.reduce((s,q)=>s+_hoyQuoteTotal(q),0);
+  const done=projectIsDone(p.id);
+  let etapa = done ? "entregado" : auth.length ? "vendido" : open.length ? "cotizado" : (lost.length ? "perdido" : "cotizar");
+  const monto = auth.length ? suma(auth) : suma(open);
+  let accion="", prio=50, tono="muted", fecha="", fechaLbl="";
+  if(etapa==="vendido"){
+    const d=p.deliveryDate;
+    if(d && d<hoy){ accion=`Entrega vencida hace ${_hoyDiasDesde(d)} días`; prio=1; tono="red"; fecha=d; fechaLbl="Entrega"; }
+    else if(!p.payStatus){ accion="Cobrar anticipo del 50%"; prio=2; tono="green"; fecha=d||""; fechaLbl=d?"Entrega":""; }
+    else if(!d){ accion="Poner fecha de entrega"; prio=6; tono="amber"; }
+    else { const falta=-_hoyDiasDesde(d); accion= falta<=3 ? `Entregar en ${falta} día${falta!==1?"s":""}` : "En producción"; prio=10+Math.min(falta,60)/10; tono= falta<=3?"amber":"accent"; fecha=d; fechaLbl="Entrega"; }
+  } else if(etapa==="cotizado"){
+    const sinEnviar=open.filter(q=>!q.pipelineStatus);
+    const enviadas=open.filter(q=>q.pipelineStatus);
+    const due=enviadas.map(q=>q.nextFollowUp||_hoyAddDays(q.sentAt||q.createdAt||hoy,HOY_SEGUIMIENTO_DIAS[0])).sort()[0]||"";
+    const edad=Math.min(...open.map(q=>_hoyDiasDesde(q.sentAt||q.createdAt)??0));
+    if(sinEnviar.length && edad<=HOY_VIEJA_DIAS){ accion="Enviar cotización"; prio=3; tono="amber"; fecha=sinEnviar[0].createdAt; fechaLbl="Hecha"; }
+    else if(edad>HOY_VIEJA_DIAS){ accion=`Sin movimiento ${edad} días: ciérrala`; prio=8; tono="red"; }
+    else if(due && due<=hoy){ accion="Dar seguimiento hoy"; prio=4; tono="accent"; fecha=due; fechaLbl="Seguimiento"; }
+    else { accion="Esperando respuesta"; prio=20; tono="muted"; fecha=due; fechaLbl="Seguimiento"; }
+  } else if(etapa==="cotizar"){ accion="Hacer la cotización"; prio=5; tono="amber"; fecha=p.createdAt||""; fechaLbl="Alta"; }
+  else if(etapa==="entregado"){ accion = p.payStatus==="anticipo" ? "Cobrar saldo" : "Pedir referido / reseña"; prio = p.payStatus==="anticipo" ? 7 : 90; tono = p.payStatus==="anticipo" ? "green" : "muted"; }
+  else { accion="Perdido"; prio=99; }
+  return {p, etapa, monto, accion, prio, tono, fecha, fechaLbl, quotes:qs};
+}
+
+let _pv2Filtro = "activos", _pv2Busca = "";
+const PV2_FILTROS = [["activos","Activos"],["cotizar","Por cotizar"],["cotizado","Cotizados"],["vendido","Vendidos"],["entregado","Entregados"],["perdido","Perdidos"],["todos","Todos"]];
+
 function renderProjectsPage(){
+  const box=document.getElementById("projV2"); if(!box || !db) return;
+  const todos=db.projects.map(_pm);
+  const cuenta=k=>todos.filter(m=>k==="todos"||(k==="activos"?["cotizar","cotizado","vendido"].includes(m.etapa):m.etapa===k));
+  const cnt=document.getElementById("projCount");
+  const activos=cuenta("activos");
+  if(cnt) cnt.textContent=`${activos.length} activos · ${activos.filter(m=>m.prio<=8).length} requieren acción`;
+  if(!box.dataset.ready){
+    box.dataset.ready="1";
+    box.innerHTML=`
+      <style>
+        #projV2 .pv-row{display:grid;grid-template-columns:6px minmax(0,2.2fr) 110px minmax(0,1.6fr) 110px 120px 92px;gap:12px;align-items:center;padding:10px 14px;border-bottom:1px solid var(--border);cursor:pointer;}
+        #projV2 .pv-row:hover{background:var(--bg3);}
+        #projV2 .pv-head{font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);cursor:default;background:var(--bg3);}
+        #projV2 .pv-head:hover{background:var(--bg3);}
+        #projV2 .pv-chip{display:inline-block;font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:999px;white-space:nowrap;}
+        @media(max-width:900px){
+          #projV2 .pv-row{grid-template-columns:6px minmax(0,1fr) auto;}
+          #projV2 .pv-row > .pv-hide{display:none;}
+          #projV2 .pv-head{display:none;}
+        }
+      </style>
+      <div class="card" style="padding:10px 12px;margin-bottom:10px;position:sticky;top:0;z-index:4;">
+        <div class="field" style="margin-bottom:8px;"><span class="ico">🔎</span><input id="pv2Search" placeholder="Buscar por proyecto, cliente, teléfono o folio…  (atajo: /)" autocomplete="off"></div>
+        <div id="pv2Chips" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
+      </div>
+      <div class="card" style="padding:0;overflow:hidden;" id="pv2List"></div>`;
+    const inp=document.getElementById("pv2Search");
+    inp.value=_pv2Busca;
+    inp.addEventListener("input",()=>{ _pv2Busca=inp.value; renderProjectsPage(); });
+    inp.addEventListener("keydown",e=>{ if(e.key==="Enter"){ const first=document.querySelector("#pv2List [data-open-p]"); if(first) openProjectDetail(first.dataset.openP); } if(e.key==="Escape"){ inp.value=""; _pv2Busca=""; renderProjectsPage(); } });
+    document.addEventListener("keydown",e=>{ if(e.key==="/" && currentPage==="projects" && document.activeElement!==inp && !/INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName||"")){ e.preventDefault(); inp.focus(); } });
+  }
+  // Chips con conteo y monto
+  document.getElementById("pv2Chips").innerHTML = PV2_FILTROS.map(([k,l])=>{
+    const arr=cuenta(k); const tot=arr.reduce((s,m)=>s+m.monto,0);
+    const on=_pv2Filtro===k;
+    return `<button class="btn small ${on?"primary":""}" data-pv2f="${k}">${l} <b style="margin-left:4px;">${arr.length}</b>${["cotizado","vendido"].includes(k)&&tot?`<span style="margin-left:6px;opacity:.75;">$${money(tot).split(".")[0]}</span>`:""}</button>`;
+  }).join("");
+  document.querySelectorAll("#pv2Chips [data-pv2f]").forEach(b=>b.onclick=()=>{ _pv2Filtro=b.dataset.pv2f; renderProjectsPage(); });
+
+  // Búsqueda: busca en todo (ignora el filtro si hay texto)
+  const t=_pv2Busca.trim().toLowerCase();
+  let items = t
+    ? todos.filter(m=>[m.p.name,m.p.client,m.p.phone,...m.quotes.map(q=>q.name),...m.quotes.map(q=>q.code)].join(" ").toLowerCase().includes(t))
+    : cuenta(_pv2Filtro);
+  items.sort((a,b)=> a.prio-b.prio || String(a.fecha||"9999").localeCompare(String(b.fecha||"9999")) || b.monto-a.monto);
+  if(_pv2Filtro==="entregado" && !t) items.sort((a,b)=>String(b.p.deliveryDate||b.p.createdAt||"").localeCompare(String(a.p.deliveryDate||a.p.createdAt||"")));
+
+  const list=document.getElementById("pv2List");
+  if(!items.length){ list.innerHTML=`<div style="padding:28px;text-align:center;color:var(--muted);font-size:13px;">${t?"Sin resultados para “"+escapeHTML(_pv2Busca)+"”.":"No hay proyectos en este filtro."}</div>`; return; }
+  list.innerHTML = `<div class="pv-row pv-head"><span></span><span>Proyecto</span><span class="pv-hide">Etapa</span><span class="pv-hide">Siguiente acción</span><span class="pv-hide">Fecha</span><span style="text-align:right;">Monto</span><span class="pv-hide"></span></div>` +
+    items.map(m=>{
+      const e=ETAPAS[m.etapa]; const tono=TONOS[m.tono]||TONOS.muted;
+      return `<div class="pv-row" data-open-p="${m.p.id}">
+        <span style="width:6px;height:34px;border-radius:3px;background:${m.prio<=8?tono:"transparent"};"></span>
+        <div style="min-width:0;">
+          <div style="font-size:13.5px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHTML(m.p.name||"Proyecto")}</div>
+          <div style="font-size:11.5px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHTML(m.p.client||"Sin cliente")}${m.p.phone?" · "+escapeHTML(m.p.phone):""}</div>
+          <div class="pv-mob" style="font-size:11px;font-weight:700;color:${tono};margin-top:2px;">${escapeHTML(m.accion)}</div>
+        </div>
+        <span class="pv-hide"><span class="pv-chip" style="color:${e.color};background:${e.bg};">${e.label}</span></span>
+        <span class="pv-hide" style="font-size:12.5px;font-weight:700;color:${tono};">${escapeHTML(m.accion)}</span>
+        <span class="pv-hide" style="font-size:11.5px;color:var(--muted);">${m.fecha?`${m.fechaLbl}<br><b style="color:var(--text);">${_fechaCorta(m.fecha)}</b>`:"—"}</span>
+        <span style="text-align:right;font-size:14px;font-weight:800;${m.monto?"":"color:var(--muted);"}">${m.monto?"$"+money(m.monto):"—"}</span>
+        <span class="pv-hide" style="display:flex;gap:4px;justify-content:flex-end;">
+          <button class="btn small" data-wa-p="${m.p.id}" title="WhatsApp" style="background:#16a34a;color:#fff;border-color:#16a34a;min-width:34px;justify-content:center;">✆</button>
+          <button class="btn small" data-open-p="${m.p.id}" title="Abrir">Abrir</button>
+        </span>
+      </div>`;
+    }).join("");
+  list.querySelectorAll(".pv-row[data-open-p]").forEach(r=>r.addEventListener("click",e=>{ if(e.target.closest("[data-wa-p]")) return; openProjectDetail(r.dataset.openP); }));
+  list.querySelectorAll("[data-wa-p]").forEach(b=>b.addEventListener("click",e=>{ e.stopPropagation(); _hoyWhats(b.dataset.waP,"hola"); }));
+  // La acción también se ve en la columna; en pantallas anchas ocultamos la línea móvil
+  if(window.innerWidth>900) list.querySelectorAll(".pv-mob").forEach(x=>x.style.display="none");
+}
+
+// Tablero: embudo por etapa comercial
+function renderTableroPage(){
+  const el=document.getElementById("tableroContent"); if(!el || !db) return;
+  const todos=db.projects.map(_pm);
+  const hace60=_hoyAddDays(todayISO(),-60);
+  const cols=[
+    ["cotizar","Por cotizar","Hazles cotización"],
+    ["cotizado","Cotizado","Envía y da seguimiento"],
+    ["vendido","Vendido · producción","Cobra y entrega a tiempo"],
+    ["entregado","Entregado (60 días)","Pide referidos"],
+  ];
+  el.innerHTML = `<div style="display:grid;grid-template-columns:repeat(4,minmax(220px,1fr));gap:10px;align-items:start;overflow-x:auto;padding-bottom:6px;">` +
+    cols.map(([k,l,sub])=>{
+      let arr=todos.filter(m=>m.etapa===k);
+      if(k==="entregado") arr=arr.filter(m=>String(m.p.deliveryDate||m.p.createdAt||"")>=hace60);
+      arr.sort((a,b)=>a.prio-b.prio||b.monto-a.monto);
+      const e=ETAPAS[k]; const tot=arr.reduce((s,m)=>s+m.monto,0);
+      return `<div style="background:var(--bg3);border:1px solid var(--border);border-radius:12px;overflow:hidden;">
+        <div style="padding:10px 12px;border-top:3px solid ${e.color};">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;"><span style="font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:${e.color};">${l}</span><span style="font-size:12px;font-weight:800;">${arr.length}</span></div>
+          <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-top:2px;"><span>${sub}</span><b style="color:var(--text);">${tot?"$"+money(tot).split(".")[0]:""}</b></div>
+        </div>
+        <div style="padding:0 8px 8px;display:flex;flex-direction:column;gap:6px;max-height:70vh;overflow:auto;">
+          ${arr.map(m=>{ const tono=TONOS[m.tono]||TONOS.muted; return `<div class="card" data-open-p="${m.p.id}" style="padding:9px 10px;cursor:pointer;border-left:3px solid ${m.prio<=8?tono:"transparent"};">
+            <div style="display:flex;justify-content:space-between;gap:6px;"><b style="font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHTML(m.p.name||"Proyecto")}</b><b style="font-size:12.5px;white-space:nowrap;">${m.monto?"$"+money(m.monto).split(".")[0]:""}</b></div>
+            <div style="font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHTML(m.p.client||"Sin cliente")}</div>
+            <div style="font-size:11px;font-weight:700;color:${tono};margin-top:3px;">${escapeHTML(m.accion)}${m.fecha&&m.prio>8?` · ${_fechaCorta(m.fecha)}`:""}</div>
+          </div>`; }).join("") || `<div style="font-size:12px;color:var(--muted);padding:10px 4px;">Nada aquí.</div>`}
+        </div>
+      </div>`;
+    }).join("") + `</div>`;
+  el.querySelectorAll("[data-open-p]").forEach(c=>c.addEventListener("click",()=>openProjectDetail(c.dataset.openP)));
+}
+
+function _renderProjectsPageLegacy(){
   const box=document.getElementById("projectsList"); if(!box) return;
   try{ renderProjKpis(); }catch(e){ console.warn('KPI error',e); }
   const term=projSearch.trim().toLowerCase();
