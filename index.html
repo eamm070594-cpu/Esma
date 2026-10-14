@@ -1062,10 +1062,11 @@ tbody tr:hover td{background:rgba(13,148,136,.03);}
         <div style="display:flex;align-items:center;gap:12px;margin-bottom:18px;">
           <button class="btn icon" id="btnBackProjects"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg></button>
           <div style="flex:1;min-width:0;">
-            <div style="font-size:44px;font-weight:800;color:var(--accent2);letter-spacing:.5px;line-height:1.1;margin-bottom:2px;">Ficha de producto</div>
-            <div style="font-size:18px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" id="detailProjectName">—</div>
-            <div style="font-size:12px;color:var(--muted);margin-top:2px;" id="detailProjectMeta">—</div>
+            <div style="font-size:10.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--accent);">Proyecto</div>
+            <div style="font-size:22px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.2;" id="detailProjectName">—</div>
+            <div style="font-size:12.5px;color:var(--muted);margin-top:2px;" id="detailProjectMeta">—</div>
           </div>
+          <button class="btn small" id="btnWaDetail" title="Abrir WhatsApp del cliente" style="background:#16a34a;color:#fff;border-color:#16a34a;"><i class="ti ti-brand-whatsapp"></i> WhatsApp</button>
           <button class="btn small primary" id="btnNewQuoteDetail"><i class="ti ti-plus"></i> Cotización</button>
         </div>
         <div id="detailContent"></div>
@@ -2184,6 +2185,11 @@ function renderQuoteBreakdown(q){
   const _bdExtraEl = $("bdExtra"); if(_bdExtraEl) _bdExtraEl.textContent = "$"+money(t.extra);
   const _bdVentaEl = $("bdVenta"); if(_bdVentaEl) _bdVentaEl.textContent = "$"+money(t.venta);
   const _bdRetornoEl = $("bdRetorno"); if(_bdRetornoEl) _bdRetornoEl.textContent = "$"+money(t.retorno);
+  const _qeTop=$("qeTotalTop"); if(_qeTop) _qeTop.textContent="$"+money(t.venta*qty);
+  const _stP=$("stProd"); if(_stP) _stP.textContent="$"+money(t.mp);
+  const _stR=$("stRoutes"); if(_stR) _stR.textContent="$"+money(t.ruta);
+  const _stE=$("stExtras"); if(_stE) _stE.textContent="$"+money(t.extra);
+  const _bdAnt=$("bdAnticipo"); if(_bdAnt) _bdAnt.textContent="$"+money(t.venta*qty*0.5);
   // Show total × qty row (works for both table-row and div versions)
   const totalVal = document.getElementById("bdTotalQty");
   const totalLabel = document.getElementById("bdTotalQtyLabel");
@@ -5796,7 +5802,8 @@ function renderProjectDetail(){
   const p=db.projects.find(x=>x.id===currentProjectId);
   if(!p){ showPage("projects"); return; }
   const el=document.getElementById("detailProjectName"); if(el) el.textContent=p.name||"Proyecto";
-  const meta=document.getElementById("detailProjectMeta"); if(meta) meta.textContent=[p.client?("👤 "+p.client):null,p.deliveryDate?("📅 "+p.deliveryDate):null].filter(Boolean).join(" · ")||"---";
+  const meta=document.getElementById("detailProjectMeta"); if(meta) meta.textContent=[p.client?("👤 "+p.client):null,p.phone?("📱 "+p.phone):null,p.deliveryDate?("📅 Entrega "+p.deliveryDate):null].filter(Boolean).join("  ·  ")||"---";
+  const waBtn=document.getElementById("btnWaDetail"); if(waBtn) waBtn.onclick=()=>_hoyWhats(p.id,"hola");
   const content=document.getElementById("detailContent");
   renderDetailFull(p, content);
 }
@@ -5815,58 +5822,44 @@ function renderDetailFull(p, content){
 
   const tRow = (t,cols) => `<tr data-id="${t.id}"><td><input type="date" data-f="date" value="${escapeAttr(t.date||"")}" style="background:transparent;border:none;color:var(--text);font-family:inherit;font-size:12px;width:108px;"></td><td><textarea data-f="title" style="background:transparent;border:none;color:var(--text);font-family:inherit;font-size:12px;resize:none;width:100%;min-height:28px;">${escapeHTML(t.title||"")}</textarea></td>${cols}<td><button class="btn small danger" data-act="del">✕</button></td></tr>`;
 
+  const _PIPE = {"":["Sin enviar","var(--muted)","rgba(100,116,139,.13)"], sent:["Enviada","var(--accent)","rgba(59,130,246,.13)"], negotiating:["Negociando","var(--green)","rgba(22,163,74,.13)"], no_response:["Sin respuesta","var(--amber)","rgba(217,119,6,.13)"], lost:["Perdida","var(--red)","rgba(220,38,38,.10)"]};
+  const _chip = (txt,color,bg) => `<span style="display:inline-block;font-size:10.5px;font-weight:700;color:${color};background:${bg};padding:2px 8px;border-radius:999px;white-space:nowrap;">${txt}</span>`;
+  const _kpi = (label,val,color,sub) => `<div class="kpi-box" style="padding:10px 12px;"><div class="kl">${label}</div><div class="kv" style="font-size:17px;color:${color};">${val}</div>${sub?`<div style="font-size:10.5px;color:var(--muted);margin-top:2px;">${sub}</div>`:""}</div>`;
+  const _openQs = quotes.filter(q=>q.status!=="authorized" && q.pipelineStatus!=="lost");
+  const _openTotal = _openQs.reduce((s,q)=>s+quoteSellTotals(q).venta*(Number(q.qty)||1),0);
+  const _pay = {"":["Sin anticipo","var(--amber)"], anticipo:["Anticipo recibido","var(--accent)"], pagado:["Pagado","var(--green)"], vencido:["Pago vencido","var(--red)"]}[p.payStatus||""] || ["Sin anticipo","var(--amber)"];
+
   const quoteCard = (q) => {
     const t = quoteSellTotals(q);
-    const isAuth = q.status === "authorized";
     const qty = Number(q.qty||1);
     const total = t.venta * qty;
-    return `<div class="card" style="padding:0;overflow:hidden;">
-      <div style="display:flex;align-items:stretch;min-height:120px;">
-        <!-- Miniatura foto -->
-        <div style="width:160px;flex-shrink:0;background:var(--bg3);position:relative;border-right:1px solid var(--border);overflow:hidden;">
-          ${q.refPhoto
-            ? `<img src="${escapeAttr(q.refPhoto)}" data-ref-view-q="${q.id}" style="width:100%;height:100%;object-fit:cover;cursor:zoom-in;display:block;">`
-            : `<label data-ref-photo-q="${q.id}" style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;min-height:120px;cursor:pointer;gap:3px;padding:6px;">
-                 <i class="ti ti-photo" style="font-size:18px;color:var(--border);"></i>
-                 <span style="font-size:9px;color:var(--muted);text-align:center;">Foto PDF</span>
-               </label>`
-          }
-        </div>
-        <!-- Info: nombre + meta + desglose -->
-        <div style="flex:1;min-width:0;padding:10px 14px;display:flex;flex-direction:column;justify-content:center;gap:3px;">
-          <div style="display:flex;align-items:center;gap:8px;">
-            <span style="font-size:13px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHTML(q.name||"Cotización")}</span>
-            <span class="badge ${isAuth?"green":"amber"}" style="font-size:10px;flex-shrink:0;">${isAuth?"✓ Auth":"Borrador"}</span>
-            ${qty>1?`<span style="font-size:11px;color:var(--muted);flex-shrink:0;">×${qty} u.</span>`:""}
-          </div>
-          <div style="font-size:11px;color:var(--muted);">${escapeHTML((q.code||q.id.slice(0,8)).toUpperCase())} · ${q.createdAt||"—"} &nbsp;·&nbsp; Costo <b style="color:var(--text);">$${money(t.costo)}</b> &nbsp;·&nbsp; Util. <b style="color:var(--green);">$${money(t.util)}</b> &nbsp;·&nbsp; Admin <b>$${money(t.admin)}</b></div>
-        </div>
-        <!-- Total -->
-        <div style="flex-shrink:0;padding:10px 16px;display:flex;align-items:center;justify-content:flex-end;border-left:1px solid var(--border);min-width:110px;">
-          <div style="text-align:right;">
-            <div style="font-size:17px;font-weight:700;">$${money(total)}</div>
-            ${qty>1?`<div style="font-size:10px;color:var(--muted);">$${money(t.venta)} c/u</div>`:""}
-          </div>
+    const isAuth = q.status === "authorized";
+    const st = isAuth ? ["Autorizada","var(--green)","rgba(22,163,74,.13)"] : (_PIPE[q.pipelineStatus||""]||_PIPE[""]);
+    const util = Number(q.marginPct ?? 25);
+    return `<div class="qrow" style="display:grid;grid-template-columns:44px minmax(0,1fr) auto auto;gap:12px;align-items:center;padding:10px 14px;border-bottom:1px solid var(--border);">
+      <div style="width:44px;height:44px;border-radius:8px;overflow:hidden;background:var(--bg3);display:flex;align-items:center;justify-content:center;">
+        ${q.refPhoto?`<img src="${escapeAttr(q.refPhoto)}" data-ref-view-q="${q.id}" style="width:100%;height:100%;object-fit:cover;cursor:zoom-in;">`:`<span style="font-size:18px;opacity:.55;">🧾</span>`}
+      </div>
+      <div data-edit-q="${q.id}" style="min-width:0;cursor:pointer;" title="Abrir cotización">
+        <div style="font-size:13.5px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHTML(q.name||"Cotización")}</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:4px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          ${_chip(st[0],st[1],st[2])}
+          <span>Folio ${escapeHTML((q.code||q.id.slice(0,6)).toUpperCase())}</span>
+          <span>${escapeHTML(q.createdAt||"")}</span>
+          <span>Costo $${money(t.mp+t.ruta)}</span>
+          <span style="color:${util>=60?"var(--green)":util>=40?"var(--amber)":"var(--red)"};font-weight:700;">Utilidad ${util}%</span>
+          ${qty>1?`<span>× ${qty} u.</span>`:""}
         </div>
       </div>
-      <!-- Barra de acciones horizontal -->
-      <div style="display:flex;border-top:1px solid var(--border);">
-        <button data-edit-q="${q.id}" style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:8px 6px;border:none;border-right:1px solid var(--border);background:transparent;cursor:pointer;font-size:12px;font-weight:600;color:var(--accent);font-family:inherit;transition:background .1s;" onmouseover="this.style.background='var(--accent-light)'" onmouseout="this.style.background='transparent'">
-          <i class="ti ti-edit"></i> Editar
-        </button>
-
-        <button data-dup-q="${q.id}" style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:8px 6px;border:none;border-right:1px solid var(--border);background:transparent;cursor:pointer;font-size:12px;font-weight:600;color:var(--muted);font-family:inherit;transition:background .1s;" onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background='transparent'">
-          <i class="ti ti-copy"></i> Duplicar
-        </button>
-        <button data-toggle-q="${q.id}" style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:8px 6px;border:none;border-right:1px solid var(--border);background:transparent;cursor:pointer;font-size:12px;font-weight:600;color:${isAuth?"var(--red)":"var(--green)"};font-family:inherit;transition:background .1s;" onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background='transparent'">
-          <i class="ti ti-${isAuth?"x":"check"}"></i> ${isAuth?"Desauth":"Autorizar"}
-        </button>
-        <button data-del-q="${q.id}" style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:8px 6px;border:none;border-right:1px solid var(--border);background:transparent;cursor:pointer;font-size:12px;font-weight:600;color:var(--red);font-family:inherit;transition:background .1s;" onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background='transparent'">
-          <i class="ti ti-trash"></i> Eliminar
-        </button>
-        <button data-more-q="${q.id}" style="padding:8px 14px;border:none;background:transparent;cursor:pointer;font-size:12px;font-weight:600;color:var(--muted);font-family:inherit;transition:background .1s;" onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background='transparent'" title="Más opciones">
-          <i class="ti ti-dots"></i>
-        </button>
+      <div style="text-align:right;white-space:nowrap;">
+        <div style="font-size:16px;font-weight:800;">$${money(total)}</div>
+        ${qty>1?`<div style="font-size:10px;color:var(--muted);">$${money(t.venta)} c/u</div>`:""}
+      </div>
+      <div class="qrow-act" style="display:flex;gap:4px;">
+        <button class="btn small" data-edit-q="${q.id}" title="Editar" style="min-width:34px;justify-content:center;">✎</button>
+        <button class="btn small" data-pdf-q="${q.id}" title="PDF" style="min-width:34px;justify-content:center;">PDF</button>
+        <button class="btn small" data-toggle-q="${q.id}" title="${isAuth?"Desautorizar":"Autorizar"}" style="min-width:34px;justify-content:center;font-weight:800;color:${isAuth?"var(--red)":"var(--green)"};">${isAuth?"✕":"✓"}</button>
+        <button class="btn small" data-more-q="${q.id}" title="Más opciones" style="min-width:34px;justify-content:center;font-weight:800;">⋯</button>
       </div>
     </div>`;
   };
@@ -5874,31 +5867,46 @@ function renderDetailFull(p, content){
   content.innerHTML = `
     <div id="photoUploading" style="display:none;font-size:12px;color:var(--muted);padding:4px 0 8px;"><i class="ti ti-upload"></i> Subiendo fotos...</div>
 
+    <style>
+      #detailContent .field-label{font-size:10.5px!important;font-weight:700;text-transform:uppercase;letter-spacing:.45px;color:var(--muted);margin-bottom:4px;}
+      #detailContent .card-sec{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);}
+      #detailContent .qrow:last-child{border-bottom:none!important;}
+      #detailContent .qrow:hover{background:var(--bg3);}
+      @media(max-width:700px){
+        #detailContent .qrow{grid-template-columns:40px minmax(0,1fr) auto!important;}
+        #detailContent .qrow-act{grid-column:1/-1;justify-content:flex-end;}
+      }
+    </style>
+
     <!-- KPIs -->
-    <div class="detail-kpi-grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px;">
-      <div class="kpi-box" style="padding:10px 12px;">
-        <div class="kl">Total autorizado</div>
-        <div class="kv" style="font-size:18px;color:var(--accent);">$${money(authTotal)}</div>
-      </div>
-      <div class="kpi-box" style="padding:10px 12px;">
-        <div class="kl">Cotizaciones</div>
-        <div class="kv">${quotes.length}</div>
-      </div>
-      <div class="kpi-box" style="padding:10px 12px;">
-        <div class="kl">Tareas</div>
-        <div class="kv">${doneCount}/${tasks.length||0}</div>
-      </div>
+    <div class="detail-kpi-grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px;">
+      ${_kpi("Autorizado","$"+money(authTotal),"var(--accent)")}
+      ${_kpi("Cotizado abierto","$"+money(_openTotal),"var(--text)",`${_openQs.length} cotización${_openQs.length!==1?"es":""} por cerrar`)}
+      ${_kpi("Pago",_pay[0],_pay[1],Number(p.anticipo||0)?`Anticipo $${money(p.anticipo)}`:"")}
       <div class="kpi-box" style="padding:10px 12px;cursor:pointer;" onclick="showPage('dashboard');_fichaSelectedId='${p.id}';_fichaMobileOpen=true;renderDashboardPage();">
-        <div class="kl">Flujo de producción</div>
-        <div style="font-size:12px;font-weight:600;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${_currentStageName(p.id)}</div>
-        <div style="font-size:10px;color:var(--accent);margin-top:1px;">Ver ficha técnica →</div>
+        <div class="kl">Etapa</div>
+        <div style="font-size:13px;font-weight:700;margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${_currentStageName(p.id)}</div>
+        <div style="font-size:10.5px;color:var(--accent);margin-top:2px;">Ver flujo →</div>
       </div>
     </div>
 
+    <!-- Cotizaciones -->
+    <div class="card" style="padding:0;overflow:hidden;margin-bottom:12px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--border);background:var(--bg3);">
+        <span class="card-sec">Cotizaciones (${quotes.length})</span>
+        <div style="display:flex;gap:6px;">
+          <button class="btn small" id="btnPDFAll"><i class="ti ti-printer"></i> PDF</button>
+          <button class="btn primary small" id="btnAddQuote"><i class="ti ti-plus"></i> Nueva cotización</button>
+        </div>
+      </div>
+      ${quotes.length ? quotes.map(quoteCard).join("") : `<div style="padding:26px 16px;text-align:center;color:var(--muted);font-size:13px;">Sin cotizaciones. Crea la primera con <b>Nueva cotización</b> y usa una plantilla.</div>`}
+    </div>
+
     <!-- Datos + Fotos -->
-    <div class="detail-info-photo-grid" style="display:grid;grid-template-columns:1fr 260px;gap:10px;margin-bottom:10px;align-items:start;">
+    <div class="detail-info-photo-grid" style="display:grid;grid-template-columns:minmax(0,1fr) 230px;gap:10px;margin-bottom:10px;align-items:start;">
       <div class="card" style="padding:12px 14px;">
-        <div class="detail-fields-grid" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+        <div class="card-sec" style="margin-bottom:10px;">Datos del proyecto</div>
+        <div class="detail-fields-grid" style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;">
           <div>
             <div class="field-label" style="margin-top:0;">Nombre del proyecto</div>
             <div class="field"><input id="pName" value="${escapeAttr(p.name||"")}"></div>
@@ -5933,7 +5941,7 @@ function renderDetailFull(p, content){
         </div>
         <div style="margin-top:8px;">
           <div class="field-label" style="margin-top:0;">Descripción detallada</div>
-          <div class="field"><textarea id="pNotes" rows="4" placeholder="Detalles del proyecto, especificaciones, acuerdos con el cliente, etc." style="resize:vertical;min-height:90px;">${escapeHTML(p.notes||"")}</textarea></div>
+          <div class="field"><textarea id="pNotes" rows="3" placeholder="Detalles del proyecto, especificaciones, acuerdos con el cliente, etc." style="resize:vertical;min-height:64px;">${escapeHTML(p.notes||"")}</textarea></div>
         </div>
         <div style="margin-top:8px;">
           <div class="field-label" style="margin-top:0;"><i class="ti ti-map-pin"></i> Dirección de entrega</div>
@@ -5957,7 +5965,7 @@ function renderDetailFull(p, content){
       <!-- Fotos del proyecto -->
       <div class="card" style="padding:12px;">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-          <span style="font-size:13px;font-weight:600;">Fotos del proyecto</span>
+          <span class="card-sec">Fotos</span>
           <label class="btn small primary" style="cursor:pointer;gap:6px;"><i class="ti ti-upload"></i> Subir foto<input type="file" id="photoInput" accept="image/*" multiple style="display:none"></label>
         </div>
         ${photos.length>0
@@ -5989,27 +5997,8 @@ function renderDetailFull(p, content){
       ${tasks.length?`<div style="margin-bottom:8px;"><div style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px;">Tareas</div><div class="table-wrap"><table><thead><tr><th>Fecha</th><th>Descripción</th><th>Hecho</th><th></th></tr></thead><tbody id="tbTasks">${tasks.map(t=>tRow(t,`<td><input type="checkbox" data-f="done" ${t.done?"checked":""}></td>`)).join("")}</tbody></table></div></div>`:""}
       ${installs.length?`<div style="margin-bottom:8px;"><div style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px;">Instalaciones</div><div class="table-wrap"><table><thead><tr><th>Fecha</th><th>Detalle</th><th></th></tr></thead><tbody id="tbInst">${installs.map(t=>tRow(t,"")).join("")}</tbody></table></div></div>`:""}
       ${purchases.length?`<div><div style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px;">Compras</div><div class="table-wrap"><table><thead><tr><th>Fecha</th><th>Detalle</th><th></th></tr></thead><tbody id="tbPurch">${purchases.map(t=>tRow(t,"")).join("")}</tbody></table></div></div>`:""}
-    </div>`:`<div class="card" style="margin-bottom:10px;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;">
-      <span style="font-size:13px;color:var(--muted);">Sin operación registrada</span>
-      <div style="display:flex;gap:5px;">
-        <button class="btn small" id="addTask"><i class="ti ti-plus"></i> Tarea</button>
-        <button class="btn small" id="addInstall"><i class="ti ti-plus"></i> Instalación</button>
-        <button class="btn small" id="addPurchase"><i class="ti ti-plus"></i> Compra</button>
-      </div>
-    </div>`}
+    </div>`:""}
 
-    <!-- Cotizaciones en lista -->
-    <div style="display:flex;align-items:center;justify-content:space-between;margin:14px 0 10px;">
-      <span style="font-size:15px;font-weight:700;">Cotizaciones <span style="font-size:12px;font-weight:400;color:var(--muted);">(${quotes.length})</span></span>
-      <div style="display:flex;gap:6px;">
-        <button class="btn small" id="btnPDFAll"><i class="ti ti-printer"></i> PDF</button>
-        <button class="btn primary small" id="btnAddQuote"><i class="ti ti-plus"></i> Nueva cotización</button>
-      </div>
-    </div>
-    ${quotes.length
-      ? `<div style="display:flex;flex-direction:column;gap:6px;">${quotes.map(quoteCard).join("")}</div>`
-      : `<div class="empty" style="padding:32px 20px;"><div class="ico" style="font-size:32px;">🧾</div><h3>Sin cotizaciones</h3><p>Crea la primera para este proyecto.</p></div>`
-    }
   `;
 
   // ── Autosave en campos ──
@@ -6188,145 +6177,151 @@ function openQuoteEditorPage(q){
   }
   const routeOpts=(db.settings.routeDB||[]).map(r=>`<option value="${escapeAttr(r.name)}">${escapeHTML(r.name)} \u00b7 $${money(r.costPerHour||0)}/h</option>`).join("");
 
-  content.innerHTML=`<div style="padding:16px 0 10px;">
+  const _qeAuth = q.status==='authorized';
+  const _qeCode = escapeHTML((q.code||q.id.slice(0,8)).toUpperCase());
+  content.innerHTML=`<div class="qe" style="padding:10px 0 28px;">
+    <style>
+      .qe .qe-sec{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);}
+      .qe .qe-head{display:flex;align-items:center;justify-content:space-between;padding:9px 14px;border-bottom:1px solid var(--border);background:var(--bg3);}
+      .qe .qe-sub{font-size:12px;font-weight:800;color:var(--text);margin-left:8px;}
+      .qe .qe-row{display:flex;justify-content:space-between;align-items:center;padding:7px 0;font-size:12.5px;border-bottom:1px dashed var(--border);}
+      .qe .qe-row > span:first-child{color:var(--muted);}
+      .qe .qe-pct{width:48px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:inherit;text-align:center;padding:2px 4px;font-size:12px;margin-left:4px;}
+      .qe table th{font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);}
+      .qe .qe-tool{display:flex;align-items:center;gap:6px;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:4px 10px;font-size:12px;color:var(--muted);}
+      .qe .qe-tool select,.qe .qe-tool input{background:transparent;border:none;color:var(--text);font-family:inherit;font-size:12.5px;font-weight:700;outline:none;}
+      .qe details.qe-guide > summary{list-style:none;}
+      .qe details.qe-guide > summary::-webkit-details-marker{display:none;}
+      @media(max-width:900px){ .qe .qe-top{flex-wrap:wrap;} .qe .qe-actions{width:100%;justify-content:flex-end;} }
+    </style>
 
-    <!-- ── HEADER ── -->
-    <div style="font-size:44px;font-weight:800;color:var(--accent2);letter-spacing:.5px;line-height:1.1;margin-bottom:6px;">Cotización</div>
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap;row-gap:8px;">
-      <button class="btn icon" id="btnBackFromQuote"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg></button>
-      <input id="qNameInput" value="${escapeAttr(q.name||"Cotización")}" style="flex:1 1 160px;min-width:140px;background:transparent;border:none;border-bottom:2px solid var(--border);color:var(--text);font-family:inherit;font-size:17px;font-weight:700;padding:4px 0;outline:none;">
-      <span class="badge ${q.status==='authorized'?'green':'amber'}" style="font-size:12px;">${q.status==='authorized'?'✓ Autorizada':'Borrador'}</span>
-      <span style="font-size:12px;color:var(--muted);">Folio: ${escapeHTML((q.code||q.id.slice(0,8)).toUpperCase())}</span>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;">
-        <button class="btn small ${q.status==='authorized'?'danger':'green'}" id="btnToggleAuth">${q.status==='authorized'?'<i class="ti ti-x"></i> Desautorizar':'<i class="ti ti-check"></i> Autorizar'}</button>
-        <button class="btn small" id="btnSaveQuote"><i class="ti ti-device-floppy"></i> Guardar</button>
-        <button class="btn small" id="btnQuotePDF2"><i class="ti ti-printer"></i> PDF</button>
-        <button class="btn small danger" id="btnDeleteQuote" title="Eliminar cotización"><i class="ti ti-trash"></i> Eliminar</button>
+    <!-- ── BARRA SUPERIOR (fija) ── -->
+    <div class="card qe-top" style="display:flex;align-items:center;gap:12px;padding:12px 14px;margin-bottom:10px;position:sticky;top:0;z-index:6;box-shadow:0 4px 14px rgba(0,0,0,.06);">
+      <button class="btn icon" id="btnBackFromQuote" title="Volver al proyecto"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg></button>
+      <div style="flex:1;min-width:200px;">
+        <input id="qNameInput" value="${escapeAttr(q.name||"Cotización")}" placeholder="Nombre de la cotización (lo ve el cliente)" style="width:100%;background:transparent;border:none;border-bottom:1px solid transparent;color:var(--text);font-family:inherit;font-size:18px;font-weight:800;padding:2px 0;outline:none;" onfocus="this.style.borderBottomColor='var(--accent)'" onblur="this.style.borderBottomColor='transparent'">
+        <div style="font-size:11.5px;color:var(--muted);margin-top:3px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+          <span class="badge ${_qeAuth?'green':'amber'}" style="font-size:10.5px;">${_qeAuth?'✓ Autorizada':'Borrador'}</span>
+          <span>Folio <b style="color:var(--text);">${_qeCode}</b></span><span>·</span>
+          <span>${escapeHTML(p.name||"Proyecto")}</span>${p.client?`<span>·</span><span>${escapeHTML(p.client)}</span>`:""}<span>·</span><span>${escapeHTML(q.createdAt||"")}</span>
+        </div>
+      </div>
+      <div style="text-align:right;padding:0 4px;">
+        <div class="qe-sec" style="font-size:10px;">Total</div>
+        <div id="qeTotalTop" style="font-size:24px;font-weight:900;color:var(--accent);line-height:1.1;white-space:nowrap;">$0.00</div>
+      </div>
+      <div class="qe-actions" style="display:flex;gap:6px;flex-wrap:wrap;">
+        <button class="btn small" id="btnQuotePDF2" title="Generar PDF"><i class="ti ti-printer"></i> PDF</button>
+        <button class="btn small" id="btnQuoteWa" title="Enviar por WhatsApp" style="background:#16a34a;color:#fff;border-color:#16a34a;"><i class="ti ti-brand-whatsapp"></i> Enviar</button>
+        <button class="btn small ${_qeAuth?'danger':'green'}" id="btnToggleAuth">${_qeAuth?'<i class="ti ti-x"></i> Desautorizar':'<i class="ti ti-check"></i> Autorizar'}</button>
+        <button class="btn small" id="btnSaveQuote" title="Guardar">💾 Guardar</button>
+        <button class="btn small danger" id="btnDeleteQuote" title="Eliminar cotización">🗑</button>
       </div>
     </div>
 
-    <!-- ── BARRA SECUNDARIA ── -->
-    <div style="display:flex;gap:8px;align-items:center;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--border);">
-      ${q.status!=='authorized'?`<select id="qPipelineStatus" style="background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:5px 10px;font-family:inherit;font-size:12px;">
-        <option value="">Sin enviar</option>
-        <option value="sent" ${q.pipelineStatus==='sent'?'selected':''}>Enviada</option>
-        <option value="negotiating" ${q.pipelineStatus==='negotiating'?'selected':''}>En negociación</option>
-        <option value="no_response" ${q.pipelineStatus==='no_response'?'selected':''}>Sin respuesta</option>
-      </select>`:''}
-      <div style="display:flex;align-items:center;gap:6px;background:var(--accent-light);border:1.5px solid var(--accent);border-radius:8px;padding:4px 12px;">
-        <span style="font-size:12px;color:var(--accent);font-weight:600;">Cantidad:</span>
-        <input id="qQtyInput" type="number" min="1" value="${Number(q.qty||1)}" style="width:50px;background:transparent;border:none;color:var(--accent);font-family:inherit;font-size:14px;font-weight:700;text-align:center;">
-        <span style="font-size:12px;color:var(--accent);">unidades</span>
-      </div>
-      <button class="btn small" id="btnLoadTemplate"><i class="ti ti-folder-open"></i> Plantilla</button>
-      <button class="btn small" id="btnSaveTemplate"><i class="ti ti-star"></i> Guardar plantilla</button>
+    <!-- ── HERRAMIENTAS ── -->
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px;">
+      ${!_qeAuth?`<label class="qe-tool">Estado
+        <select id="qPipelineStatus">
+          <option value="">Sin enviar</option>
+          <option value="sent" ${q.pipelineStatus==='sent'?'selected':''}>Enviada</option>
+          <option value="negotiating" ${q.pipelineStatus==='negotiating'?'selected':''}>En negociación</option>
+          <option value="no_response" ${q.pipelineStatus==='no_response'?'selected':''}>Sin respuesta</option>
+          <option value="lost" ${q.pipelineStatus==='lost'?'selected':''}>Perdida</option>
+        </select></label>`:''}
+      <label class="qe-tool">Cantidad <input id="qQtyInput" type="number" min="1" value="${Number(q.qty||1)}" style="width:44px;text-align:center;"> u.</label>
+      <button class="btn small" id="btnLoadTemplate"><i class="ti ti-folder-open"></i> Usar plantilla</button>
+      <button class="btn small" id="btnSaveTemplate"><i class="ti ti-star"></i> Guardar como plantilla</button>
+      <details class="qe-guide" style="margin-left:auto;position:relative;">
+        <summary class="btn small" style="cursor:pointer;">📘 Cómo cotizar</summary>
+        <div class="card" style="position:absolute;right:0;top:38px;width:min(580px,92vw);z-index:20;padding:12px 16px;box-shadow:0 12px 32px rgba(0,0,0,.18);">${GUIA_COTIZAR_HTML}</div>
+      </details>
     </div>
 
-    <details style="margin-bottom:14px;background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:10px 14px;">
-      <summary style="cursor:pointer;font-weight:800;font-size:13px;">📘 Cómo cotizar en ESMA</summary>
-      ${GUIA_COTIZAR_HTML}
-    </details>
+    <!-- ── CUERPO: partidas + resumen ── -->
+    <div class="quote-editor-grid" style="display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:14px;align-items:start;">
 
-    <!-- ── LAYOUT DOS COLUMNAS ── -->
-    <div class="quote-editor-grid" style="display:grid;grid-template-columns:260px 1fr;gap:16px;align-items:start;">
-
-      <!-- COLUMNA IZQUIERDA: Foto + Desglose -->
-      <div class="quote-editor-left-col" style="position:sticky;top:0;">
-
-        <!-- Foto de referencia -->
-        <div class="card" style="padding:0;overflow:hidden;margin-bottom:12px;">
-          <div style="padding:10px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
-            <span style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;">Foto de referencia</span>
-            <label id="btnChangeRefPhoto" style="cursor:pointer;" title="Cambiar foto">
-              <i class="ti ti-camera" style="font-size:15px;color:var(--muted);"></i>
-              <input type="file" id="refPhotoInput" accept="image/*" style="display:none;">
-            </label>
-          </div>
-          <div id="refPhotoWrap" style="width:100%;aspect-ratio:4/3;background:var(--bg3);position:relative;overflow:hidden;">
-            ${q.refPhoto
-              ?`<img src="${escapeAttr(q.refPhoto)}" id="refPhotoImg" style="width:100%;height:100%;object-fit:cover;cursor:zoom-in;">`
-              :`<div id="refPhotoEmpty" style="width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:var(--muted);">
-                  <i class="ti ti-photo" style="font-size:36px;opacity:.3;"></i>
-                  <span style="font-size:12px;">Sin foto de referencia</span>
-                  <label class="btn small" style="cursor:pointer;"><i class="ti ti-upload"></i> Agregar<input type="file" id="refPhotoInput2" accept="image/*" style="display:none;"></label>
-                </div>`
-            }
-            ${q.refPhoto?`<button id="btnDelRefPhoto" style="position:absolute;top:6px;right:6px;background:rgba(0,0,0,.55);color:#fff;border:none;border-radius:5px;padding:3px 8px;cursor:pointer;font-size:11px;font-weight:600;font-family:inherit;">✕ Quitar</button>`:""}
-          </div>
-        </div>
-
-        <!-- Desglose -->
-        <div class="card" style="padding:14px;">
-          <div style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:10px;">Desglose de precio</div>
-          <div style="display:flex;flex-direction:column;gap:0;">
-            <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px;"><span style="color:var(--muted);">Materiales <span id="bdMP_pct" style="color:var(--accent);font-weight:600;"></span></span><span id="bdMP">$0.00</span></div>
-            <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px;"><span style="color:var(--muted);">Ruta / M.O. <span id="bdRuta_pct" style="color:var(--accent);font-weight:600;"></span></span><span id="bdRuta">$0.00</span></div>
-            <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px;"><span style="color:var(--muted);">Costo directo</span><span id="bdCosto" style="font-weight:600;">$0.00</span></div>
-            <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px;align-items:center;">
-              <span style="color:var(--muted);">Admin <input id="adminPctInput" type="number" step="0.1" style="width:38px;background:var(--bg3);border:1px solid var(--border);border-radius:5px;color:var(--text);font-family:inherit;text-align:center;padding:1px 3px;font-size:11px;">%</span>
-              <span id="bdAdmin">$0.00</span>
-            </div>
-            <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px;"><span style="color:var(--muted);">Costo con admin</span><span id="bdCostoAdmin" style="font-weight:600;">$0.00</span></div>
-            <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px;align-items:center;">
-              <span style="color:var(--muted);">Utilidad <input id="qMarginPct" type="number" step="0.1" style="width:38px;background:var(--bg3);border:1px solid var(--border);border-radius:5px;color:var(--text);font-family:inherit;text-align:center;padding:1px 3px;font-size:11px;">%</span>
-              <span id="bdUtil" style="color:var(--green);">$0.00</span>
-            </div>
-            ${`<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px;"><span style="color:var(--muted);">Extras</span><span id="bdExtra">$0.00</span></div>`}
-            <div style="display:flex;justify-content:space-between;padding:10px 0 4px;font-size:14px;font-weight:700;">
-              <span>Precio de venta</span><span id="bdVenta" style="color:var(--accent);">$0.00</span>
-            </div>
-            <div style="display:flex;justify-content:space-between;padding:4px 0;font-size:11px;color:var(--muted);"><span>Retorno neto</span><span id="bdRetorno">$0.00</span></div>
-            <div id="bdTotalQtyRow" style="display:none;background:var(--accent-light);border-radius:8px;padding:8px 10px;margin-top:6px;justify-content:space-between;align-items:center;">
-              <span id="bdTotalQtyLabel" style="font-weight:700;color:var(--accent);font-size:12px;">Total × N unidades</span>
-              <span id="bdTotalQty" style="font-size:15px;font-weight:700;color:var(--accent);">$0.00</span>
-            </div>
-          </div>
-        </div>
-
-      </div>
-
-      <!-- COLUMNA DERECHA: Tablas -->
       <div>
-
-        <!-- Productos -->
         <div class="card" style="margin-bottom:10px;padding:0;overflow:hidden;">
-          <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--border);">
-            <span style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;">Productos / Materiales</span>
-            <button class="btn small primary" id="addProd"><i class="ti ti-plus"></i> Agregar</button>
-          </div>
+          <div class="qe-head"><span><span class="qe-sec">1 · Materiales</span><span class="qe-sub" id="stProd"></span></span>
+            <button class="btn small primary" id="addProd"><i class="ti ti-plus"></i> Material</button></div>
           <div class="table-wrap" style="border:none;border-radius:0;">
-            <table><thead><tr><th>Material</th><th>Descripción</th><th>Cant.</th><th>Costo unit.</th><th>Total</th><th></th></tr></thead>
+            <table><thead><tr><th>Material del catálogo</th><th>Descripción</th><th>Cant.</th><th>Costo unit.</th><th>Total</th><th></th></tr></thead>
             <tbody id="tbProd"></tbody></table>
           </div>
         </div>
 
-        <!-- Ruta / M.O. -->
         <div class="card" style="margin-bottom:10px;padding:0;overflow:hidden;">
-          <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--border);">
-            <span style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;">Ruta / Mano de obra</span>
-            <button class="btn small primary" id="addRoute"><i class="ti ti-plus"></i> Agregar</button>
-          </div>
+          <div class="qe-head"><span><span class="qe-sec">2 · Mano de obra</span><span class="qe-sub" id="stRoutes"></span></span>
+            <button class="btn small primary" id="addRoute"><i class="ti ti-plus"></i> Ruta</button></div>
           <div class="table-wrap" style="border:none;border-radius:0;">
             <table><thead><tr><th>Ruta</th><th>Horas</th><th>$/hora</th><th>Total</th><th></th></tr></thead>
             <tbody id="tbRoutes"></tbody></table>
           </div>
         </div>
 
-        <!-- Extras -->
         <div class="card" style="padding:0;overflow:hidden;">
-          <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--border);">
-            <span style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;">Extras y servicios adicionales</span>
-            <button class="btn small primary" id="addExtra"><i class="ti ti-plus"></i> Agregar</button>
-          </div>
+          <div class="qe-head"><span><span class="qe-sec">3 · Extras (instalación, envío…)</span><span class="qe-sub" id="stExtras"></span></span>
+            <button class="btn small primary" id="addExtra"><i class="ti ti-plus"></i> Extra</button></div>
           <div class="table-wrap" style="border:none;border-radius:0;">
-            <table><thead><tr><th>Concepto</th><th>Importe</th><th></th></tr></thead>
+            <table><thead><tr><th>Concepto (lo ve el cliente)</th><th>Importe</th><th></th></tr></thead>
             <tbody id="tbExtras"></tbody></table>
           </div>
         </div>
+      </div>
 
+      <div class="quote-editor-left-col" style="position:sticky;top:96px;">
+        <div class="card" style="padding:14px 16px;margin-bottom:10px;">
+          <div class="qe-sec" style="margin-bottom:6px;">Resumen</div>
+          <div class="qe-row"><span>Materiales <span id="bdMP_pct" style="color:var(--accent);font-weight:600;"></span></span><span id="bdMP">$0.00</span></div>
+          <div class="qe-row"><span>Mano de obra <span id="bdRuta_pct" style="color:var(--accent);font-weight:600;"></span></span><span id="bdRuta">$0.00</span></div>
+          <div class="qe-row"><span>Costo directo</span><span id="bdCosto" style="font-weight:700;">$0.00</span></div>
+          <div class="qe-row"><span>Admin<input id="adminPctInput" class="qe-pct" type="number" step="0.1">%</span><span id="bdAdmin">$0.00</span></div>
+          <div class="qe-row"><span>Costo con admin</span><span id="bdCostoAdmin">$0.00</span></div>
+          <div class="qe-row"><span>Utilidad<input id="qMarginPct" class="qe-pct" type="number" step="0.1">%</span><span id="bdUtil" style="color:var(--green);font-weight:700;">$0.00</span></div>
+          <div class="qe-row"><span>Extras</span><span id="bdExtra">$0.00</span></div>
+          <div style="display:flex;justify-content:space-between;align-items:baseline;padding:12px 0 2px;">
+            <span style="font-size:13px;font-weight:800;">Precio de venta</span><span id="bdVenta" style="font-size:20px;font-weight:900;color:var(--accent);">$0.00</span>
+          </div>
+          <div id="bdTotalQtyRow" style="display:none;background:var(--accent-light);border-radius:8px;padding:8px 10px;margin-top:6px;justify-content:space-between;align-items:center;">
+            <span id="bdTotalQtyLabel" style="font-weight:700;color:var(--accent);font-size:12px;">Total × N unidades</span>
+            <span id="bdTotalQty" style="font-size:15px;font-weight:800;color:var(--accent);">$0.00</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:11.5px;color:var(--muted);padding-top:6px;"><span>Anticipo 50%</span><span id="bdAnticipo">$0.00</span></div>
+          <div style="display:flex;justify-content:space-between;font-size:11.5px;color:var(--muted);padding-top:3px;"><span>Retorno neto</span><span id="bdRetorno">$0.00</span></div>
+        </div>
+
+        <div class="card" style="padding:0;overflow:hidden;">
+          <div style="padding:8px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
+            <span class="qe-sec">Foto para el PDF</span>
+            <label id="btnChangeRefPhoto" style="cursor:pointer;" title="Cambiar foto"><i class="ti ti-camera" style="font-size:15px;color:var(--muted);"></i><input type="file" id="refPhotoInput" accept="image/*" style="display:none;"></label>
+          </div>
+          <div id="refPhotoWrap" style="width:100%;aspect-ratio:16/10;background:var(--bg3);position:relative;overflow:hidden;">
+            ${q.refPhoto
+              ?`<img src="${escapeAttr(q.refPhoto)}" id="refPhotoImg" style="width:100%;height:100%;object-fit:cover;cursor:zoom-in;">
+                <button id="btnDelRefPhoto" style="position:absolute;top:6px;right:6px;background:rgba(0,0,0,.55);color:#fff;border:none;border-radius:5px;padding:3px 8px;cursor:pointer;font-size:11px;font-weight:600;font-family:inherit;">✕ Quitar</button>`
+              :`<div id="refPhotoEmpty" style="width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;color:var(--muted);">
+                  <i class="ti ti-photo" style="font-size:28px;opacity:.35;"></i>
+                  <label class="btn small" style="cursor:pointer;"><i class="ti ti-upload"></i> Agregar foto<input type="file" id="refPhotoInput2" accept="image/*" style="display:none;"></label>
+                </div>`}
+          </div>
+        </div>
       </div>
     </div>
   </div>`;
+
+  document.getElementById("btnQuoteWa").addEventListener("click",()=>{
+    q.name=document.getElementById("qNameInput").value.trim()||"Cotización"; saveQuote(q);
+    _hoyWhats(p.id,"enviar",q.id);
+    if(q.status!=="authorized" && !q.pipelineStatus){
+      setTimeout(()=>{
+        if(!confirm("¿Marcar la cotización como ENVIADA?\n(Adjunta el PDF en el chat de WhatsApp.)")) return;
+        q.pipelineStatus="sent"; q.sentAt=todayISO(); q.followUps=0; q.nextFollowUp=_hoyAddDays(todayISO(),HOY_SEGUIMIENTO_DIAS[0]);
+        saveQuote(q); save();
+        const sel=document.getElementById("qPipelineStatus"); if(sel) sel.value="sent";
+      },500);
+    }
+  });
 
   document.getElementById("btnBackFromQuote").addEventListener("click",()=>{ q.name=document.getElementById("qNameInput").value.trim()||"Cotización"; saveQuote(q); currentProjectId=q.projectId; showPage("project-detail"); renderProjectDetail(); });
   document.getElementById("qNameInput").addEventListener("blur",()=>{ q.name=document.getElementById("qNameInput").value.trim()||"Cotización"; saveQuote(q); });
