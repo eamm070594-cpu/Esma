@@ -4585,6 +4585,7 @@ const HOY_SEGUIMIENTO_DIAS = [2,3,5,7]; // días entre un seguimiento y el sigui
 const HOY_MAX_SEGUIMIENTOS = 4;         // después de esto: ganada o perdida
 const HOY_VIEJA_DIAS = 30;              // "sin enviar" más vieja que esto = limpieza
 const HOY_ACCIONES_META = 5;            // acciones mínimas por día
+const HOY_META_MENSUAL = 18000;         // meta fija de ventas por mes (definida por el dueño)
 
 function _hoyCoach(){
   db.settings.coach = db.settings.coach || {};
@@ -4720,7 +4721,7 @@ function _hoyDatos(){
   const abiertas=db.quotes.filter(q=>q.status!=="authorized" && q.pipelineStatus!=="lost");
   const vivas=abiertas.filter(q=>_hoyQuoteTotal(q)>0 && (q.pipelineStatus || (_hoyDiasDesde(q.createdAt)??0)<=HOY_VIEJA_DIAS));
   const pipeline=vivas.reduce((s,q)=>s+_hoyQuoteTotal(q),0);
-  const meta=Number(c.metaMensual)||0;
+  const meta=HOY_META_MENSUAL;
   const diasMes=new Date(d0.getFullYear(), d0.getMonth()+1, 0).getDate();
   const esperado=meta*(d0.getDate()/diasMes);
   const faltante=Math.max(0, meta-vendidoMes);
@@ -4782,7 +4783,7 @@ function renderHoyPage(){
     semaforo=`<div class="card" style="padding:16px;border:2px solid ${color};">
       <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:baseline;">
         <div style="font-size:19px;font-weight:900;color:${color};">${titulo}</div>
-        <div style="font-size:12px;color:var(--muted);">Meta del mes: <b>$${money(D.meta)}</b> · <a href="#" onclick="_hoySetMeta();return false;">cambiar</a></div>
+        <div style="font-size:12px;color:var(--muted);">Meta del mes: <b>$${money(D.meta)}</b></div>
       </div>
       <div style="font-size:13px;margin-top:6px;">${detalle}</div>
       <div style="position:relative;height:14px;background:var(--bg3);border-radius:7px;margin-top:12px;overflow:hidden;">
