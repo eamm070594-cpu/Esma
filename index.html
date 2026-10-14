@@ -961,7 +961,7 @@ tbody tr:hover td{background:rgba(13,148,136,.03);}
       <i class="ti ti-package s-ico"></i>BOM Materiales
     </button>
     <button class="s-tile-full" id="snav-materiales" onclick="showSection('materiales');sTileFullActive('snav-materiales')">
-      <i class="ti ti-database s-ico"></i>Materiales y Rutas
+      <i class="ti ti-database s-ico"></i>Catálogo de costos
     </button>
 
     <div class="s-divider"></div>
@@ -1171,7 +1171,7 @@ tbody tr:hover td{background:rgba(13,148,136,.03);}
   <!-- DROPDOWN: Más -->
   <div class="nav-dropdown" id="dd-more">
     <div class="nav-dd-item" style="display:none" onclick="closeAllDropdowns();mNavGo('bom')"><i class="ti ti-package dd-ico"></i>BOM Materiales</div>
-    <div class="nav-dd-item" onclick="closeAllDropdowns();mShowSection('materiales')"><i class="ti ti-database dd-ico"></i>Materiales y Rutas</div>
+    <div class="nav-dd-item" onclick="closeAllDropdowns();mShowSection('materiales')"><i class="ti ti-database dd-ico"></i>Catálogo de costos</div>
     <div class="nav-dd-divider"></div>
     <div class="nav-dd-item" onclick="closeAllDropdowns();mNavGo('sales')"><i class="ti ti-chart-line dd-ico"></i>Ventas</div>
     <div class="nav-dd-item" style="display:none" onclick="closeAllDropdowns();mShowSection('costos')"><i class="ti ti-scale dd-ico"></i>Costos / PE</div>
@@ -2724,7 +2724,7 @@ function createProject(){
 function createQuote(projectId){
   db.settings.folioCounter = (Number(db.settings.folioCounter)||0) + 1;
   const folio = String(db.settings.folioCounter).padStart(4,"0");
-  const q={id:uid(), projectId, code: folio, name:"Cotización "+folio, qty:1, status:"draft", saleType:"manufactured", marginPct:25, createdAt:todayISO(), products:[], routes:[], extras:[]};
+  const q={id:uid(), projectId, code: folio, name:"Cotización "+folio, qty:1, status:"draft", saleType:"manufactured", marginPct:60, createdAt:todayISO(), products:[], routes:[], extras:[]};
   db.quotes.unshift(q);
   _onQuoteCreated(projectId);
   saveQuote(q);
@@ -3115,6 +3115,7 @@ function openQuoteEditor(q){
       q.routes   = JSON.parse(JSON.stringify(tpl.routes||[])).map(r=>({...r, id:uid()}));
       q.extras   = JSON.parse(JSON.stringify(tpl.extras||[])).map(r=>({...r, id:uid()}));
       q.marginPct = tpl.marginPct ?? q.marginPct ?? 25;
+      _tplRefrescarPrecios(q);
       saveQuote(q); save();
       renderLines();
       const btn = $("btnLoadTemplate");
@@ -5062,7 +5063,7 @@ function showSection(section){
 }
 
 function _renderSection(section){
-  const titles = {compras:"\u{1F6D2} Compras", instalaciones:"\u{1F6E0}\uFE0F Instalaciones", cotizaciones:"\u{1F9FE} Cotizaciones", tareas:"\u2705 Tareas", costos:"\u2696\uFE0F Costos / PE", materiales:"\u{1F5C4} Materiales y Rutas"};
+  const titles = {compras:"\u{1F6D2} Compras", instalaciones:"\u{1F6E0}\uFE0F Instalaciones", cotizaciones:"\u{1F9FE} Cotizaciones", tareas:"\u2705 Tareas", costos:"\u2696\uFE0F Costos / PE", materiales:"\u{1F5C4} Catálogo de costos"};
   const st = document.getElementById("secTitle"); if(st) st.textContent = titles[section]||section;
   const filtersEl = document.getElementById("secFilters");
   const contentEl = document.getElementById("secContent");
@@ -6221,6 +6222,11 @@ function openQuoteEditorPage(q){
       <button class="btn small" id="btnSaveTemplate"><i class="ti ti-star"></i> Guardar plantilla</button>
     </div>
 
+    <details style="margin-bottom:14px;background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:10px 14px;">
+      <summary style="cursor:pointer;font-weight:800;font-size:13px;">📘 Cómo cotizar en ESMA</summary>
+      ${GUIA_COTIZAR_HTML}
+    </details>
+
     <!-- ── LAYOUT DOS COLUMNAS ── -->
     <div class="quote-editor-grid" style="display:grid;grid-template-columns:260px 1fr;gap:16px;align-items:start;">
 
@@ -6460,6 +6466,7 @@ function openQuoteEditorPage(q){
       q.routes   = JSON.parse(JSON.stringify(tpl.routes||[])).map(r=>({...r,id:uid()}));
       q.extras   = JSON.parse(JSON.stringify(tpl.extras||[])).map(r=>({...r,id:uid()}));
       q.marginPct = tpl.marginPct ?? q.marginPct ?? 25;
+      _tplRefrescarPrecios(q);
       saveQuote(q); renderLines();
       const btn=document.getElementById("btnLoadTemplate");
       if(btn){ btn.textContent="✅ Cargada"; setTimeout(()=>{ if(btn) btn.textContent="📂 Plantilla"; },2000); }
@@ -8119,60 +8126,218 @@ function _renderBEInline(wrap){
 
 
 // ── SECCIÓN: MATERIALES Y RUTAS ────────────────────────────
+// ── CATÁLOGO DE COSTOS: categorías, importación y guía de cotización ──
+const CAT_MATERIALES = ["Prefabricados","Acrílicos","Trovicel y aluminio","Cantos","Vinil","LED y neón","Fuentes","Eléctrico","Herrajes y adhesivos","Madera y melamina","Herrajes de mueble","Otros"];
+
+// Precios de menudeo del catálogo "Todo Para El Anunciero", abril 2026 (precios netos).
+const CATALOGO_ANUNCIERO_2026_04 = [
+  ["Prefabricados","Caja de luz circular 60 cm (sin gráfico)",950,"pza"],
+  ["Prefabricados","Caja de luz circular 50 cm (sin gráfico)",850,"pza"],
+  ["Prefabricados","Caja de luz circular 80 cm (sin gráfico)",1215,"pza"],
+  ["Prefabricados","Caja de luz circular 100 cm plata (sin gráfico)",2200,"pza"],
+  ["Prefabricados","Caja de luz rectangular 40x60 cm (sin gráfico)",800,"pza"],
+  ["Prefabricados","Caja de luz rectangular 50x70 cm (sin gráfico)",900,"pza"],
+  ["Prefabricados","Marco de luz 40x60 cm",790,"pza"],
+  ["Prefabricados","Marco de luz 50x70 cm",900,"pza"],
+  ["Prefabricados","Marco de luz 60x90 cm",1350,"pza"],
+  ["Prefabricados","Marco de luz 70x120 cm",1860,"pza"],
+  ["Acrílicos","Acrílico cristal 3mm 1.22x2.44",1290,"hoja"],
+  ["Acrílicos","Acrílico cristal 6mm 1.22x2.44",2908,"hoja"],
+  ["Acrílicos","Acrílico blanco translúcido 3mm 1.22x2.44 (caja de luz)",1399,"hoja"],
+  ["Acrílicos","Acrílico sólido blanco/rojo/negro 3mm 1.22x2.44",1850,"hoja"],
+  ["Acrílicos","Acrílico de color 3mm 1.20x1.80",1400,"hoja"],
+  ["Acrílicos","Acrílico espejo plata/dorado 3mm 1.20x2.40",1510,"hoja"],
+  ["Acrílicos","Acrílico espejo plata/dorado 3mm 1.20x1.80",1150,"hoja"],
+  ["Trovicel y aluminio","Trovicel blanco 3mm 1.20x2.40",365,"hoja"],
+  ["Trovicel y aluminio","Trovicel blanco 6mm 1.20x2.40",575,"hoja"],
+  ["Trovicel y aluminio","Trovicel blanco 10mm 1.20x2.40",889,"hoja"],
+  ["Trovicel y aluminio","Trovicel negro 3mm 1.20x2.40",480,"hoja"],
+  ["Trovicel y aluminio","Lámina aluminio natural cal 24 4x8",990,"hoja"],
+  ["Trovicel y aluminio","Lámina aluminio natural cal 22 4x8",1190,"hoja"],
+  ["Trovicel y aluminio","Lámina aluminio blanco cal 21 4x8",1750,"hoja"],
+  ["Cantos","Canto aluminio 5cm blanco/negro/plata (rollo 100 m)",1700,"rollo"],
+  ["Cantos","Canto aluminio 8cm blanco/negro/plata (rollo 100 m)",2450,"rollo"],
+  ["Cantos","Canto aluminio 10cm blanco/negro/plata (rollo 100 m)",3150,"rollo"],
+  ["LED y neón","Neón flexible genérico 12V (rollo 5 m)",110,"rollo"],
+  ["LED y neón","Neón flexible Gengxin IP67 12V (rollo 5 m)",175,"rollo"],
+  ["LED y neón","Neón 2da generación tira + silicón",48,"m"],
+  ["LED y neón","Tira LED exterior colores 5050 12V (rollo 5 m)",158,"rollo"],
+  ["LED y neón","Tira COB 12V interior (rollo 5 m)",225,"rollo"],
+  ["LED y neón","Módulo LED botón 12V 1.5W",9.28,"pza"],
+  ["Fuentes","Fuente 12V exterior IP67 60W",302,"pza"],
+  ["Fuentes","Fuente 12V exterior IP67 100W",415,"pza"],
+  ["Fuentes","Fuente 12V exterior IP67 200W",655,"pza"],
+  ["Fuentes","Fuente 12V interior slim 60W",199,"pza"],
+  ["Fuentes","Fuente 12V interior slim 120W",272,"pza"],
+  ["Fuentes","Eliminador 12V 5A",120,"pza"],
+  ["Eléctrico","Cable cal 22 cobre (para letrero)",8,"m"],
+  ["Herrajes y adhesivos","Chapetón acero inoxidable 19x20",22,"pza"],
+  ["Herrajes y adhesivos","Silvatrim 1 pulgada (décima 4.57 m)",350,"pza"],
+  ["Herrajes y adhesivos","Cinta doble cara 18mm (33 m)",350,"rollo"],
+  ["Herrajes y adhesivos","Cianoacrilato Strong 28 g",210,"pza"],
+  ["Herrajes y adhesivos","Cloruro de metileno 1 L",265,"pza"],
+];
+// Materiales que ESMA usa al instalar y vinil por metro (precios de web / catálogo propio).
+const CATALOGO_ESMA_BASE = [
+  ["Vinil","Vinil de color (1 m por color)",45,"m","ESMA"],
+  ["Eléctrico","Cable THW cal 14 (instalación)",19,"m","Web: IUSA rollo 100 m $1,899"],
+  ["Eléctrico","Apagador sencillo con placa",55,"pza","Web: Volteck/Truper"],
+  ["Eléctrico","Grapas para cable",25,"pza","ESMA"],
+];
+// Plantillas de costeo de ESMA. Los precios se toman del catálogo al usarlas.
+const PLANTILLAS_ESMA = [
+  { name:"Letrero caja de luz circular 60 cm + instalación", marginPct:60,
+    products:[["Caja de luz circular 60 cm (sin gráfico)",1],["Vinil de color (1 m por color)",2],["Cable THW cal 14 (instalación)",10],["Apagador sencillo con placa",1],["Grapas para cable",1]],
+    routes:[["Plotter",0.5],["Habilitado de letreros",2]],
+    extras:[["Instalación en fachada",800]] },
+  { name:"Kit eléctrico para letrero (cable, apagador, grapas)", marginPct:60,
+    products:[["Cable THW cal 14 (instalación)",10],["Apagador sencillo con placa",1],["Grapas para cable",1]],
+    routes:[], extras:[] },
+];
+
+function _diasDesde(iso){ if(!iso) return null; return Math.round((new Date(todayISO()+"T00:00:00")-new Date(String(iso).slice(0,10)+"T00:00:00"))/86400000); }
+
+// Categoría sugerida por palabras clave, para materiales que ya existían sin categoría.
+const CAT_PALABRAS = [
+  ["Acrílicos",/acr[ií]l/i], ["Vinil",/vinil/i], ["LED y neón",/\bled\b|ne[oó]n/i], ["Fuentes",/fuente|eliminador/i],
+  ["Eléctrico",/cable|grapa|apagador/i],
+  ["Herrajes de mueble",/bisagra|corredera|jaladera|caj[oó]n|riel oculto|brazo|m[eé]nsula|inserto|escuadra|pija|taquete|tornillo|clavo/i],
+  ["Madera y melamina",/melamina|madera|mdf|pino|lambr[ií]n|chapacinta|enchapado|cubierta|moldura/i],
+  ["Trovicel y aluminio",/trovicel|l[aá]mina|alumin/i],
+  ["Herrajes y adhesivos",/silic[oó]n|resistol|kola|cinta|chapet[oó]n|soldadura|cutter|thiner|barniz|pintura|tinta|aceite|lija|corrector|iman|cadena|argolla/i],
+];
+function _catSugerida(desc){ const d=String(desc||""); const hit=CAT_PALABRAS.find(([,re])=>re.test(d)); return hit?hit[0]:""; }
+
+function importarCatalogoAnunciero(){
+  const mats=db.settings.materialDB=db.settings.materialDB||[];
+  mats.forEach(m=>{ if(!m.cat){ const c=_catSugerida(m.desc); if(c) m.cat=c; } });
+  const filas=[...CATALOGO_ANUNCIERO_2026_04.map(r=>[...r,"El Anunciero (catálogo abril 2026)"]), ...CATALOGO_ESMA_BASE];
+  let nuevos=0, actualizados=0;
+  filas.forEach(([cat,desc,cost,uom,vendor])=>{
+    const ex=mats.find(m=>String(m.desc||"").trim().toLowerCase()===desc.toLowerCase());
+    if(ex){ if(Number(ex.cost)!==cost){ ex.cost=cost; ex.updatedAt=todayISO(); actualizados++; } ex.cat=ex.cat||cat; ex.vendor=ex.vendor||vendor; ex.uom=ex.uom||uom; }
+    else { mats.push({id:uid(), desc, cost, uom, vendor, cat, updatedAt:todayISO()}); nuevos++; }
+  });
+  return {nuevos, actualizados};
+}
+function importarPlantillasESMA(){
+  const tpls=db.settings.quoteTemplates=db.settings.quoteTemplates||[];
+  let nuevas=0;
+  PLANTILLAS_ESMA.forEach(p=>{
+    if(tpls.some(t=>t.name===p.name)) return;
+    tpls.push({ id:uid(), name:p.name, createdAt:todayISO(), marginPct:p.marginPct, saleType:"manufactured", esma:true,
+      products:p.products.map(([desc,qty])=>{ const m=materialByDesc(desc); return {id:uid(), desc, matPick:desc, qty, unitPrice:m?Number(m.cost||0):0}; }),
+      routes:p.routes.map(([routeName,hours])=>{ const r=routeByName(routeName); return {id:uid(), routeName, hours, rate:r?Number(r.costPerHour||0):0}; }),
+      extras:p.extras.map(([label,amount])=>({id:uid(), label, amount})) });
+    nuevas++;
+  });
+  return nuevas;
+}
+// Al usar una plantilla, toma los precios vigentes del catálogo (si el material o la ruta existen).
+function _tplRefrescarPrecios(q){
+  (q.products||[]).forEach(r=>{ const m=materialByDesc(r.desc); if(m) r.unitPrice=Number(m.cost||0); });
+  (q.routes||[]).forEach(r=>{ const rt=routeByName(r.routeName); if(rt) r.rate=Number(rt.costPerHour||0); });
+}
+
+const GUIA_COTIZAR_HTML = `
+  <ol style="margin:6px 0 0 18px;padding:0;font-size:12.5px;line-height:1.6;">
+    <li><b>Empieza con una plantilla</b> (botón <i>Plantilla</i>) si ya existe el tipo de trabajo. Ajusta cantidades.</li>
+    <li><b>Materiales:</b> elige del <i>Catálogo de costos</i>. Si un material no está o su precio es viejo, búscalo en la web o pregunta al proveedor y <b>actualízalo en el catálogo</b>.</li>
+    <li><b>Vinil:</b> 1 metro por cada color del diseño.</li>
+    <li><b>Mano de obra:</b> Plotter = cortar vinil · <b>Habilitado de letreros</b> = colocar vinil, armar y alambrar (un letrero de 60 cm ≈ 2 h).</li>
+    <li><b>Letrero con luz que se instala:</b> suma mínimo <b>10 m de cable + apagador + grapas</b> (plantilla <i>Kit eléctrico</i>).</li>
+    <li><b>Utilidad: siempre empieza en 60%</b>. Los descuentos se dan después, al negociar.</li>
+    <li><b>Instalación:</b> va en <i>Extras</i>, de <b>$500 a $800</b>. Ponle nombre a cada extra para que el cliente sepa qué paga.</li>
+    <li><b>Productos comprados</b> (cajas de luz, marcos): costo = pieza comprada + vinil + plotter + habilitado (+ kit eléctrico).</li>
+    <li><b>Antes de enviar:</b> revisa competencia (internet ≈ $2,300 el letrero de 60 cm sin instalar; instalarlo le cuesta al cliente ≈ $1,000 más) y vende "todo incluido, un solo responsable".</li>
+    <li>Condiciones: 50% anticipo, 2–3 semanas, vigencia 15 días, precios sin IVA.</li>
+  </ol>`;
+
 function _renderSecMateriales(filtersEl, contentEl){
   if(!contentEl) return;
+  let catSel = "Todas";
   function render(){
     const mats = db.settings.materialDB||[];
     const routes = db.settings.routeDB||[];
-    const matRows = mats.length===0
-      ? '<div style="color:var(--muted);font-size:13px;padding:8px 0;">Sin materiales. Agrégalos para usarlos en cotizaciones.</div>'
-      : mats.map((m,i)=>`<div class="sec-item" style="padding:9px 0;"><div class="si-body"><div class="si-title">${escapeHTML(m.desc)}</div><div class="si-meta">$${money(m.cost||0)} / ${escapeHTML(m.uom||"pza")}${m.vendor?" · "+escapeHTML(m.vendor):""}</div></div><div class="si-right" style="display:flex;gap:6px;"><button class="btn small" data-edit-mat="${i}" title="Editar">✏️</button><button class="btn small danger" data-del-mat="${i}" title="Eliminar">✕</button></div></div>`).join('');
+    const cats = ["Todas", ...CAT_MATERIALES.filter(c=>mats.some(m=>m.cat===c)), ...(mats.some(m=>!m.cat)?["Sin categoría"]:[])];
+    const visibles = mats.map((m,i)=>({m,i})).filter(({m})=> catSel==="Todas" || (catSel==="Sin categoría" ? !m.cat : m.cat===catSel));
+    const grupos = {};
+    visibles.forEach(o=>{ const k=o.m.cat||"Sin categoría"; (grupos[k]=grupos[k]||[]).push(o); });
+    const orden = [...CAT_MATERIALES, "Sin categoría"].filter(k=>grupos[k]);
+    const filaMat = ({m,i})=>{
+      const d=_diasDesde(m.updatedAt);
+      const edad = d===null ? `<span style="color:var(--amber);">sin fecha de precio</span>` : d>90 ? `<span style="color:var(--amber);">precio de hace ${d} días</span>` : `<span>actualizado hace ${d} días</span>`;
+      return `<div class="sec-item" style="padding:9px 0;">
+        <div class="si-body"><div class="si-title">${escapeHTML(m.desc)}</div>
+          <div class="si-meta">$${money(m.cost||0)} / ${escapeHTML(m.uom||"pza")}${m.vendor?" · "+escapeHTML(m.vendor):""} · ${edad}</div></div>
+        <div class="si-right" style="display:flex;gap:6px;align-items:center;">
+          <input type="number" step="0.01" data-price-mat="${i}" value="${Number(m.cost||0)}" title="Precio (se guarda al salir del campo)" style="width:90px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:5px 8px;color:var(--text);font-family:inherit;text-align:right;">
+          <button class="btn small" data-edit-mat="${i}">✏️</button>
+          <button class="btn small danger" data-del-mat="${i}">✕</button>
+        </div></div>`;
+    };
+    const matRows = visibles.length===0
+      ? '<div style="color:var(--muted);font-size:13px;padding:8px 0;">Sin materiales en esta categoría.</div>'
+      : orden.map(k=>`<div style="font-size:11px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--accent);margin:12px 0 2px;">${escapeHTML(k)} (${grupos[k].length})</div>${grupos[k].map(filaMat).join("")}`).join("");
     const routeRows = routes.length===0
       ? '<div style="color:var(--muted);font-size:13px;padding:8px 0;">Sin rutas.</div>'
-      : routes.map((r,i)=>`<div class="sec-item" style="padding:9px 0;"><div class="si-body"><div class="si-title">${escapeHTML(r.name)}</div><div class="si-meta">${escapeHTML(r.type||"---")} · $${money(r.costPerHour||0)}/hora</div></div><div class="si-right" style="display:flex;gap:6px;"><button class="btn small" data-edit-route="${i}" title="Editar">✏️</button><button class="btn small danger" data-del-route="${i}" title="Eliminar">✕</button></div></div>`).join('');
+      : routes.map((r,i)=>`<div class="sec-item" style="padding:9px 0;"><div class="si-body"><div class="si-title">${escapeHTML(r.name)}</div><div class="si-meta">${escapeHTML(r.type||"---")} · $${money(r.costPerHour||0)}/hora</div></div><div class="si-right" style="display:flex;gap:6px;"><button class="btn small" data-edit-route="${i}">✏️</button><button class="btn small danger" data-del-route="${i}">✕</button></div></div>`).join("");
+    const tpls = db.settings.quoteTemplates||[];
 
     contentEl.innerHTML = `
+      <details class="card" style="margin-bottom:12px;padding:12px 14px;">
+        <summary style="cursor:pointer;font-weight:800;">📘 Cómo cotizar en ESMA (léelo si eres nuevo)</summary>
+        ${GUIA_COTIZAR_HTML}
+      </details>
       <div class="card" style="margin-bottom:12px;">
-        <div class="card-header"><div class="card-title">🗄 Materiales</div><button class="btn small primary" id="smBtnAddMat">＋ Agregar</button></div>
+        <div class="card-header" style="flex-wrap:wrap;gap:8px;"><div class="card-title">🗄 Materiales (${mats.length})</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;">
+            <button class="btn small" id="smBtnImport" title="Agrega o actualiza precios de El Anunciero y materiales base de ESMA">📥 Importar catálogo El Anunciero</button>
+            <button class="btn small primary" id="smBtnAddMat">＋ Agregar</button>
+          </div></div>
+        <div style="font-size:12px;color:var(--muted);margin:-4px 0 8px;">Cambia el precio en la casilla y se guarda al salir. Las cotizaciones nuevas y las plantillas toman este precio.</div>
         <div class="field" style="margin-bottom:8px;"><span class="ico">🔎</span><input id="smMatSearch" placeholder="Buscar material..."></div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px;">${cats.map(c=>`<button class="btn small ${c===catSel?"primary":""}" data-cat="${escapeAttr(c)}">${escapeHTML(c)}</button>`).join("")}</div>
         <div id="smMatList">${matRows}</div>
       </div>
-      <div class="card">
-        <div class="card-header"><div class="card-title">⚙️ Rutas / M.O.</div><button class="btn small primary" id="smBtnAddRoute">＋ Agregar</button></div>
+      <div class="card" style="margin-bottom:12px;">
+        <div class="card-header"><div class="card-title">⚙️ Rutas / Mano de obra</div><button class="btn small primary" id="smBtnAddRoute">＋ Agregar</button></div>
         <div id="smRouteList">${routeRows}</div>
+      </div>
+      <div class="card">
+        <div class="card-header"><div class="card-title">📋 Plantillas de costeo (${tpls.length})</div></div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:6px;">Se usan desde el cotizador con el botón <b>Plantilla</b>. Toman los precios actuales del catálogo.</div>
+        ${tpls.map(t=>`<div class="sec-item" style="padding:8px 0;"><div class="si-body"><div class="si-title">${t.esma?"⭐ ":""}${escapeHTML(t.name)}</div><div class="si-meta">${(t.products||[]).length} materiales · ${(t.routes||[]).length} rutas · utilidad ${Number(t.marginPct??25)}%</div></div></div>`).join("") || '<div style="color:var(--muted);font-size:13px;">Sin plantillas.</div>'}
       </div>`;
 
-    // ── Agregar material ──
-    document.getElementById("smBtnAddMat").onclick = () => _showEditMaterialSheet(null, render);
-
-    // ── Editar material ──
-    contentEl.querySelectorAll("[data-edit-mat]").forEach(b=>b.addEventListener("click",()=>{
-      const idx = Number(b.dataset.editMat);
-      _showEditMaterialSheet(db.settings.materialDB[idx], render);
+    document.getElementById("smBtnImport").onclick = () => {
+      if(!confirm("Se agregarán los precios del catálogo de El Anunciero (abril 2026), el kit eléctrico y las plantillas de ESMA.\nSi un material ya existe con el mismo nombre, solo se actualiza su precio.\n\n¿Continuar?")) return;
+      const r = importarCatalogoAnunciero(); const t = importarPlantillasESMA();
+      save(); render();
+      _showSaveToast(`✅ ${r.nuevos} materiales nuevos · ${r.actualizados} precios actualizados · ${t} plantillas`, "success");
+    };
+    contentEl.querySelectorAll("[data-cat]").forEach(b=>b.addEventListener("click",()=>{ catSel=b.dataset.cat; render(); }));
+    contentEl.querySelectorAll("[data-price-mat]").forEach(el=>el.addEventListener("change",()=>{
+      const m=db.settings.materialDB[Number(el.dataset.priceMat)]; if(!m) return;
+      m.cost=Number(el.value||0); m.updatedAt=todayISO(); save(); render();
     }));
 
-    // ── Eliminar material ──
+    document.getElementById("smBtnAddMat").onclick = () => _showEditMaterialSheet(null, render);
+    contentEl.querySelectorAll("[data-edit-mat]").forEach(b=>b.addEventListener("click",()=>{
+      _showEditMaterialSheet(db.settings.materialDB[Number(b.dataset.editMat)], render);
+    }));
     contentEl.querySelectorAll("[data-del-mat]").forEach(b=>b.addEventListener("click",()=>{
       if(!confirm("¿Eliminar este material?")) return;
       db.settings.materialDB.splice(Number(b.dataset.delMat),1); save(); render();
     }));
-
-    // ── Agregar ruta ──
     document.getElementById("smBtnAddRoute").onclick = () => _showEditRouteSheet(null, render);
-
-    // ── Editar ruta ──
     contentEl.querySelectorAll("[data-edit-route]").forEach(b=>b.addEventListener("click",()=>{
-      const idx = Number(b.dataset.editRoute);
-      _showEditRouteSheet(db.settings.routeDB[idx], render);
+      _showEditRouteSheet(db.settings.routeDB[Number(b.dataset.editRoute)], render);
     }));
-
-    // ── Eliminar ruta ──
     contentEl.querySelectorAll("[data-del-route]").forEach(b=>b.addEventListener("click",()=>{
       if(!confirm("¿Eliminar esta ruta?")) return;
       db.settings.routeDB.splice(Number(b.dataset.delRoute),1); save(); render();
     }));
-
-    // ── Búsqueda ──
     const srch=document.getElementById("smMatSearch");
     if(srch) srch.addEventListener("input",()=>{ const t=srch.value.toLowerCase(); contentEl.querySelectorAll("#smMatList .sec-item").forEach(r=>{ r.style.display=r.textContent.toLowerCase().includes(t)?"":"none"; }); });
   }
@@ -8184,18 +8349,25 @@ function _showEditMaterialSheet(existing, onDone){
   openSheet(isNew ? "＋ Nuevo material" : "✏️ Editar material", `
     <div class="field-label">Descripción *</div>
     <div class="field"><input id="_em_desc" placeholder="Nombre del material" value="${escapeAttr(existing?existing.desc:"")}"></div>
+    <div class="field-label">Categoría</div>
+    <div class="field" style="padding:0 10px;"><select id="_em_cat" style="background:transparent;border:none;color:var(--text);font-family:inherit;font-size:13px;width:100%;padding:9px 0;">
+      ${CAT_MATERIALES.map(c=>`<option ${existing&&existing.cat===c?"selected":""}>${c}</option>`).join("")}
+    </select></div>
     <div class="field-label">Costo unitario</div>
     <div class="field"><input id="_em_cost" type="number" step="0.01" value="${existing?existing.cost||0:0}"></div>
-    <div class="field-label">Unidad (pza, m², ml…)</div>
+    <div class="field-label">Unidad (pza, m, hoja, rollo…)</div>
     <div class="field"><input id="_em_uom" placeholder="pza" value="${escapeAttr(existing?existing.uom||"":"")}"></div>
-    <div class="field-label">Proveedor (opcional)</div>
-    <div class="field"><input id="_em_vendor" placeholder="Proveedor" value="${escapeAttr(existing?existing.vendor||"":"")}"></div>
+    <div class="field-label">Proveedor / fuente del precio</div>
+    <div class="field"><input id="_em_vendor" placeholder="Ej: El Anunciero, Home Depot, web" value="${escapeAttr(existing?existing.vendor||"":"")}"></div>
+    ${existing&&existing.updatedAt?`<div style="font-size:12px;color:var(--muted);margin-top:8px;">Precio actualizado el ${escapeHTML(existing.updatedAt)}</div>`:""}
   `, [
     {label:"Cancelar", cls:"btn", action: closeSheet},
     {label: isNew?"Agregar":"Guardar", cls:"btn primary", action:()=>{
       const desc = document.getElementById("_em_desc").value.trim();
       if(!desc){ alert("Escribe un nombre"); return; }
-      const data = { desc, cost: Number(document.getElementById("_em_cost").value||0), uom: document.getElementById("_em_uom").value.trim(), vendor: document.getElementById("_em_vendor").value.trim() };
+      const cost = Number(document.getElementById("_em_cost").value||0);
+      const data = { desc, cost, uom: document.getElementById("_em_uom").value.trim(), vendor: document.getElementById("_em_vendor").value.trim(), cat: document.getElementById("_em_cat").value };
+      if(isNew || Number(existing.cost)!==cost) data.updatedAt = todayISO();
       db.settings.materialDB = db.settings.materialDB||[];
       if(isNew){ data.id = uid(); db.settings.materialDB.push(data); }
       else { Object.assign(existing, data); }
