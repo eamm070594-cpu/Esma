@@ -915,7 +915,10 @@ tbody tr:hover td{background:rgba(13,148,136,.03);}
 
     <!-- INICIO: Tablero por etapas -->
     <div class="s-tile-section">Inicio</div>
-    <button class="s-tile-full active" id="snav-dashboard" onclick="showPage('dashboard');this.classList.add('active')">
+    <button class="s-tile-full active" id="snav-hoy" onclick="showPage('hoy')" style="background:linear-gradient(90deg,rgba(37,99,235,.35),rgba(37,99,235,.08));font-weight:800;">
+      <i class="ti ti-target-arrow s-ico"></i>Hoy · Vender
+    </button>
+    <button class="s-tile-full" id="snav-dashboard" onclick="showPage('dashboard');this.classList.add('active')">
       <i class="ti ti-layout-kanban s-ico"></i>Tablero de proyectos
     </button>
 
@@ -926,11 +929,11 @@ tbody tr:hover td{background:rgba(13,148,136,.03);}
         <svg class="s-tile-ico" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h3.586a1 1 0 0 1 .707.293l1.414 1.414a1 1 0 0 0 .707.293H19a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/></svg>
         <span class="s-tile-lbl">Proyectos</span>
       </button>
-      <button class="s-tile" id="snav-purchases" onclick="showSection('compras');sTileActive('snav-purchases')">
+      <button class="s-tile" id="snav-purchases" style="display:none" onclick="showSection('compras');sTileActive('snav-purchases')">
         <svg class="s-tile-ico" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="20" r="1"/><circle cx="18" cy="20" r="1"/><path d="M2.5 3h2l2.6 12.2a2 2 0 0 0 2 1.6h8.4a2 2 0 0 0 2-1.6L21 8H5.5"/></svg>
         <span class="s-tile-lbl">Compras</span>
       </button>
-      <button class="s-tile" id="snav-agenda" onclick="sNavGo('agenda');sTileActive('snav-agenda')">
+      <button class="s-tile" id="snav-agenda" style="display:none" onclick="sNavGo('agenda');sTileActive('snav-agenda')">
         <svg class="s-tile-ico" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="3" x2="8" y2="7"/><line x1="16" y1="3" x2="16" y2="7"/></svg>
         <span class="s-tile-lbl">Agenda</span>
       </button>
@@ -941,7 +944,7 @@ tbody tr:hover td{background:rgba(13,148,136,.03);}
     </div>
 
     <!-- Proyectos submenu (collapsible) -->
-    <div class="s-subnav" id="subnav-projects" style="margin:0 8px 4px;">
+    <div class="s-subnav" id="subnav-projects" style="margin:0 8px 4px;display:none !important;">
       <button class="s-sub-item" id="ssub-projects-tasks" onclick="showSection('tareas');sSubActive('projects','tasks')" style="width:100%;padding:7px 12px;border-radius:6px;background:rgba(255,255,255,.03);border:none;display:flex;align-items:center;gap:8px;color:#4a7fa0;cursor:pointer;font-family:var(--font);font-size:12px;font-weight:500;">
         <i class="ti ti-check" style="font-size:13px;width:14px;text-align:center;"></i>Tareas
       </button>
@@ -953,8 +956,8 @@ tbody tr:hover td{background:rgba(13,148,136,.03);}
     <div class="s-divider"></div>
 
     <!-- PRODUCCIÓN: Full-width buttons -->
-    <div class="s-tile-section">Producción</div>
-    <button class="s-tile-full" id="snav-bom" onclick="showPage('bom');sTileFullActive('snav-bom')">
+    <div class="s-tile-section">Catálogo</div>
+    <button class="s-tile-full" id="snav-bom" style="display:none" onclick="showPage('bom');sTileFullActive('snav-bom')">
       <i class="ti ti-package s-ico"></i>BOM Materiales
     </button>
     <button class="s-tile-full" id="snav-materiales" onclick="showSection('materiales');sTileFullActive('snav-materiales')">
@@ -968,7 +971,7 @@ tbody tr:hover td{background:rgba(13,148,136,.03);}
     <button class="s-tile-full" id="ssub-results-sales" onclick="showPage('sales');sTileFullActive('ssub-results-sales')">
       <i class="ti ti-chart-line s-ico"></i>Ventas
     </button>
-    <button class="s-tile-full" id="ssub-results-be" onclick="showSection('costos');sTileFullActive('ssub-results-be')">
+    <button class="s-tile-full" id="ssub-results-be" style="display:none" onclick="showSection('costos');sTileFullActive('ssub-results-be')">
       <i class="ti ti-scale s-ico"></i>Costos / PE
     </button>
 
@@ -1003,8 +1006,13 @@ tbody tr:hover td{background:rgba(13,148,136,.03);}
     <!-- TOPBAR (mobile only) -->
     <div class="topbar" id="mainTopbar"></div>
 
+    <!-- PAGE: HOY (coach de ventas diario) -->
+    <div class="page active" id="page-hoy">
+      <div id="hoyContent"></div>
+    </div>
+
     <!-- PAGE: DASHBOARD (TABLERO) -->
-    <div class="page active" id="page-dashboard">
+    <div class="page" id="page-dashboard">
       <div class="page-header">
         <div>
           <h1>Resumen de proyectos</h1>
@@ -1133,9 +1141,9 @@ tbody tr:hover td{background:rgba(13,148,136,.03);}
       <div class="nav-ico-wrap"><i class="ti ti-receipt nav-ico"></i></div>
       <span class="nav-lbl">Cotizaciones</span>
     </button>
-    <button class="nav-item" id="mnav-bom" onclick="mNavGo('bom')">
-      <div class="nav-ico-wrap"><i class="ti ti-package nav-ico"></i></div>
-      <span class="nav-lbl">BOM</span>
+    <button class="nav-item" id="mnav-hoy" onclick="mNavGo('hoy')">
+      <div class="nav-ico-wrap"><i class="ti ti-target-arrow nav-ico"></i></div>
+      <span class="nav-lbl">Hoy</span>
     </button>
     <button class="nav-item" id="mnav-more" onclick="mNavToggle('more',event)">
       <div class="nav-ico-wrap"><i class="ti ti-menu-2 nav-ico"></i></div>
@@ -1162,16 +1170,16 @@ tbody tr:hover td{background:rgba(13,148,136,.03);}
 
   <!-- DROPDOWN: Más -->
   <div class="nav-dropdown" id="dd-more">
-    <div class="nav-dd-item" onclick="closeAllDropdowns();mNavGo('bom')"><i class="ti ti-package dd-ico"></i>BOM Materiales</div>
+    <div class="nav-dd-item" style="display:none" onclick="closeAllDropdowns();mNavGo('bom')"><i class="ti ti-package dd-ico"></i>BOM Materiales</div>
     <div class="nav-dd-item" onclick="closeAllDropdowns();mShowSection('materiales')"><i class="ti ti-database dd-ico"></i>Materiales y Rutas</div>
     <div class="nav-dd-divider"></div>
     <div class="nav-dd-item" onclick="closeAllDropdowns();mNavGo('sales')"><i class="ti ti-chart-line dd-ico"></i>Ventas</div>
-    <div class="nav-dd-item" onclick="closeAllDropdowns();mShowSection('costos')"><i class="ti ti-scale dd-ico"></i>Costos / PE</div>
-    <div class="nav-dd-item" onclick="closeAllDropdowns();mNavGo('agenda')"><i class="ti ti-calendar dd-ico"></i>Agenda</div>
-    <div class="nav-dd-divider"></div>
-    <div class="nav-dd-item" onclick="closeAllDropdowns();mShowSection('compras')"><i class="ti ti-shopping-cart dd-ico"></i>Compras</div>
-    <div class="nav-dd-item" onclick="closeAllDropdowns();mShowSection('instalaciones')"><i class="ti ti-tool dd-ico"></i>Instalaciones</div>
-    <div class="nav-dd-item" onclick="closeAllDropdowns();mShowSection('tareas')"><i class="ti ti-check dd-ico"></i>Tareas</div>
+    <div class="nav-dd-item" style="display:none" onclick="closeAllDropdowns();mShowSection('costos')"><i class="ti ti-scale dd-ico"></i>Costos / PE</div>
+    <div class="nav-dd-item" style="display:none" onclick="closeAllDropdowns();mNavGo('agenda')"><i class="ti ti-calendar dd-ico"></i>Agenda</div>
+    <div class="nav-dd-item" onclick="closeAllDropdowns();mNavGo('dashboard')"><i class="ti ti-layout-kanban dd-ico"></i>Tablero de proyectos</div>
+    <div class="nav-dd-item" style="display:none" onclick="closeAllDropdowns();mShowSection('compras')"><i class="ti ti-shopping-cart dd-ico"></i>Compras</div>
+    <div class="nav-dd-item" style="display:none" onclick="closeAllDropdowns();mShowSection('instalaciones')"><i class="ti ti-tool dd-ico"></i>Instalaciones</div>
+    <div class="nav-dd-item" style="display:none" onclick="closeAllDropdowns();mShowSection('tareas')"><i class="ti ti-check dd-ico"></i>Tareas</div>
     <div class="nav-dd-divider"></div>
     <div class="nav-dd-item" onclick="mNavGo('settings')"><svg class="dd-ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Ajustes</div>
     <div class="nav-dd-item" onclick="closeAllDropdowns();exportJSON()"><i class="ti ti-device-floppy dd-ico"></i>Respaldo</div>
@@ -1968,6 +1976,7 @@ function applyRemoteData(data){
   try { buildTopbar(); } catch(e){}
   try { renderProjectsPage(); } catch(e){}
   try { renderDashboardPage(); } catch(e){}
+  try{ if(currentPage==="hoy") renderHoyPage(); }catch(e){}
   try {
     if(typeof currentPage !== "undefined"){
       if(currentPage==="settings") renderSettingsPage();
@@ -2045,11 +2054,13 @@ function subscribeFirestoreRealtime(){
     snap.docChanges().forEach(c=>_mergeFirestoreDocChange(db.projects, c));
     try{ renderProjectsPage(); }catch(e){}
     try{ renderDashboardPage(); }catch(e){}
+    try{ if(currentPage==="hoy") renderHoyPage(); }catch(e){}
     try{ buildTopbar(); }catch(e){}
   }, err=>console.error("Firestore projects listener error:", err));
   firestore.collection('quotes').onSnapshot(snap=>{
     snap.docChanges().forEach(c=>_mergeFirestoreDocChange(db.quotes, c));
     try{ renderDashboardPage(); }catch(e){}
+    try{ if(currentPage==="hoy") renderHoyPage(); }catch(e){}
   }, err=>console.error("Firestore quotes listener error:", err));
 }
 
@@ -4567,6 +4578,346 @@ let _calSelectedDay = "";
 let _calFilter = {delivery:true, install:true, purchase:true, task:true};
 let _calCursor = new Date(); _calCursor.setDate(1);
 let _salesCursor = new Date(); _salesCursor.setDate(1);
+// ── HOY: COACH DE VENTAS DIARIO ─────────────────────────────
+// Pantalla de inicio. Dice cómo vas contra la meta del mes y qué hacer HOY
+// para vender: cobrar, dar seguimiento, enviar cotizaciones y reactivar clientes.
+const HOY_SEGUIMIENTO_DIAS = [2,3,5,7]; // días entre un seguimiento y el siguiente
+const HOY_MAX_SEGUIMIENTOS = 4;         // después de esto: ganada o perdida
+const HOY_VIEJA_DIAS = 30;              // "sin enviar" más vieja que esto = limpieza
+const HOY_ACCIONES_META = 5;            // acciones mínimas por día
+
+function _hoyCoach(){
+  db.settings.coach = db.settings.coach || {};
+  const c = db.settings.coach;
+  if(!c.contacted || typeof c.contacted!=="object") c.contacted = {};
+  if(!c.log || typeof c.log!=="object") c.log = {};
+  return c;
+}
+function _hoyAddDays(iso, n){ const d=new Date(iso.slice(0,10)+"T00:00:00"); d.setDate(d.getDate()+n); return d.toISOString().slice(0,10); }
+function _hoyDiasDesde(iso){ if(!iso) return null; return Math.round((new Date(todayISO()+"T00:00:00") - new Date(String(iso).slice(0,10)+"T00:00:00"))/86400000); }
+function _hoyQuoteTotal(q){ return quoteSellTotals(q).venta*(Number(q.qty)||1); }
+function _hoyProject(q){ return db.projects.find(p=>p.id===q.projectId); }
+function _hoyNombre(p){ const n=String(p?.client||"").trim().split(/\s+/)[0]||""; return n ? n.charAt(0).toUpperCase()+n.slice(1).toLowerCase() : ""; }
+function _hoyPhone(p){
+  let d=String(p?.phone||"").replace(/\D/g,"");
+  if(d.length===10) d="52"+d;
+  if(d.length===13 && d.startsWith("521")) d="52"+d.slice(3);
+  return d.length===12 ? d : "";
+}
+function _hoyDiasHabilesRestantes(){
+  const d=new Date(todayISO()+"T00:00:00"); const mes=d.getMonth(); let n=0;
+  while(d.getMonth()===mes){ if(d.getDay()!==0) n++; d.setDate(d.getDate()+1); }
+  return Math.max(1,n);
+}
+
+function _hoyMsg(tipo, q, p){
+  const n=_hoyNombre(p); const hola=n?`Hola ${n}`:"Hola";
+  const proy=(q&&q.name&&!/^Cotizaci[oó]n( \d+)?$/i.test(q.name)) ? q.name : (p?.name||"tu proyecto");
+  const tot=q ? "$"+money(_hoyQuoteTotal(q)) : "";
+  switch(tipo){
+    case "enviar":   return `${hola}, ¿cómo estás? Te comparto la cotización de ${proy} por ${tot}. La armamos a tu medida; si quieres ajustar algo, lo vemos sin problema. ¿Qué te parece?`;
+    case "seg1":     return `${hola}, ¿cómo vas? ¿Pudiste revisar la cotización de ${proy}? Cualquier duda o ajuste aquí estoy 🙂`;
+    case "seg2":     return `${hola}, te escribo por lo de ${proy}. Estamos programando producción de las próximas semanas; si me confirmas esta semana te aparto el lugar. ¿Lo agendamos?`;
+    case "seg3":     return `${hola}, ¿sigues con la idea de ${proy}? Si el presupuesto es el detalle, dime y buscamos una opción que te funcione.`;
+    case "seg4":     return `${hola}, no quiero ser insistente 🙂 ¿Seguimos con ${proy} o lo dejamos para más adelante? Con que me digas me ayudas mucho.`;
+    case "anticipo": { const t=projectAuthorizedTotal(p.id); return `${hola}, para arrancar con ${p?.name||"tu proyecto"} solo queda pendiente el anticipo del 50% ($${money(t*0.5)}). ¿Te paso los datos para transferencia?`; }
+    case "reactivar":return `${hola}, ¿cómo te ha ido con ${p?.name||"tu proyecto"}? En ESMA seguimos haciendo letreros, muebles a medida y corte láser. Si tienes algo en mente o conoces a alguien que lo necesite, con gusto te cotizo 🙌`;
+  }
+  return hola;
+}
+
+function _hoyWhats(pid, tipo, qid){
+  const p=db.projects.find(x=>x.id===pid); if(!p) return;
+  const q=qid?db.quotes.find(x=>x.id===qid):null;
+  let tel=_hoyPhone(p);
+  if(!tel){
+    const t=prompt(`WhatsApp de ${p.client||"el cliente"} (10 dígitos):`, p.phone||"");
+    if(t===null) return;
+    p.phone=t.trim(); tel=_hoyPhone(p);
+    if(!tel){ _showSaveToast("Número no válido: escribe 10 dígitos","warning"); return; }
+    saveProject(p);
+  }
+  window.open(`https://wa.me/${tel}?text=${encodeURIComponent(_hoyMsg(tipo,q,p))}`,"_blank");
+}
+
+function _hoyLog(){ const c=_hoyCoach(); const t=todayISO(); c.log[t]=(Number(c.log[t])||0)+1; }
+
+function _hoyAccion(qid, act){
+  const q=db.quotes.find(x=>x.id===qid); if(!q) return;
+  const hoy=todayISO();
+  if(act==="enviada"){
+    q.pipelineStatus="sent"; q.sentAt=hoy; q.followUps=0;
+    q.nextFollowUp=_hoyAddDays(hoy,HOY_SEGUIMIENTO_DIAS[0]);
+  } else if(act==="seguimiento"){
+    q.followUps=(Number(q.followUps)||0)+1; q.lastFollowUp=hoy;
+    if(!q.sentAt) q.sentAt=q.createdAt||hoy;
+    q.nextFollowUp=_hoyAddDays(hoy,HOY_SEGUIMIENTO_DIAS[Math.min(q.followUps,HOY_SEGUIMIENTO_DIAS.length-1)]);
+    if(q.pipelineStatus!=="negotiating") q.pipelineStatus="no_response";
+  } else if(act==="negociando"){
+    q.pipelineStatus="negotiating"; q.lastFollowUp=hoy; q.nextFollowUp=_hoyAddDays(hoy,2);
+  } else if(act==="ganada"){
+    if(!confirm(`¿Marcar "${q.name||"la cotización"}" como GANADA (autorizada)?`)) return;
+    q.status="authorized"; q.authorizedAt=hoy; _onQuoteAuthorized(q.projectId);
+    const proj=_hoyProject(q); if(proj) saveProject(proj);
+  } else if(act==="perdida"){
+    const r=prompt("¿Por qué se perdió? (precio, tiempo, no contestó, se fue con otro...)","");
+    if(r===null) return;
+    q.pipelineStatus="lost"; q.lostAt=hoy; q.lostReason=r.trim();
+  } else return;
+  _hoyLog(); saveQuote(q); save(); renderHoyPage();
+}
+
+function _hoyAccionProyecto(pid, act){
+  const p=db.projects.find(x=>x.id===pid); if(!p) return;
+  if(act==="anticipo"){
+    const sug=Math.round(projectAuthorizedTotal(pid)*0.5*100)/100;
+    const m=prompt("¿Cuánto te dieron de anticipo?", String(sug));
+    if(m===null) return;
+    p.payStatus="anticipo"; p.anticipo=Number(String(m).replace(/[^\d.]/g,""))||0;
+  } else if(act==="pagado"){
+    p.payStatus="pagado";
+  } else if(act==="terminado"){
+    if(!confirm(`¿Marcar "${p.name||"el proyecto"}" como terminado y entregado?`)) return;
+    p.manualDone=true;
+  } else if(act==="reprogramar"){
+    const f=prompt("Nueva fecha de entrega (AAAA-MM-DD):", _hoyAddDays(todayISO(),7));
+    if(f===null) return;
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(f.trim())){ _showSaveToast("Fecha no válida. Usa AAAA-MM-DD","warning"); return; }
+    p.deliveryDate=f.trim();
+  } else if(act==="contactado"){
+    _hoyCoach().contacted[pid]=todayISO();
+    _hoyLog(); save(); renderHoyPage(); return;
+  } else return;
+  _hoyLog(); saveProject(p); save(); renderHoyPage();
+}
+
+function _hoySetMeta(){
+  const c=_hoyCoach();
+  const m=prompt("¿Cuánto quieres vender este mes? (meta en pesos)", c.metaMensual?String(c.metaMensual):"");
+  if(m===null) return;
+  const n=Number(String(m).replace(/[^\d.]/g,""));
+  if(!n){ _showSaveToast("Escribe una cantidad válida","warning"); return; }
+  c.metaMensual=n; save(); renderHoyPage();
+}
+
+function _hoyAbrirQuote(qid){
+  const q=db.quotes.find(x=>x.id===qid); if(!q) return;
+  currentProjectId=q.projectId; openQuoteEditorPage(q);
+}
+
+function _hoyDatos(){
+  const hoy=todayISO(); const mes=hoy.slice(0,7);
+  const c=_hoyCoach();
+  const auth=db.quotes.filter(q=>q.status==="authorized" && q.authorizedAt);
+  const vendidoMes=auth.filter(q=>q.authorizedAt.slice(0,7)===mes).reduce((s,q)=>s+_hoyQuoteTotal(q),0);
+  const recientes=auth.filter(q=>_hoyDiasDesde(q.authorizedAt)<=180);
+  const ticket=recientes.length ? recientes.reduce((s,q)=>s+_hoyQuoteTotal(q),0)/recientes.length : 0;
+  // Promedio de los últimos 3 meses cerrados, para sugerir meta
+  const d0=new Date(hoy+"T00:00:00"); let suma3=0;
+  for(let i=1;i<=3;i++){ const d=new Date(d0.getFullYear(), d0.getMonth()-i, 1); const k=d.toISOString().slice(0,7);
+    suma3+=auth.filter(q=>q.authorizedAt.slice(0,7)===k).reduce((s,q)=>s+_hoyQuoteTotal(q),0); }
+  const promedio3=suma3/3;
+  const abiertas=db.quotes.filter(q=>q.status!=="authorized" && q.pipelineStatus!=="lost");
+  const vivas=abiertas.filter(q=>_hoyQuoteTotal(q)>0 && (q.pipelineStatus || (_hoyDiasDesde(q.createdAt)??0)<=HOY_VIEJA_DIAS));
+  const pipeline=vivas.reduce((s,q)=>s+_hoyQuoteTotal(q),0);
+  const meta=Number(c.metaMensual)||0;
+  const diasMes=new Date(d0.getFullYear(), d0.getMonth()+1, 0).getDate();
+  const esperado=meta*(d0.getDate()/diasMes);
+  const faltante=Math.max(0, meta-vendidoMes);
+  const habiles=_hoyDiasHabilesRestantes();
+  return {hoy, c, vendidoMes, ticket, promedio3, abiertas, vivas, pipeline, meta, esperado, faltante, habiles,
+          accionesHoy:Number(c.log[hoy])||0};
+}
+
+function _hoyBtn(label, onclick, kind){
+  const cls = kind==="wa" ? "btn small" : kind==="ok" ? "btn small green" : kind==="bad" ? "btn small danger" : kind==="pri" ? "btn small primary" : "btn small";
+  const st = kind==="wa" ? 'style="background:#16a34a;color:#fff;border-color:#16a34a;"' : "";
+  return `<button class="${cls}" ${st} onclick="${escapeAttr(onclick)}">${label}</button>`;
+}
+function _hoyItem(o){
+  return `<div class="card" style="padding:12px 14px;margin-bottom:10px;border-left:4px solid ${o.color};">
+    <div style="display:flex;gap:10px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;">
+      <div style="flex:1;min-width:200px;">
+        <div style="font-size:11px;font-weight:800;letter-spacing:.5px;color:${o.color};text-transform:uppercase;">${o.tag}</div>
+        <div style="font-size:15px;font-weight:800;margin-top:2px;">${o.titulo}</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:3px;">${o.sub||""}</div>
+      </div>
+      ${o.monto!=null?`<div style="font-size:18px;font-weight:900;color:var(--accent2);white-space:nowrap;">$${money(o.monto)}</div>`:""}
+    </div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;">${o.botones.join("")}</div>
+  </div>`;
+}
+
+function renderHoyPage(){
+  const el=document.getElementById("hoyContent"); if(!el || !db) return;
+  try{
+  const D=_hoyDatos();
+  const fecha=new Date(D.hoy+"T12:00:00").toLocaleDateString("es-MX",{weekday:"long", day:"numeric", month:"long"});
+  const u=(typeof currentUser==="function" && currentUser()) || {};
+  const nombre=/^admin/i.test(String(u.name||"")) ? "" : String(u.name||"").split(/\s+/)[0];
+
+  // ── 1. Semáforo de la meta ──
+  let semaforo;
+  if(!D.meta){
+    const sug=D.promedio3>0 ? Math.ceil(D.promedio3*1.3/1000)*1000 : 0;
+    semaforo=`<div class="card" style="padding:16px;border:2px solid var(--amber);">
+      <div style="font-size:18px;font-weight:900;">🎯 Sin meta no hay a dónde empujar.</div>
+      <div style="font-size:13px;color:var(--muted);margin-top:4px;">Define cuánto quieres vender este mes${sug?`. Tu promedio de los últimos 3 meses fue $${money(D.promedio3)}; una meta retadora sería <b>$${money(sug)}</b>`:""}.</div>
+      <div style="margin-top:10px;">${_hoyBtn("Poner meta del mes","_hoySetMeta()","pri")}</div>
+    </div>`;
+  } else {
+    const pct=Math.min(100, D.vendidoMes/D.meta*100);
+    const pctEsp=Math.min(100, D.esperado/D.meta*100);
+    let color, titulo, detalle;
+    if(D.vendidoMes>=D.meta){
+      color="var(--green)"; titulo="🔥 Meta cumplida. No te detengas.";
+      detalle=`Vendiste $${money(D.vendidoMes)}. Cierra lo que tienes abierto y sube la meta del próximo mes.`;
+    } else if(D.vendidoMes>=D.esperado){
+      color="var(--green)"; titulo="✅ Vas a ritmo. No aflojes.";
+      detalle=`Te faltan $${money(D.faltante)} en ${D.habiles} días hábiles: cierra unos <b>$${money(D.faltante/D.habiles)} diarios</b>.`;
+    } else {
+      color="var(--red)"; titulo=`🚨 Vas atrasado $${money(D.esperado-D.vendidoMes)}. Muévete.`;
+      detalle=`A estas alturas deberías llevar $${money(D.esperado)}. Te faltan $${money(D.faltante)} en ${D.habiles} días hábiles: necesitas cerrar <b>$${money(D.faltante/D.habiles)} diarios</b>.`;
+    }
+    semaforo=`<div class="card" style="padding:16px;border:2px solid ${color};">
+      <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:baseline;">
+        <div style="font-size:19px;font-weight:900;color:${color};">${titulo}</div>
+        <div style="font-size:12px;color:var(--muted);">Meta del mes: <b>$${money(D.meta)}</b> · <a href="#" onclick="_hoySetMeta();return false;">cambiar</a></div>
+      </div>
+      <div style="font-size:13px;margin-top:6px;">${detalle}</div>
+      <div style="position:relative;height:14px;background:var(--bg3);border-radius:7px;margin-top:12px;overflow:hidden;">
+        <div style="position:absolute;inset:0 auto 0 0;width:${pct}%;background:${color};border-radius:7px;"></div>
+        <div title="Donde deberías ir hoy" style="position:absolute;top:0;bottom:0;left:${pctEsp}%;width:2px;background:var(--text);opacity:.6;"></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-top:4px;">
+        <span>Vendido: <b style="color:var(--text);">$${money(D.vendidoMes)}</b> (${pct.toFixed(0)}%)</span>
+        <span>Deberías llevar: $${money(D.esperado)}</span>
+      </div>
+    </div>`;
+  }
+
+  // ── 2. ¿Alcanza lo que tienes cotizado? ──
+  let cobertura="";
+  if(D.meta && D.faltante>0){
+    const necesario=D.faltante*3; // regla: 3 pesos cotizados por cada peso que falta
+    if(D.pipeline<necesario){
+      const nuevas=D.ticket>0 ? Math.ceil((necesario-D.pipeline)/D.ticket) : null;
+      cobertura=`<div class="card" style="padding:14px;margin-top:10px;border-left:4px solid var(--amber);">
+        <div style="font-weight:900;">⚠️ No te alcanza con lo que tienes cotizado.</div>
+        <div style="font-size:13px;margin-top:4px;">Tienes $${money(D.pipeline)} en cotizaciones vivas y necesitas al menos <b>$${money(necesario)}</b> (3 a 1 contra lo que te falta).
+        ${nuevas?` Con tu ticket promedio de $${money(D.ticket)}, necesitas <b>${nuevas} cotizaciones nuevas</b>. Hoy: reactiva clientes, publica y pide referidos.`:""}</div>
+      </div>`;
+    }
+  }
+
+  // ── 3. Acciones de hoy ──
+  const items=[];
+  // 3a. Cobrar: autorizados sin anticipo
+  db.projects.filter(p=>!p.payStatus && projectHasAuthorized(p.id) && !projectIsDone(p.id)).forEach(p=>{
+    const t=projectAuthorizedTotal(p.id);
+    items.push({prio:1, html:_hoyItem({color:"var(--green)", tag:"💰 Cobra el anticipo", titulo:escapeHTML(p.name||"Proyecto"),
+      sub:`${escapeHTML(p.client||"Sin cliente")} · autorizado, sin anticipo registrado · 50% = $${money(t*0.5)}`, monto:t,
+      botones:[_hoyBtn("WhatsApp: pedir anticipo",`_hoyWhats('${p.id}','anticipo')`,"wa"),
+               _hoyBtn("✓ Ya dio anticipo",`_hoyAccionProyecto('${p.id}','anticipo')`,"ok"),
+               _hoyBtn("Pagó completo",`_hoyAccionProyecto('${p.id}','pagado')`)]})});
+  });
+  // 3b. Seguimientos que tocan hoy
+  D.abiertas.filter(q=>q.pipelineStatus && q.pipelineStatus!=="lost").forEach(q=>{
+    const base=q.sentAt||q.createdAt||D.hoy;
+    const due=q.nextFollowUp||_hoyAddDays(base,HOY_SEGUIMIENTO_DIAS[0]);
+    if(due>D.hoy) return;
+    const p=_hoyProject(q); if(!p) return;
+    const n=Number(q.followUps)||0; const dias=_hoyDiasDesde(base);
+    const cerrar=n>=HOY_MAX_SEGUIMIENTOS || dias>HOY_VIEJA_DIAS;
+    const tipo=cerrar?"seg4":["seg1","seg2","seg3","seg4"][Math.min(n,3)];
+    items.push({prio:cerrar?4:2, monto:_hoyQuoteTotal(q), html:_hoyItem({color:cerrar?"var(--red)":"var(--accent)",
+      tag:cerrar?"⏳ Ciérrala: sí o no":`📞 Seguimiento #${n+1}`, titulo:escapeHTML(q.name||"Cotización"),
+      sub:`${escapeHTML(p.client||"Sin cliente")} · enviada hace ${dias} días${n?` · ${n} seguimiento${n>1?"s":""}`:""}${q.pipelineStatus==="negotiating"?" · en negociación":""}`,
+      monto:_hoyQuoteTotal(q),
+      botones:[_hoyBtn("WhatsApp",`_hoyWhats('${p.id}','${tipo}','${q.id}')`,"wa"),
+               _hoyBtn("✓ Ya le escribí",`_hoyAccion('${q.id}','seguimiento')`),
+               _hoyBtn("Está negociando",`_hoyAccion('${q.id}','negociando')`),
+               _hoyBtn("🏆 Ganada",`_hoyAccion('${q.id}','ganada')`,"ok"),
+               _hoyBtn("Perdida",`_hoyAccion('${q.id}','perdida')`,"bad")]})});
+  });
+  // 3c. Cotizaciones recientes sin enviar
+  const viejas=[];
+  D.abiertas.filter(q=>!q.pipelineStatus).forEach(q=>{
+    const dias=_hoyDiasDesde(q.createdAt)??0;
+    if(dias>HOY_VIEJA_DIAS || _hoyQuoteTotal(q)<=0){ viejas.push(q); return; }
+    const p=_hoyProject(q); if(!p) return;
+    items.push({prio:3, monto:_hoyQuoteTotal(q), html:_hoyItem({color:"var(--amber)", tag:"📤 Envíala hoy", titulo:escapeHTML(q.name||"Cotización"),
+      sub:`${escapeHTML(p.client||"Sin cliente")} · hecha ${dias===0?"hoy":`hace ${dias} días`} y no se ha enviado. Cotización que no se envía, no se vende.`,
+      monto:_hoyQuoteTotal(q),
+      botones:[_hoyBtn("Abrir / PDF",`_hoyAbrirQuote('${q.id}')`),
+               _hoyBtn("WhatsApp",`_hoyWhats('${p.id}','enviar','${q.id}')`,"wa"),
+               _hoyBtn("✓ Ya la envié",`_hoyAccion('${q.id}','enviada')`,"ok"),
+               _hoyBtn("Perdida",`_hoyAccion('${q.id}','perdida')`,"bad")]})});
+  });
+  // 3d. Entregas vencidas (solo proyectos vendidos)
+  db.projects.filter(p=>p.deliveryDate && p.deliveryDate<D.hoy && projectHasAuthorized(p.id) && !projectIsDone(p.id)).forEach(p=>{
+    items.push({prio:5, html:_hoyItem({color:"var(--red)", tag:"🚚 Entrega vencida", titulo:escapeHTML(p.name||"Proyecto"),
+      sub:`${escapeHTML(p.client||"Sin cliente")} · prometido para ${p.deliveryDate} (hace ${_hoyDiasDesde(p.deliveryDate)} días). Cliente que espera no recomienda.`,
+      botones:[_hoyBtn("✓ Ya se entregó",`_hoyAccionProyecto('${p.id}','terminado')`,"ok"),
+               _hoyBtn("Reprogramar",`_hoyAccionProyecto('${p.id}','reprogramar')`)]})});
+  });
+  items.sort((a,b)=>a.prio-b.prio || (b.monto||0)-(a.monto||0));
+
+  // 3e. Reactivar clientes (siempre 3, más si falta cotizar)
+  const c=D.c; const vistos=new Set(); const reactivar=[];
+  db.projects.filter(p=>projectHasAuthorized(p.id)).forEach(p=>{
+    const key=String(p.client||"").trim().toLowerCase(); if(!key || vistos.has(key)) return;
+    const ult=db.quotes.filter(q=>q.projectId===p.id).map(q=>q.authorizedAt||q.createdAt||"").sort().pop()||"";
+    const contactado=c.contacted[p.id];
+    if(_hoyDiasDesde(ult)<45) { vistos.add(key); return; }
+    if(contactado && _hoyDiasDesde(contactado)<60) { vistos.add(key); return; }
+    vistos.add(key); reactivar.push({p, ult});
+  });
+  reactivar.sort((a,b)=>a.ult<b.ult?-1:1);
+  const nReact = cobertura ? 5 : 3;
+  const reactHTML = reactivar.slice(0,nReact).map(({p,ult})=>_hoyItem({color:"#7c3aed", tag:"🔁 Reactiva un cliente", titulo:escapeHTML(p.client||"Cliente"),
+    sub:`Le hiciste: ${escapeHTML(p.name||"un proyecto")} · hace ${_hoyDiasDesde(ult)} días. Los clientes que ya te compraron son la venta más fácil.`,
+    botones:[_hoyBtn("WhatsApp",`_hoyWhats('${p.id}','reactivar')`,"wa"),
+             _hoyBtn("✓ Ya le escribí",`_hoyAccionProyecto('${p.id}','contactado')`,"ok")]})).join("");
+
+  // 3f. Limpieza: cotizaciones viejas sin enviar
+  const limpiezaHTML = viejas.length ? `<details class="card" style="padding:12px 14px;margin-top:10px;">
+    <summary style="cursor:pointer;font-weight:800;">🧹 Limpia tu embudo: ${viejas.length} cotizaciones viejas sin enviar ($${money(viejas.reduce((s,q)=>s+_hoyQuoteTotal(q),0))})</summary>
+    <div style="font-size:12px;color:var(--muted);margin:6px 0 10px;">Tienen más de ${HOY_VIEJA_DIAS} días o están en $0. Dime qué pasó con cada una para que los números digan la verdad.</div>
+    ${viejas.sort((a,b)=>_hoyQuoteTotal(b)-_hoyQuoteTotal(a)).map(q=>{ const p=_hoyProject(q); return `<div style="display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:8px 0;border-top:1px solid var(--border);">
+      <div style="min-width:180px;flex:1;"><b>${escapeHTML(q.name||"Cotización")}</b><div style="font-size:11px;color:var(--muted);">${escapeHTML(p?.client||"—")} · hace ${_hoyDiasDesde(q.createdAt)} días · $${money(_hoyQuoteTotal(q))}</div></div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;">${_hoyBtn("Sí la envié",`_hoyAccion('${q.id}','enviada')`)}${_hoyBtn("🏆 Ganada",`_hoyAccion('${q.id}','ganada')`,"ok")}${_hoyBtn("Perdida",`_hoyAccion('${q.id}','perdida')`,"bad")}</div>
+    </div>`; }).join("")}
+  </details>` : "";
+
+  const accColor = D.accionesHoy>=HOY_ACCIONES_META ? "var(--green)" : "var(--amber)";
+  el.innerHTML = `
+    <div class="page-header">
+      <div>
+        <h1>${nombre?`${escapeHTML(nombre)}, esto toca hoy`:"Esto toca hoy"}</h1>
+        <div class="sub" style="text-transform:capitalize;">${fecha}</div>
+      </div>
+      <div style="text-align:right;">
+        <div style="font-size:22px;font-weight:900;color:${accColor};">${D.accionesHoy}/${HOY_ACCIONES_META}</div>
+        <div style="font-size:11px;color:var(--muted);">acciones de venta hoy</div>
+      </div>
+    </div>
+    ${semaforo}
+    ${cobertura}
+    <div style="display:flex;justify-content:space-between;align-items:baseline;margin:18px 0 8px;">
+      <h2 style="margin:0;font-size:17px;">⚡ Tus pendientes de venta (${items.length})</h2>
+      <span style="font-size:12px;color:var(--muted);">Primero lo que trae dinero</span>
+    </div>
+    ${items.length ? items.map(i=>i.html).join("") : `<div class="card" style="padding:14px;color:var(--muted);">Sin pendientes urgentes. Usa el tiempo para reactivar clientes y conseguir cotizaciones nuevas 👇</div>`}
+    ${reactHTML?`<h2 style="margin:18px 0 8px;font-size:17px;">🔁 Clientes para reactivar</h2>${reactHTML}`:""}
+    ${limpiezaHTML}
+  `;
+  }catch(e){
+    console.error("renderHoyPage error:", e);
+    el.innerHTML = `<div class="card" style="padding:14px;">No se pudo armar la pantalla de Hoy. Recarga la página.</div>`;
+  }
+}
+
 let currentProjectId = "";
 let currentDetailTab = "overview";
 let projSeg = "noauth";
@@ -4587,12 +4938,13 @@ function showPage(name){
   if(pg) pg.classList.add("active");
   // mobile bottom nav active
   document.querySelectorAll(".nav-item").forEach(n=>n.classList.remove("active"));
-  const mMap = {dashboard:"mnav-dashboard",projects:"mnav-projects",agenda:"mnav-more",sales:"mnav-more",settings:"mnav-more",bom:"mnav-bom",plan:"mnav-more"};
+  const mMap = {hoy:"mnav-hoy",dashboard:"mnav-dashboard",projects:"mnav-projects",agenda:"mnav-more",sales:"mnav-more",settings:"mnav-more",bom:"mnav-more",plan:"mnav-more"};
   const mBtn = document.getElementById(mMap[name]||"");
   if(mBtn) mBtn.classList.add("active");
   // sidebar active
   document.querySelectorAll(".s-nav-item,.s-sub-item,.s-tile,.s-tile-full").forEach(n=>n.classList.remove("active"));
   const sMap = {
+    hoy:"snav-hoy",
     dashboard:"snav-dashboard",
     projects:"snav-projects",
     agenda:"snav-agenda",
@@ -4606,6 +4958,7 @@ function showPage(name){
   const scr = document.getElementById("screen");
   if(scr) scr.scrollTop = 0;
   _pushNav(name, {});
+  if(name==="hoy") renderHoyPage();
   if(name==="dashboard") renderDashboardPage();
   if(name==="projects") renderProjectsPage();
   if(name==="agenda"){ renderCalendarPage(); renderResumenPage(); switchAgendaTab("cal"); }
@@ -4648,16 +5001,16 @@ function showApp(){
   const ss=document.getElementById("sectionScreen"); ss.classList.remove("show"); ss.style.display="";
   const scr=document.getElementById("screen"); if(scr) scr.style.display="";
   document.getElementById("app").style.display = "";
-  currentPage = "dashboard";
+  currentPage = "hoy";
   document.querySelectorAll(".page").forEach(p=>p.classList.remove("active"));
-  const pg = document.getElementById("page-dashboard"); if(pg) pg.classList.add("active");
-  renderDashboardPage();
+  const pg = document.getElementById("page-hoy"); if(pg) pg.classList.add("active");
+  renderHoyPage();
   // mobile bottom nav active
   document.querySelectorAll(".nav-item").forEach(n=>n.classList.remove("active"));
-  const mbtn=document.getElementById("mnav-dashboard"); if(mbtn) mbtn.classList.add("active");
+  const mbtn=document.getElementById("mnav-hoy"); if(mbtn) mbtn.classList.add("active");
   // sync sidebar
   document.querySelectorAll(".s-nav-item,.s-sub-item,.s-tile,.s-tile-full").forEach(n=>n.classList.remove("active"));
-  const el=document.getElementById("snav-dashboard"); if(el) el.classList.add("active");
+  const el=document.getElementById("snav-hoy"); if(el) el.classList.add("active");
   // update sidebar user info
   const _su = currentUser();
   const _sunEl = document.getElementById("sidebarUserName");
@@ -4853,7 +5206,7 @@ function renderProjKpis(){
     const active = allP.filter(p => { try{ return !projectIsDone(p.id); }catch(e){ return true; } });
     const total = allP.length;
     const enCurso = active.length;
-    const vencidos = active.filter(p => p.delivery && p.delivery < todayStr).length;
+    const vencidos = active.filter(p => p.deliveryDate && p.deliveryDate < todayStr).length;
     // Compras pend. = materiales en faltante (consumo > stock) entre los proyectos activos
     const shortageSet = new Set();
     active.forEach(p=>{
@@ -5021,7 +5374,7 @@ function renderHealthPanel(){
   if(vencidos.length) alerts.push({icon:'ti-calendar-x', color:'var(--red)', text:`${vencidos.length} proyecto${vencidos.length!==1?'s':''} con fecha de entrega vencida`, items:vencidos.slice(0,3).map(p=>p.name||"Sin nombre")});
 
   const staleQuotes = db.quotes.filter(q=>{
-    if(q.status==='authorized' || !q.createdAt) return false;
+    if(q.status==='authorized' || q.pipelineStatus==='lost' || !q.createdAt) return false;
     const dias = Math.floor((Date.now()-new Date(q.createdAt+"T00:00:00").getTime())/86400000);
     return (q.pipelineStatus==='no_response' && dias>=3) || (q.pipelineStatus==='sent' && dias>=5);
   });
@@ -5553,6 +5906,10 @@ function renderDetailFull(p, content){
             <div class="field"><input id="pClient" value="${escapeAttr(p.client||"")}"></div>
           </div>
           <div>
+            <div class="field-label" style="margin-top:0;">WhatsApp del cliente</div>
+            <div class="field"><input id="pPhone" type="tel" placeholder="449 123 4567" value="${escapeAttr(p.phone||"")}"></div>
+          </div>
+          <div>
             <div class="field-label" style="margin-top:0;">Fecha de entrega</div>
             <div class="field"><input id="pDelivery" type="date" value="${escapeAttr(p.deliveryDate||"")}"></div>
           </div>
@@ -5657,6 +6014,7 @@ function renderDetailFull(p, content){
   function _autoSave(){
     p.name    = document.getElementById("pName")?.value.trim()||p.name;
     p.client  = document.getElementById("pClient")?.value.trim()||"";
+    const _ph = document.getElementById("pPhone"); if(_ph) p.phone = _ph.value.trim();
     p.deliveryDate = document.getElementById("pDelivery")?.value||"";
     p.notes   = document.getElementById("pNotes")?.value.trim()||"";
     p.deliveryAddress = document.getElementById("pDeliveryAddress")?.value.trim()||"";
@@ -5665,7 +6023,7 @@ function renderDetailFull(p, content){
     const tt  = document.getElementById("pTipoTrabajo"); if(tt) p.tipoTrabajo=tt.value;
     saveProject(p); renderProjectsPage();
   }
-  ["pName","pClient","pDelivery","pNotes","pAnticipo","pDeliveryAddress"].forEach(id=>{
+  ["pName","pClient","pPhone","pDelivery","pNotes","pAnticipo","pDeliveryAddress"].forEach(id=>{
     const el=document.getElementById(id); if(el) el.addEventListener("blur",_autoSave);
   });
   const psEl=document.getElementById("pPayStatus");
@@ -6281,7 +6639,7 @@ function renderSalesPage(){
       <div class="kpi-box" style="background:rgba(59,130,246,.07);border-color:rgba(59,130,246,.2);"><div class="kl">🔄 Anticipo recibido</div><div class="kv" style="font-size:15px;color:var(--accent);">$${money(totalAnticipo)}</div></div>
       <div class="kpi-box" style="background:rgba(220,38,38,.07);border-color:rgba(220,38,38,.2);"><div class="kl">💼 Por cobrar</div><div class="kv" style="font-size:15px;color:var(--red);">$${money(totalPorCobrar)}</div></div>
       <div class="kpi-box"><div class="kl">Utilidad operación</div><div class="kv" style="font-size:15px;color:${utilidadOperacion>=0?"var(--green)":"var(--red)"};">${utilidadOperacion>=0?"+":""}$${money(utilidadOperacion)}</div></div>
-      <div class="kpi-box" style="background:rgba(220,38,38,.05);border-color:rgba(220,38,38,.15);"><div class="kl">🧱 Materia prima</div><div class="kv" style="font-size:15px;color:var(--red);">$${money(costoMPReal)}</div><div class="ks">${totalVentas>0?(costoMPReal/totalEnCaja*100).toFixed(1)+"% de lo cobrado":""}</div></div>
+      <div class="kpi-box" style="background:rgba(220,38,38,.05);border-color:rgba(220,38,38,.15);"><div class="kl">🧱 Materia prima</div><div class="kv" style="font-size:15px;color:var(--red);">$${money(costoMPReal)}</div><div class="ks">${totalEnCaja>0?(costoMPReal/totalEnCaja*100).toFixed(1)+"% de lo cobrado":""}</div></div>
       <div class="kpi-box" style="background:rgba(220,38,38,.05);border-color:rgba(220,38,38,.15);"><div class="kl">⚙️ M.O. / Rutas</div><div class="kv" style="font-size:15px;color:var(--red);">$${money(costoRutasReal)}</div></div>
     </div>
 
@@ -7061,7 +7419,7 @@ function closeAllDropdowns(){
   if(ov) ov.classList.remove('open');
   document.querySelectorAll('.nav-item').forEach(el=>el.classList.remove('active'));
   // Restore active based on current page / section
-  const mMap = {dashboard:'mnav-dashboard',projects:'mnav-projects',calendar:'mnav-more',sales:'mnav-more',settings:'mnav-more',bom:'mnav-bom','project-detail':'mnav-projects'};
+  const mMap = {hoy:'mnav-hoy',dashboard:'mnav-dashboard',projects:'mnav-projects',calendar:'mnav-more',sales:'mnav-more',settings:'mnav-more',bom:'mnav-more','project-detail':'mnav-projects'};
   const cur = mMap[currentPage||'projects'];
   const btn = cur && document.getElementById(cur);
   if(btn) btn.classList.add('active');
@@ -7104,7 +7462,7 @@ function mNavGo(page){
   const ap = document.getElementById('app');
   if(ap){ ap.style.cssText='display:flex;'; }
   document.querySelectorAll('.nav-item').forEach(el=>el.classList.remove('active'));
-  const mMap = {dashboard:'mnav-dashboard',projects:'mnav-projects',calendar:'mnav-more',sales:'mnav-more',settings:'mnav-more',resumen:'mnav-more',bom:'mnav-bom'};
+  const mMap = {hoy:'mnav-hoy',dashboard:'mnav-dashboard',projects:'mnav-projects',calendar:'mnav-more',sales:'mnav-more',settings:'mnav-more',resumen:'mnav-more',bom:'mnav-more'};
   const btn = document.getElementById(mMap[page]||'mnav-projects');
   if(btn) btn.classList.add('active');
   showPage(page);
@@ -7538,7 +7896,7 @@ function _buildPipelineHTML(){
   };
 
   // Collect all draft (non-authorized) quotes
-  const drafts = db.quotes.filter(q => q.status !== 'authorized');
+  const drafts = db.quotes.filter(q => q.status !== 'authorized' && q.pipelineStatus !== 'lost');
   if(!drafts.length){
     return '<div style="color:var(--muted);font-size:13px;padding:8px 0;">No hay cotizaciones en curso.</div>';
   }
