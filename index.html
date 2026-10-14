@@ -892,9 +892,7 @@ tbody tr:hover td{background:rgba(13,148,136,.03);}
       <div style="height:16px"></div>
       <div style="display:flex;gap:8px;">
         <button class="btn primary" id="btnLogin" style="flex:1;justify-content:center;">Entrar</button>
-        <button class="btn" id="btnSeedDemo" title="Borra todos los datos reales y los reemplaza con datos de ejemplo">Borrar y cargar ejemplo</button>
       </div>
-      <div style="font-size:12px;color:var(--red);margin-top:10px;">⚠️ "Borrar y cargar ejemplo" borra TODOS los datos reales. No es un modo de prueba: usa tu correo y contraseña reales para entrar.</div>
       <div style="font-size:12px;color:var(--red);margin-top:6px;display:none" id="loginMsg"></div>
     </div>
   </div>
@@ -6886,7 +6884,6 @@ function bootNew(){
   });
   document.getElementById("loginEmail").addEventListener("keydown",(e)=>{ if(e.key==="Enter") document.getElementById("loginPass").focus(); });
   document.getElementById("loginPass").addEventListener("keydown",(e)=>{ if(e.key==="Enter") document.getElementById("btnLogin").click(); });
-  document.getElementById("btnSeedDemo").addEventListener("click",seedDemo);
 
   // mobile nav handled by mNavToggle/mNavGo inline handlers
   document.getElementById("btnBackProjects").addEventListener("click",()=>showPage("projects"));
