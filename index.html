@@ -5911,6 +5911,8 @@ function renderDetailFull(p, content){
       ${quotes.length ? quotes.map(quoteCard).join("") : `<div style="padding:26px 16px;text-align:center;color:var(--muted);font-size:13px;">Sin cotizaciones. Crea la primera con <b>Nueva cotización</b> y usa una plantilla.</div>`}
     </div>
 
+    ${_renderCardHTML(p)}
+
     <!-- Datos + Fotos -->
     <div class="detail-info-photo-grid" style="display:grid;grid-template-columns:minmax(0,1fr) 230px;gap:10px;margin-bottom:10px;align-items:start;">
       <div class="card" style="padding:12px 14px;">
@@ -6009,6 +6011,8 @@ function renderDetailFull(p, content){
     </div>`:""}
 
   `;
+
+  _bindRenderCard(p);
 
   // ── Autosave en campos ──
   function _autoSave(){
@@ -8214,6 +8218,103 @@ const PLANTILLAS_ESMA = [
     products:[["Cable THW cal 14 (instalación)",10],["Apagador sencillo con placa",1],["Grapas para cable",1]],
     routes:[], extras:[] },
 ];
+
+// ── PROMPT PARA RENDER CON IA (se arma desde la ficha del proyecto) ──
+const RENDER_TIPOS = [
+  ["circular_bandera","Caja de luz circular tipo bandera","an illuminated round double-sided LED light box (projecting blade sign) on a short black metal bracket, sticking out perpendicular to the facade"],
+  ["rect_bandera","Caja de luz rectangular tipo bandera","an illuminated rectangular double-sided LED light box (projecting blade sign) on a black metal bracket, sticking out perpendicular to the facade"],
+  ["rect_muro","Caja de luz rectangular sobre muro","an illuminated rectangular LED light box sign mounted flat on the wall"],
+  ["letras_luz","Letras 3D iluminadas","3D channel letters with LED illumination mounted on the wall"],
+  ["letras","Letras 3D sin luz","3D letters without illumination, mounted on the wall with small standoffs"],
+  ["lamina","Letrero de lámina / aluminio","a flat aluminum composite panel sign with vinyl graphics, mounted on the wall"],
+  ["neon","Neón LED","an LED neon flex sign mounted on a clear acrylic backing"],
+  ["vinil","Vinil en cristal","cut vinyl graphics applied on the glass door/window"],
+  ["otro","Otro (descríbelo abajo)","a sign as described in the notes"],
+];
+function _renderPrompt(r){
+  r = r || {};
+  const tipo = (RENDER_TIPOS.find(t=>t[0]===r.tipo)||RENDER_TIPOS[0]);
+  const L = [];
+  L.push("Use image 1 (storefront photo) as the base. Keep the exact same camera angle, perspective, lighting, building, doors, sidewalk and surroundings. It must look like a real photograph, not an illustration.");
+  L.push("");
+  L.push("Changes:");
+  let n = 1;
+  if(r.fachada) L.push(`${n++}. Facade changes (instructions in Spanish): ${r.fachada}`);
+  L.push(`${n++}. Add ${tipo[2]}${r.medidas?`, size: ${r.medidas}`:""}${r.ubicacion?`, placed (Spanish): ${r.ubicacion}`:""}${r.altura?`, at about ${r.altura} m height`:""}.${r.ejemplo?" Use image 2 only as a reference for the type and style of sign.":""}`);
+  if(r.acabado) L.push(`${n++}. Materials, colors and finish (Spanish): ${r.acabado}`);
+  L.push(`${n++}. Graphic: reproduce the client's logo from image ${r.ejemplo?3:2} EXACTLY (same shapes, colors and letters). Do not invent or change any letters.`);
+  if(r.texto) L.push(`${n++}. Additional text on the sign, exactly as written: "${r.texto}"`);
+  if(r.notas) L.push(`${n++}. Client notes (Spanish): ${r.notas}`);
+  L.push(`${n++}. Correct real-world scale relative to the door and people. Clean, professional installation.`);
+  L.push("");
+  L.push("Output: photorealistic, high resolution, same framing as image 1.");
+  if(r.noche!==false) L.push("Then make a second version at dusk/night with the sign lit and a soft glow on the wall.");
+  return L.join("\n");
+}
+function _renderImagenes(r){
+  return r && r.ejemplo
+    ? "Sube 3 imágenes en este orden: 1) foto de la fachada · 2) foto del ejemplo del letrero · 3) logo del cliente."
+    : "Sube 2 imágenes en este orden: 1) foto de la fachada · 2) logo del cliente.";
+}
+function _renderCardHTML(p){
+  const r = p.render || {};
+  const f = (id,label,ph,val,full) => `<div style="${full?"grid-column:1/-1;":""}"><div class="field-label">${label}</div><div class="field"><input data-rf="${id}" placeholder="${escapeAttr(ph)}" value="${escapeAttr(val||"")}"></div></div>`;
+  return `<details class="card" id="renderCard" style="padding:12px 14px;margin-bottom:12px;" ${r.open?"open":""}>
+    <summary style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;list-style:none;">
+      <span class="card-sec">🎨 Prompt para render con IA</span><span style="font-size:11px;color:var(--muted);">Describe el letrero y copia el prompt para ChatGPT o Gemini</span>
+    </summary>
+    <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:12px;" class="detail-fields-grid">
+      <div><div class="field-label">Tipo de letrero</div><div class="field" style="padding:0 10px;"><select data-rf="tipo" style="background:transparent;border:none;color:var(--text);font-family:inherit;font-size:13px;width:100%;padding:9px 0;">
+        ${RENDER_TIPOS.map(t=>`<option value="${t[0]}" ${r.tipo===t[0]?"selected":""}>${t[1]}</option>`).join("")}</select></div></div>
+      ${f("medidas","Medidas","60 cm de diámetro",r.medidas)}
+      ${f("altura","Altura de instalación (m)","2.6",r.altura)}
+      ${f("ubicacion","¿Dónde va en la fachada?","pared derecha junto a la puerta",r.ubicacion,true)}
+      ${f("acabado","Materiales, colores y acabado","acrílico blanco con LED, marco negro, logo turquesa y magenta",r.acabado,true)}
+      ${f("texto","Texto adicional en el letrero","horarios, teléfono…",r.texto,true)}
+      ${f("fachada","Cambios a la fachada (opcional)","pintar de crema, quitar letrero viejo…",r.fachada,true)}
+      <div style="grid-column:1/-1;"><div class="field-label">Notas libres (lo que pidió el cliente)</div><div class="field"><textarea data-rf="notas" rows="2" style="resize:vertical;">${escapeHTML(r.notas||"")}</textarea></div></div>
+      <label style="display:flex;align-items:center;gap:6px;font-size:12px;"><input type="checkbox" data-rf="ejemplo" ${r.ejemplo?"checked":""}> Tengo foto de ejemplo del letrero</label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:12px;"><input type="checkbox" data-rf="noche" ${r.noche===false?"":"checked"}> Pedir versión de noche</label>
+    </div>
+    <div style="margin-top:12px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:6px;">
+        <span id="renderImgs" style="font-size:12px;font-weight:700;">${escapeHTML(_renderImagenes(r))}</span>
+        <div style="display:flex;gap:6px;">
+          <button class="btn small primary" id="btnCopyRender">📋 Copiar prompt</button>
+          <a class="btn small" href="https://chatgpt.com/" target="_blank" rel="noopener">Abrir ChatGPT</a>
+          <a class="btn small" href="https://gemini.google.com/" target="_blank" rel="noopener">Abrir Gemini</a>
+        </div>
+      </div>
+      <textarea id="renderPromptOut" readonly rows="9" style="width:100%;box-sizing:border-box;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:ui-monospace,Consolas,monospace;font-size:11.5px;line-height:1.45;padding:8px 10px;resize:vertical;">${escapeHTML(_renderPrompt(r))}</textarea>
+      <div style="font-size:11px;color:var(--muted);margin-top:4px;">Descarga el mejor resultado y súbelo en la cotización → <b>Render / foto para el PDF</b>.</div>
+    </div>
+  </details>`;
+}
+function _bindRenderCard(p){
+  const card = document.getElementById("renderCard"); if(!card) return;
+  p.render = p.render || {};
+  const refresh = () => {
+    const out = document.getElementById("renderPromptOut"); if(out) out.value = _renderPrompt(p.render);
+    const im = document.getElementById("renderImgs"); if(im) im.textContent = _renderImagenes(p.render);
+  };
+  card.addEventListener("toggle", () => { p.render.open = card.open; });
+  card.querySelectorAll("[data-rf]").forEach(el=>{
+    const k = el.dataset.rf;
+    const commit = (persist) => {
+      p.render[k] = el.type==="checkbox" ? el.checked : el.value.trim();
+      refresh(); if(persist) saveProject(p);
+    };
+    el.addEventListener("input", ()=>commit(false));
+    el.addEventListener("change", ()=>commit(true));
+    if(el.tagName!=="SELECT" && el.type!=="checkbox") el.addEventListener("blur", ()=>commit(true));
+  });
+  document.getElementById("btnCopyRender").addEventListener("click", async ()=>{
+    const out = document.getElementById("renderPromptOut");
+    try{ await navigator.clipboard.writeText(out.value); }
+    catch(e){ out.focus(); out.select(); document.execCommand("copy"); }
+    _showSaveToast("📋 Prompt copiado. Pégalo en ChatGPT o Gemini junto con las fotos.", "success");
+  });
+}
 
 function _diasDesde(iso){ if(!iso) return null; return Math.round((new Date(todayISO()+"T00:00:00")-new Date(String(iso).slice(0,10)+"T00:00:00"))/86400000); }
 
