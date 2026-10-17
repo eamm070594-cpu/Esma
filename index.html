@@ -6405,6 +6405,7 @@ function openQuoteEditorPage(q){
           <option value="lost" ${q.pipelineStatus==='lost'?'selected':''}>Perdida</option>
         </select></label>`:''}
       <label class="qe-tool">Cantidad <input id="qQtyInput" type="number" min="1" value="${Number(q.qty||1)}" style="width:44px;text-align:center;"> u.</label>
+      <button class="btn small primary" id="btnAsistente" title="Arma la cotización con unos cuantos datos">⚡ Asistente de letrero</button>
       <button class="btn small" id="btnLoadTemplate"><i class="ti ti-folder-open"></i> Usar plantilla</button>
       <button class="btn small" id="btnSaveTemplate"><i class="ti ti-star"></i> Guardar como plantilla</button>
       <details class="qe-guide" style="margin-left:auto;position:relative;">
@@ -6602,6 +6603,12 @@ function openQuoteEditorPage(q){
   }
 
   document.getElementById("addProd").addEventListener("click",()=>{ q.products=q.products||[]; q.products.push({id:uid(),matPick:"",desc:"",qty:1,unitPrice:0}); saveQuote(q); renderLines(); });
+  document.getElementById("btnAsistente").addEventListener("click",()=>openAsistenteLetrero(q, r=>{
+    q.products=r.products; q.routes=r.routes; q.extras=r.extras; q.marginPct=r.marginPct; q.clientDesc=r.desc;
+    if(!q.name || /^Cotizaci[oó]n( \d+)?$/.test(q.name)) q.name=r.nombre;
+    saveQuote(q); save(); openQuoteEditorPage(q);
+    _showSaveToast("⚡ Cotización armada con el asistente. Revisa y ajusta lo que necesites.","success");
+  }));
   document.getElementById("btnNest").addEventListener("click",()=>openNestSim(row=>{ q.products=q.products||[]; q.products.push(row); saveQuote(q); renderLines(); }));
   document.getElementById("addRoute").addEventListener("click",()=>{ q.routes=q.routes||[]; const first=db.settings.routeDB[0]?.name||""; const rate=first?(routeByName(first)?.costPerHour||0):0; q.routes.push({id:uid(),routeName:first,hours:1,rate:Number(rate||0)}); saveQuote(q); renderLines(); });
   document.getElementById("addExtra").addEventListener("click",()=>{ q.extras=q.extras||[]; q.extras.push({id:uid(),label:"",amount:0}); saveQuote(q); renderLines(); });
@@ -8639,6 +8646,155 @@ function openNestSim(onAdd){
   render();
 }
 
+// ── ASISTENTE DE LETREROS ────────────────────────────────────
+// Con pocos datos arma materiales, horas, extras y descripción de la cotización.
+// Las reglas salen de cómo cotiza el dueño (ver areas/cotizaciones/como-cotiza-esma.md).
+const ASIS_REGLAS = {
+  neonCmPorCm: {manuscrita:2.6, molde:2.0},   // cm de neón por cm de altura de letra, por carácter
+  neonDesperdicio: 1.10,
+  wattsPorMetro: 8, margenFuente: 1.25,
+  routerBaseH: 0.5, routerHporM2: 3,          // horas de router = base + 3 h por m² de acrílico
+  habilitadoHporMetroNeon: 0.75,              // armar y soldar neón
+  mermaAcrilico: 1.10,
+};
+const ASIS_FUENTES = {
+  interior: [["Fuente 12V interior slim 60W",60],["Fuente 12V interior slim 120W",120]],
+  exterior: [["Fuente 12V exterior IP67 60W",60],["Fuente 12V exterior IP67 100W",100],["Fuente 12V exterior IP67 200W",200]],
+};
+const ASIS_CAJAS = [
+  ["Caja de luz circular 50 cm (sin gráfico)","circular Ø 50 cm"],
+  ["Caja de luz circular 60 cm (sin gráfico)","circular Ø 60 cm"],
+  ["Caja de luz circular 80 cm (sin gráfico)","circular Ø 80 cm"],
+  ["Caja de luz rectangular 40x60 cm (sin gráfico)","rectangular 60 x 40 cm"],
+  ["Caja de luz rectangular 50x70 cm (sin gráfico)","rectangular 70 x 50 cm"],
+];
+
+function _asisProd(desc, qty, faltan){
+  const m=materialByDesc(desc); if(!m) faltan.push(desc);
+  return {id:uid(), desc, matPick:m?desc:"", qty:Math.round(qty*100)/100, unitPrice:m?Number(m.cost||0):0};
+}
+function _asisRuta(name, h){ const r=routeByName(name); return {id:uid(), routeName:name, hours:Math.round(h*10)/10, rate:r?Number(r.costPerHour||0):0}; }
+
+function _asisCalcular(t, s){
+  const faltan=[], P=[], R=[], E=[]; let nombre="", desc="", notas=[];
+  if(t==="neon"){
+    const chars=String(s.texto||"").replace(/\s/g,"").length || 1;
+    const lineas=Math.max(1,Number(s.lineas)||1);
+    const letraH=(Number(s.alto)||0)/lineas*0.75;
+    const metros=chars*letraH*ASIS_REGLAS.neonCmPorCm[s.estilo]/100*ASIS_REGLAS.neonDesperdicio;
+    const rollos=Math.max(1,Math.ceil(metros/5));
+    const areaM2=(Number(s.ancho)||0)*(Number(s.alto)||0)/10000;
+    const fracAcr=Math.ceil(((Number(s.ancho)+5)*(Number(s.alto)+5))/(122*244)*ASIS_REGLAS.mermaAcrilico*100)/100;
+    const watts=metros*ASIS_REGLAS.wattsPorMetro*ASIS_REGLAS.margenFuente;
+    const lista=ASIS_FUENTES[s.uso]; const fuente=(lista.find(f=>f[1]>=watts)||lista[lista.length-1]);
+    P.push(_asisProd(s.uso==="exterior"?"Neón flexible Gengxin IP67 12V (rollo 5 m)":"Neón flexible Gengxin IP67 12V (rollo 5 m)", rollos, faltan));
+    P.push(_asisProd(s.base==="negro"?"Acrílico sólido blanco/rojo/negro 3mm 1.22x2.44":"Acrílico cristal 3mm 1.22x2.44", fracAcr, faltan));
+    P.push(_asisProd(fuente[0],1,faltan));
+    P.push(_asisProd("Cable cal 22 cobre (para letrero)",2,faltan));
+    P.push(_asisProd("Soldadura de estaño",0.1,faltan));
+    P.push(_asisProd("Cianoacrilato Strong 28 g",0.2,faltan));
+    if(s.montaje==="pared") P.push(_asisProd("Chapetón acero inoxidable 19x20",4,faltan));
+    if(s.montaje==="colgar") P.push(_asisProd("Cadena",1,faltan));
+    R.push(_asisRuta("Router de Cama", ASIS_REGLAS.routerBaseH+ASIS_REGLAS.routerHporM2*areaM2));
+    R.push(_asisRuta("Habilitado de letreros", Math.max(1, metros*ASIS_REGLAS.habilitadoHporMetroNeon)));
+    if(Number(s.instalacion)>0) E.push({id:uid(),label:"Instalación",amount:Number(s.instalacion)});
+    nombre=`Neón LED "${s.texto}" · ${s.ancho} x ${s.alto} cm`;
+    desc=[`Neón LED "${s.texto}"`,"","Incluye:",
+      `• Neón LED flexible color ${s.color}, letra ${s.estilo==="manuscrita"?"manuscrita":"de molde"}`,
+      `• Base de acrílico ${s.base==="negro"?"negro":"transparente"} de ${s.ancho} x ${s.alto} cm, cortada a la forma`,
+      `• Fuente de poder para ${s.uso} y cable para conectar a contacto normal`,
+      s.montaje==="pared"?"• Herrajes para fijarlo a la pared":s.montaje==="colgar"?"• Cadena para colgarlo":"",
+      Number(s.instalacion)>0?"• Instalación":"",
+      "","Diseño previo para tu aprobación antes de fabricar."].filter((l,i,a)=>l!==""||a[i-1]!=="").join("\n");
+    notas.push(`${chars} caracteres · letra de ~${Math.round(letraH)} cm · ~${metros.toFixed(1)} m de neón → ${rollos} rollo(s) · fuente ${fuente[1]} W (${Math.round(watts)} W necesarios) · ${fracAcr} hoja de acrílico`);
+  } else {
+    const caja=ASIS_CAJAS.find(c=>c[0]===s.caja)||ASIS_CAJAS[1];
+    P.push(_asisProd(caja[0],1,faltan));
+    P.push(_asisProd("Vinil de color (1 m por color)", Math.max(1,Number(s.colores)||1), faltan));
+    if(s.kit){ P.push(_asisProd("Cable THW cal 14 (instalación)",10,faltan)); P.push(_asisProd("Apagador sencillo con placa",1,faltan)); P.push(_asisProd("Grapas para cable",1,faltan)); }
+    R.push(_asisRuta("Plotter",0.5)); R.push(_asisRuta("Habilitado de letreros",2));
+    if(Number(s.instalacion)>0) E.push({id:uid(),label:"Instalación en fachada",amount:Number(s.instalacion)});
+    nombre=`Letrero luminoso ${caja[1]}${s.negocio?" · "+s.negocio:""}`;
+    desc=[`Letrero luminoso ${caja[1]}${s.negocio?" · "+s.negocio:""}`,"","Incluye:",
+      `• Caja de luz ${caja[1]} con iluminación LED${s.bandera?", montaje tipo bandera (se ve desde los dos lados)":""}`,
+      `• Gráfico en vinil${s.negocio?" con el logo de "+s.negocio:""} (${s.colores} color${Number(s.colores)!==1?"es":""})`,
+      s.kit?"• Cableado y apagador":"", Number(s.instalacion)>0?"• Instalación en fachada":"",
+      "","Diseño previo para tu aprobación antes de fabricar."].filter((l,i,a)=>l!==""||a[i-1]!=="").join("\n");
+  }
+  const q={products:P,routes:R,extras:E,marginPct:Number(s.utilidad)||60,qty:1};
+  const t2=quoteSellTotals(q);
+  return {products:P,routes:R,extras:E,nombre,desc,faltan,notas,totales:t2,marginPct:q.marginPct};
+}
+
+function openAsistenteLetrero(q, onApply){
+  const old=document.getElementById("_asisModal"); if(old) old.remove();
+  let tipo="neon";
+  const st={ neon:{texto:"",lineas:1,ancho:60,alto:30,estilo:"manuscrita",color:"blanco",base:"transparente",uso:"interior",montaje:"pared",instalacion:0,utilidad:60},
+             caja:{caja:ASIS_CAJAS[1][0],colores:2,kit:true,bandera:true,instalacion:800,negocio:"",utilidad:60} };
+  const ov=document.createElement("div"); ov.id="_asisModal";
+  ov.style.cssText="position:fixed;inset:0;background:rgba(2,6,23,.6);display:flex;align-items:center;justify-content:center;z-index:9999;padding:12px;";
+  document.body.appendChild(ov);
+  const inp=(k,label,type,extra,full)=>`<div style="${full?"grid-column:1/-1;":""}"><div class="field-label">${label}</div><div class="field"><input data-a="${k}" type="${type||"text"}" value="${escapeAttr(st[tipo][k])}" ${extra||""}></div></div>`;
+  const sel=(k,label,opts)=>`<div><div class="field-label">${label}</div><div class="field" style="padding:0 10px;"><select data-a="${k}" style="background:transparent;border:none;color:var(--text);font-family:inherit;font-size:13px;width:100%;padding:9px 0;">${opts.map(([v,l])=>`<option value="${escapeAttr(v)}" ${String(st[tipo][k])===String(v)?"selected":""}>${escapeHTML(l)}</option>`).join("")}</select></div></div>`;
+  const chk=(k,label)=>`<label style="display:flex;align-items:center;gap:6px;font-size:12.5px;"><input type="checkbox" data-a="${k}" ${st[tipo][k]?"checked":""}> ${label}</label>`;
+  const render=()=>{
+    const s=st[tipo]; const r=_asisCalcular(tipo,s); const t=r.totales;
+    const campos = tipo==="neon" ? `
+      ${inp("texto","Texto del letrero","text",'placeholder="Ej: One love, one heart"',true)}
+      ${sel("lineas","Renglones",[[1,"1"],[2,"2"],[3,"3"]])}
+      ${sel("estilo","Tipo de letra",[["manuscrita","Manuscrita"],["molde","Molde / bar"]])}
+      ${inp("ancho","Ancho (cm)","number")}${inp("alto","Alto (cm)","number")}
+      ${sel("color","Color del neón",[["blanco","Blanco frío"],["blanco cálido","Blanco cálido"],["rosa","Rosa"],["rojo","Rojo"],["azul","Azul"],["verde","Verde"],["amarillo","Amarillo"],["morado","Morado"]])}
+      ${sel("base","Base de acrílico",[["transparente","Transparente"],["negro","Negro"]])}
+      ${sel("uso","Uso",[["interior","Interior"],["exterior","Exterior"]])}
+      ${sel("montaje","Montaje",[["pared","Pared (chapetones)"],["colgar","Colgante (cadena)"],["ninguno","Sin montaje"]])}
+      ${inp("instalacion","Instalación ($, 0 = no)","number")}${inp("utilidad","Utilidad (%)","number")}`
+      : `
+      ${sel("caja","Caja de luz (proveedor)",ASIS_CAJAS)}
+      ${inp("negocio","Nombre del negocio","text",'placeholder="Ej: Fisio Therapy"')}
+      ${inp("colores","Colores del diseño (1 m de vinil c/u)","number")}
+      ${inp("instalacion","Instalación ($)","number")}
+      ${inp("utilidad","Utilidad (%)","number")}
+      <div style="display:flex;flex-direction:column;gap:6px;justify-content:center;">${chk("bandera","Tipo bandera (doble vista)")}${chk("kit","Kit eléctrico (10 m cable, apagador, grapas)")}</div>`;
+    ov.innerHTML=`<div style="background:var(--card);border-radius:16px;width:940px;max-width:100%;max-height:94vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.3);">
+      <div style="display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid var(--border);">
+        <div style="font-size:16px;font-weight:900;flex:1;">⚡ Asistente de letreros</div>
+        <button class="btn small ${tipo==="neon"?"primary":""}" data-tipo="neon">Neón LED</button>
+        <button class="btn small ${tipo==="caja"?"primary":""}" data-tipo="caja">Caja de luz</button>
+        <button class="btn small" id="_asClose">✕</button>
+      </div>
+      <div style="display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:16px;padding:14px 18px;overflow:auto;" class="quote-editor-grid">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;align-content:start;">${campos}</div>
+        <div>
+          <div class="kpi-box" style="padding:12px 14px;margin-bottom:10px;">
+            <div class="kl">Precio de venta</div><div class="kv" style="font-size:24px;color:var(--accent);">$${money(t.venta)}</div>
+            <div style="font-size:11.5px;color:var(--muted);margin-top:4px;">Materiales $${money(t.mp)} · Mano de obra $${money(t.ruta)} · Extras $${money(t.extra)} · Utilidad ${r.marginPct}%</div>
+          </div>
+          ${r.notas.length?`<div style="font-size:11.5px;color:var(--muted);margin-bottom:8px;">🧮 ${escapeHTML(r.notas.join(" · "))}</div>`:""}
+          ${r.faltan.length?`<div style="font-size:12px;color:var(--red);font-weight:700;margin-bottom:8px;">⚠️ Faltan en el catálogo (precio $0): ${escapeHTML(r.faltan.join(", "))}</div>`:""}
+          <table style="width:100%;font-size:12px;border-collapse:collapse;">
+            ${r.products.map(p=>`<tr style="border-bottom:1px solid var(--border);"><td style="padding:4px 0;">${escapeHTML(p.desc)}</td><td style="text-align:right;">${p.qty}</td><td style="text-align:right;">$${money(p.qty*p.unitPrice)}</td></tr>`).join("")}
+            ${r.routes.map(x=>`<tr style="border-bottom:1px solid var(--border);color:var(--muted);"><td style="padding:4px 0;">${escapeHTML(x.routeName)}</td><td style="text-align:right;">${x.hours} h</td><td style="text-align:right;">$${money(x.hours*x.rate)}</td></tr>`).join("")}
+            ${r.extras.map(x=>`<tr style="color:var(--muted);"><td style="padding:4px 0;">${escapeHTML(x.label)}</td><td></td><td style="text-align:right;">$${money(x.amount)}</td></tr>`).join("")}
+          </table>
+          <div style="font-size:11px;color:var(--muted);margin-top:8px;">Al aplicar, todo queda editable en la cotización.</div>
+        </div>
+      </div>
+      <div style="display:flex;justify-content:flex-end;gap:8px;padding:12px 18px;border-top:1px solid var(--border);">
+        <button class="btn" id="_asCancel">Cerrar</button>
+        <button class="btn primary" id="_asOk">Aplicar a la cotización · $${money(t.venta)}</button>
+      </div></div>`;
+    ov.querySelector("#_asClose").onclick=ov.querySelector("#_asCancel").onclick=()=>ov.remove();
+    ov.querySelectorAll("[data-tipo]").forEach(b=>b.onclick=()=>{ tipo=b.dataset.tipo; render(); });
+    ov.querySelectorAll("[data-a]").forEach(el=>el.onchange=()=>{ const k=el.dataset.a; st[tipo][k]= el.type==="checkbox"?el.checked : el.type==="number"?Number(el.value||0) : el.value; render(); });
+    ov.querySelector("#_asOk").onclick=()=>{
+      if(((q.products||[]).length||(q.routes||[]).length||(q.extras||[]).length) && !confirm("Esto reemplaza los materiales, horas y extras actuales de la cotización. ¿Continuar?")) return;
+      onApply(r); ov.remove();
+    };
+  };
+  render();
+}
+
 function _diasDesde(iso){ if(!iso) return null; return Math.round((new Date(todayISO()+"T00:00:00")-new Date(String(iso).slice(0,10)+"T00:00:00"))/86400000); }
 
 // Categoría sugerida por palabras clave, para materiales que ya existían sin categoría.
@@ -8695,7 +8851,8 @@ function _tplRefrescarPrecios(q){
 
 const GUIA_COTIZAR_HTML = `
   <ol style="margin:6px 0 0 18px;padding:0;font-size:12.5px;line-height:1.6;">
-    <li><b>Empieza con una plantilla</b> (botón <i>Plantilla</i>) si ya existe el tipo de trabajo. Ajusta cantidades.</li>
+    <li><b>Letreros de neón o caja de luz:</b> usa <b>⚡ Asistente de letrero</b>. Pones texto, medidas, color y montaje, y la app calcula neón, acrílico, fuente, horas e instalación.</li>
+    <li><b>Para otros trabajos, empieza con una plantilla</b> (botón <i>Usar plantilla</i>) si ya existe el tipo de trabajo. Ajusta cantidades.</li>
     <li><b>Materiales:</b> elige del <i>Catálogo de costos</i>. Si un material no está o su precio es viejo, búscalo en la web o pregunta al proveedor y <b>actualízalo en el catálogo</b>.</li>
     <li><b>Hojas (acrílico, MDF, melamina, trovicel, aluminio):</b> no calcules a ojo. Usa <b>📐 Calcular hoja</b> en Materiales: pones las piezas y la app las acomoda, dibuja la hoja y agrega la fracción exacta.</li>
     <li><b>Vinil:</b> 1 metro por cada color del diseño.</li>
