@@ -8977,22 +8977,25 @@ function openProyectoRapido(){
 // lo limpia y suaviza, mide los metros de neón y exporta la línea a SVG / DXF a tamaño real.
 // [familia, nombre en el catálogo, peso, estilo para el asistente]
 const NEON_FUENTES=[
-  ["Sacramento","Clásica neón","400","manuscrita"],["Satisfy","Manuscrita","400","manuscrita"],["Great Vibes","Elegante","400","manuscrita"],
-  ["Allura","Caligráfica","400","manuscrita"],["Yellowtail","Retro","400","manuscrita"],["Kaushan Script","Brush","400","manuscrita"],["Dancing Script","Casual","500","manuscrita"],
+  ["Sacramento","Clásica neón","400","manuscrita"],["Ephesis","Firma","400","manuscrita"],["Allison","Romántica","400","manuscrita"],["Ms Madi","Boutique","400","manuscrita"],
+  ["Vujahday Script","Juvenil","400","manuscrita"],["Send Flowers","Floral","400","manuscrita"],["Satisfy","Manuscrita","400","manuscrita"],["Great Vibes","Elegante","400","manuscrita"],
+  ["Parisienne","Parisina","400","manuscrita"],["Tangerine","Delicada","400","manuscrita"],["Mrs Saint Delafield","Lujo","400","manuscrita"],["Marck Script","Diario","400","manuscrita"],
+  ["Courgette","Café","400","manuscrita"],["Dancing Script","Casual","500","manuscrita"],["Yellowtail","Retro","400","manuscrita"],["Birthstone","Cursiva moderna","400","manuscrita"],
   ["Quicksand","Moderna","500","molde"],["Comfortaa","Redonda","400","molde"],["Josefin Sans","Minimalista","300","molde"],["Poiret One","Delgada","400","molde"],
   ["Orbitron","Tecnológica","500","molde"],["Bebas Neue","Industrial","400","molde"],["Montserrat","Bloque","500","molde"]];
 const _fNeon=fam=>NEON_FUENTES.find(f=>f[0]===fam)||NEON_FUENTES[0];
-let _neonCssP=null;
-function _neonCss(){
-  return _neonCssP||(_neonCssP=new Promise((ok,ko)=>{
+// Cada letra se carga por separado: si una falla, las demás siguen funcionando.
+const _neonLinks={};
+function _neonCss(f){
+  return _neonLinks[f[0]]||(_neonLinks[f[0]]=new Promise((ok,ko)=>{
     const l=document.createElement("link"); l.rel="stylesheet";
-    l.href="https://fonts.googleapis.com/css2?"+NEON_FUENTES.map(f=>"family="+f[0].replace(/ /g,"+")+(f[2]!=="400"?":wght@"+f[2]:"")).join("&")+"&display=swap";
-    l.onload=ok; l.onerror=()=>{ _neonCssP=null; l.remove(); ko(new Error("No se pudieron cargar las letras")); };
+    l.href="https://fonts.googleapis.com/css2?family="+f[0].replace(/ /g,"+")+(f[2]!=="400"?":wght@"+f[2]:"")+"&display=swap";
+    l.onload=ok; l.onerror=()=>{ delete _neonLinks[f[0]]; l.remove(); ko(new Error("No se pudo cargar la letra "+f[1])); };
     document.head.appendChild(l);
   }));
 }
 async function _cargarFuenteNeon(f, texto){
-  await _neonCss();
+  await _neonCss(f);
   const faces=await document.fonts.load(`${f[2]} 100px "${f[0]}"`, texto||"Neón");
   if(!faces.length) throw new Error("No se pudo cargar la letra "+f[1]);
 }
@@ -9195,9 +9198,11 @@ function openGeneradorLinea(inicial, onUse){
         <div class="kpi-box" style="padding:8px 10px;"><div class="kl">Base de acrílico</div><div class="kv">${ultimo.anchoBase} × ${ultimo.altoBase} cm</div><div style="font-size:10.5px;color:var(--muted);">con ${st.margen} cm de margen</div></div></div>`;
     }catch(e){ if(yo!==turno) return; prev.innerHTML=`<div style="color:#f87171;padding:40px;text-align:center;">${escapeHTML(e.message)}. Revisa tu conexión a internet.</div>`; ultimo=null; }
   };
-  const chips=()=>NEON_FUENTES.map(f=>`<button type="button" data-nf="${escapeHTML(f[0])}" style="background:#0b1020;border:2px solid ${f[0]===st.fuente?"var(--accent)":"#1e293b"};border-radius:10px;padding:6px 4px 4px;cursor:pointer;min-width:0;">
+  const chip=f=>`<button type="button" data-nf="${escapeHTML(f[0])}" style="background:#0b1020;border:2px solid ${f[0]===st.fuente?"var(--accent)":"#1e293b"};border-radius:10px;padding:6px 4px 4px;cursor:pointer;min-width:0;">
       <div style="font-family:'${f[0]}';font-weight:${f[2]};font-size:22px;line-height:1.3;color:#fff;text-shadow:0 0 6px ${st.color},0 0 14px ${st.color};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHTML((st.texto.split("\n")[0]||"Neón").slice(0,12))}</div>
-      <div style="font-size:10px;color:#94a3b8;font-weight:700;">${f[1]}</div></button>`).join("");
+      <div style="font-size:10px;color:#94a3b8;font-weight:700;">${f[1]}</div></button>`;
+  const grupo=(t,est)=>`<div style="grid-column:1/-1;font-size:11px;font-weight:800;color:var(--muted);margin-top:4px;">${t}</div>`+NEON_FUENTES.filter(f=>f[3]===est).map(chip).join("");
+  const chips=()=>grupo("✍️ Cursivas","manuscrita")+grupo("🔠 Molde","molde");
   ov.innerHTML=`<div style="background:var(--card);border-radius:16px;width:1040px;max-width:100%;max-height:95vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.3);">
     <div style="display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid var(--border);">
       <div style="font-size:16px;font-weight:900;flex:1;">✏️ Generador de línea de neón</div><button class="btn small" id="_nlClose">✕</button></div>
@@ -9208,7 +9213,7 @@ function openGeneradorLinea(inicial, onUse){
         <div><div class="field-label">Color / fondo</div><div style="display:flex;gap:6px;align-items:center;"><input id="_nlColor" type="color" value="${st.color}" style="width:44px;height:36px;border:none;background:none;"><label style="font-size:12px;display:flex;gap:4px;align-items:center;"><input type="checkbox" id="_nlOscuro" checked> Encendido</label></div></div>
       </div>
       <div class="field-label" style="margin-top:10px;">Estilo de letra</div>
-      <div id="_nlChips" style="display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px;">${chips()}</div>
+      <div id="_nlChips" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(118px,1fr));gap:6px;">${chips()}</div>
       <div id="_nlPrev" style="margin:12px 0;border-radius:12px;overflow:hidden;"></div>
       <div id="_nlInfo"></div>
       <div style="font-size:11px;color:var(--muted);margin-top:8px;">Es el recorrido central del neón (una sola línea), sacado del centro de cada letra. Los tramos son las piezas separadas que hay que unir. SVG y DXF salen a tamaño real en milímetros.</div>
@@ -9236,7 +9241,7 @@ function openGeneradorLinea(inicial, onUse){
     bajar(`<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" width="${g.W.toFixed(1)}mm" height="${g.H.toFixed(1)}mm" viewBox="0 0 ${g.W.toFixed(2)} ${g.H.toFixed(2)}">\n<!-- Línea central de neón: ${ultimo.texto.replace(/--/g,"-")} · ${ultimo.metros.toFixed(2)} m · ESMA Industrial -->\n<rect x="0" y="0" width="${g.W.toFixed(2)}" height="${g.H.toFixed(2)}" fill="none" stroke="#0000ff" stroke-width="0.2"/>\n<path d="${g.paths}" fill="none" stroke="#ff0000" stroke-width="0.2"/>\n</svg>`,"image/svg+xml",nombre("svg"));
   };
   if(onUse) $l("_nlUsar").onclick=()=>{ if(!ultimo) return; onUse(ultimo); ov.remove(); };
-  refrescarChips(); _neonCss().catch(()=>{}); pintar();
+  refrescarChips(); NEON_FUENTES.forEach(f=>_neonCss(f).catch(()=>{})); pintar();
 }
 
 function _diasDesde(iso){ if(!iso) return null; return Math.round((new Date(todayISO()+"T00:00:00")-new Date(String(iso).slice(0,10)+"T00:00:00"))/86400000); }
