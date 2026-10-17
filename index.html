@@ -1045,7 +1045,7 @@ tbody tr:hover td{background:rgba(13,148,136,.03);}
           <h1>Proyectos</h1>
           <div class="sub" id="projCount">—</div>
         </div>
-        <button class="btn primary" id="btnNewProject"><i class="ti ti-plus"></i> Nuevo proyecto</button>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;"><button class="btn primary" onclick="openProyectoRapido()">🎤 Proyecto rápido (voz o captura)</button><button class="btn" id="btnNewProject"><i class="ti ti-plus"></i> Nuevo proyecto</button></div>
       </div>
 
       <div id="projV2"></div>
@@ -5757,7 +5757,7 @@ function renderProjectsPage(){
       return `<div class="pv-row" data-open-p="${m.p.id}">
         <span style="width:6px;height:34px;border-radius:3px;background:${m.prio<=8?tono:"transparent"};"></span>
         <div style="min-width:0;">
-          <div style="font-size:13.5px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHTML(m.p.name||"Proyecto")}</div>
+          <div style="font-size:13.5px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${(LINEAS.find(x=>x[0]===_lineaDe(m.p))||["",""])[1].split(" ")[0]} ${escapeHTML(m.p.name||"Proyecto")}</div>
           <div style="font-size:11.5px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHTML(m.p.client||"Sin cliente")}${m.p.phone?" · "+escapeHTML(m.p.phone):""}</div>
           <div class="pv-mob" style="font-size:11px;font-weight:700;color:${tono};margin-top:2px;">${escapeHTML(m.accion)}</div>
         </div>
@@ -6078,7 +6078,13 @@ function renderDetailFull(p, content){
     <!-- Datos + Fotos -->
     <div class="detail-info-photo-grid" style="display:grid;grid-template-columns:minmax(0,1fr) 230px;gap:10px;margin-bottom:10px;align-items:start;">
       <div class="card" style="padding:12px 14px;">
-        <div class="card-sec" style="margin-bottom:10px;">Datos del proyecto</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
+          <div class="card-sec">Datos del proyecto</div>
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);">Tipo de proyecto
+            <select id="pLinea" style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;font-size:13px;font-weight:700;padding:5px 8px;">
+              ${LINEAS.map(([k,l])=>`<option value="${k}" ${_lineaDe(p)===k?"selected":""}>${l}</option>`).join("")}
+            </select></label>
+        </div>
         <div class="detail-fields-grid" style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;">
           <div>
             <div class="field-label" style="margin-top:0;">Nombre del proyecto</div>
@@ -6187,6 +6193,7 @@ function renderDetailFull(p, content){
     const ps  = document.getElementById("pPayStatus"); if(ps) p.payStatus=ps.value;
     const pa  = document.getElementById("pAnticipo");  if(pa) p.anticipo=Number(pa.value||0);
     const tt  = document.getElementById("pTipoTrabajo"); if(tt) p.tipoTrabajo=tt.value;
+    const pl  = document.getElementById("pLinea"); if(pl) p.linea=pl.value;
     saveProject(p); renderProjectsPage();
   }
   ["pName","pClient","pPhone","pDelivery","pNotes","pAnticipo","pDeliveryAddress"].forEach(id=>{
@@ -6197,6 +6204,7 @@ function renderDetailFull(p, content){
   if(psEl){
     psEl.addEventListener("change",()=>{ antRow&&(antRow.style.display=(psEl.value==="anticipo"||psEl.value==="pagado")?"":"none"); _autoSave(); });
   }
+  const plEl=document.getElementById("pLinea"); if(plEl) plEl.addEventListener("change",_autoSave);
   const ttEl=document.getElementById("pTipoTrabajo");
   if(ttEl) ttEl.addEventListener("change",_autoSave);
 
@@ -6603,6 +6611,7 @@ function openQuoteEditorPage(q){
   }
 
   document.getElementById("addProd").addEventListener("click",()=>{ q.products=q.products||[]; q.products.push({id:uid(),matPick:"",desc:"",qty:1,unitPrice:0}); saveQuote(q); renderLines(); });
+  if(_lineaDe(p)!=="letrero"){ const _ba=document.getElementById("btnAsistente"); if(_ba) _ba.style.display="none"; const _bn=document.getElementById("btnNest"); if(_bn) _bn.classList.add("primary"); }
   document.getElementById("btnAsistente").addEventListener("click",()=>openAsistenteLetrero(q, r=>{
     q.products=r.products; q.routes=r.routes; q.extras=r.extras; q.marginPct=r.marginPct; q.clientDesc=r.desc;
     if(!q.name || /^Cotizaci[oó]n( \d+)?$/.test(q.name)) q.name=r.nombre;
@@ -8793,6 +8802,157 @@ function openAsistenteLetrero(q, onApply){
     };
   };
   render();
+}
+
+// ── TIPO DE PROYECTO (línea de negocio) ─────────────────────
+const LINEAS = [["letrero","🪧 Letrero"],["mueble","🪑 Mueble"],["laser","✂️ Corte láser"],["otro","📦 Otro"]];
+const _LINEA_PALABRAS = {
+  letrero:/letrero|ne[oó]n|caja de luz|anuncio|letras|r[oó]tulo|lona|vinil|se[ñn]al[eé]tica|fachada|bandera/i,
+  mueble:/mueble|cocina|cl[oó]set|closet|librero|repisa|recepci[oó]n|melamina|puerta|caj[oó]n|escritorio|centro de entretenimiento|televisi[oó]n|tv\b|barra de madera|carpinter/i,
+  laser:/l[aá]ser|grabad|termo|vaso|llavero|corte de|cortes|piezas de mdf|base para celular|invitaci|caja para padrinos|nicho/i,
+};
+function _lineaDeTexto(t){ for(const [k,re] of Object.entries(_LINEA_PALABRAS)) if(re.test(t||"")) return k; return ""; }
+function _lineaDe(p){ return p.linea || _lineaDeTexto([p.name,p.notes,p.tipoTrabajo].join(" ")) || "otro"; }
+
+// ── PARSEO DE TEXTO (dictado o captura) ─────────────────────
+const _MESES=["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
+const _DIAS=["domingo","lunes","martes","miércoles","jueves","viernes","sábado"];
+const _NUM={un:1,una:1,uno:1,dos:2,tres:3,cuatro:4,cinco:5,seis:6,siete:7,ocho:8,nueve:9,diez:10,quince:15};
+function _isoLocal(d){ return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10); }
+function _parseFecha(t){
+  const hoy=new Date(todayISO()+"T12:00:00"); const s=(t||"").toLowerCase().normalize("NFC");
+  let m=s.match(/(\d{1,2})\s+de\s+(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)(?:\s+(?:de|del)\s+(\d{4}))?/);
+  if(m){ let y=m[3]?Number(m[3]):hoy.getFullYear(); let d=new Date(y,_MESES.indexOf(m[2]),Number(m[1]),12); if(!m[3]&&d<hoy) d.setFullYear(y+1); return _isoLocal(d); }
+  m=s.match(/\b(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?\b/);
+  if(m){ let y=m[3]?Number(m[3].length===2?"20"+m[3]:m[3]):hoy.getFullYear(); let d=new Date(y,Number(m[2])-1,Number(m[1]),12); if(!m[3]&&d<hoy) d.setFullYear(y+1); if(!isNaN(d)) return _isoLocal(d); }
+  m=s.match(/en\s+(\d+|un|una|dos|tres|cuatro|cinco|seis|siete|ocho|diez|quince)\s+(d[ií]as?|semanas?)/);
+  if(m){ const n=_NUM[m[1]]||Number(m[1]); const d=new Date(hoy); d.setDate(d.getDate()+n*(/semana/.test(m[2])?7:1)); return _isoLocal(d); }
+  if(/pasado ma[ñn]ana/.test(s)){ const d=new Date(hoy); d.setDate(d.getDate()+2); return _isoLocal(d); }
+  if(/\bma[ñn]ana\b/.test(s) && /(para|entrega|necesit)/.test(s)){ const d=new Date(hoy); d.setDate(d.getDate()+1); return _isoLocal(d); }
+  m=s.match(/(?:para el|el pr[oó]ximo|este)\s+(domingo|lunes|martes|mi[eé]rcoles|jueves|viernes|s[aá]bado)/);
+  if(m){ const idx=_DIAS.findIndex(x=>x.normalize("NFD").replace(/[̀-ͯ]/g,"")===m[1].normalize("NFD").replace(/[̀-ͯ]/g,"")); const d=new Date(hoy); let k=(idx-d.getDay()+7)%7||7; d.setDate(d.getDate()+k); return _isoLocal(d); }
+  return "";
+}
+function _parseTelefono(t){
+  const m=(t||"").replace(/(\d)[\s.\-()]+(?=\d)/g,"$1").match(/(?:\+?52)?1?(\d{10})(?!\d)/);
+  if(!m) return ""; const d=m[1]; return `${d.slice(0,3)} ${d.slice(3,6)} ${d.slice(6)}`;
+}
+const _cap=w=>w.split(/\s+/).filter(Boolean).map(x=>x.charAt(0).toUpperCase()+x.slice(1)).join(" ");
+function _parseCliente(t){
+  const s=t||"";
+  let m=s.match(/nombre\s*:\s*([^\n·|,]+)/i); if(m) return _cap(m[1].trim());
+  m=s.match(/(?:mi|la|el)\s+(prima|primo|t[ií]a|t[ií]o|hermana|hermano|amiga|amigo|cu[ñn]ada|cu[ñn]ado|comadre|compadre)\s+([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)?)/i);
+  if(m){ const nom=m[2].replace(/\s+(su|que|y|para|lo|la|quiere|necesita)\b.*$/i,""); return `${_cap(nom)} (${m[1].toLowerCase()})`; }
+  const corta=x=>x.replace(/\s+(su|que|y|el|la|lo|con|quiere|quieren|necesita|whatsapp|tel[eé]fono|n[uú]mero|cel|celular|para|mi|es)\b.*$/i,"");
+  m=s.match(/(?:\bsoy|me llamo|mi nombre es|el cliente es|la cliente es|cliente(?: se llama)?|se llama|de parte de|cotizaci[oó]n para|(?:el|la) due[ñn][oa](?: es)?)\s*:?\s+([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+){0,3})/i);
+  if(m){ const nom=corta(m[1]); if(nom.length>1) return _cap(nom); }
+  return "";
+}
+function _parseNegocio(t){
+  const m=String(t||"").trim().match(/^([A-ZÁÉÍÓÚÑ][\wáéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][\wáéíóúñ]+){0,3})\s*[,.\n]/);
+  return m && !/^(hola|buen|buenas|qu[eé]|oye|es|el|la)\b/i.test(m[1]) ? m[1] : "";
+}
+function _parseNombre(t, linea, cliente){
+  let m=(t||"").match(/proyecto\s+(?:es|se llama)\s*:?\s*([^.,\n]{3,60})/i);
+  if(m) return _cap(m[1].trim()).replace(/\s+(Para|Del|De La)\s.*$/,"");
+  m=(t||"").match(/(?:que diga|que dice|con el texto|con la frase)\s+["“]?([^".,\n”]{2,60})/i);
+  const texto=m ? m[1].replace(/\s+(en\s+(blanco|negro|rojo|azul|color)|y otro|y el otro|para)\b.*$/i,"").trim() : "";
+  const base={letrero:"Letrero",mueble:"Mueble",laser:"Corte láser",otro:"Proyecto"}[linea||"otro"];
+  const quien=_parseNegocio(t) || (cliente?cliente.replace(/\s*\(.*\)$/,""):"");
+  return [base + (texto?` "${texto}"`:""), quien].filter(Boolean).join(" · ");
+}
+function _analizarTexto(t){
+  const linea=_lineaDeTexto(t)||"otro"; const cliente=_parseCliente(t);
+  return { linea, client:cliente, phone:_parseTelefono(t), deliveryDate:_parseFecha(t), name:_parseNombre(t,linea,cliente),
+           notes:String(t||"").replace(/\s+\n/g,"\n").trim() };
+}
+
+// ── CAPTURA RÁPIDA: voz + captura de pantalla ───────────────
+let _tessPromise=null;
+function _cargarTesseract(){
+  if(window.Tesseract) return Promise.resolve(window.Tesseract);
+  if(!_tessPromise) _tessPromise=new Promise((res,rej)=>{ const s=document.createElement("script"); s.src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"; s.onload=()=>res(window.Tesseract); s.onerror=()=>rej(new Error("No se pudo cargar el lector de imágenes")); document.head.appendChild(s); });
+  return _tessPromise;
+}
+function openProyectoRapido(){
+  const old=document.getElementById("_qpModal"); if(old) old.remove();
+  const ov=document.createElement("div"); ov.id="_qpModal";
+  ov.style.cssText="position:fixed;inset:0;background:rgba(2,6,23,.6);display:flex;align-items:center;justify-content:center;z-index:9999;padding:12px;";
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  let rec=null, grabando=false, datos=null;
+  ov.innerHTML=`<div style="background:var(--card);border-radius:16px;width:860px;max-width:100%;max-height:94vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.3);">
+    <div style="display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid var(--border);">
+      <div style="font-size:16px;font-weight:900;flex:1;">🎤 Proyecto rápido</div><button class="btn small" id="_qpClose">✕</button></div>
+    <div style="padding:14px 18px;overflow:auto;">
+      <div style="font-size:12.5px;color:var(--muted);margin-bottom:10px;">Dicta o sube una captura del chat. Ejemplo: <i>"Letrero de neón para mi prima Michelle, su WhatsApp es 449 123 4567, lo necesita para el 25 de octubre, que diga One love one heart en blanco."</i></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
+        <button class="btn primary" id="_qpMic">🎤 Empezar a dictar</button>
+        <label class="btn" style="cursor:pointer;">🖼 Subir captura<input type="file" id="_qpImg" accept="image/*" multiple style="display:none;"></label>
+        <span id="_qpEstado" style="font-size:12px;color:var(--muted);align-self:center;"></span>
+      </div>
+      <textarea id="_qpTexto" rows="6" placeholder="Aquí aparece lo que dictas o lo que se lee de la captura. También puedes pegar o escribir texto." style="width:100%;box-sizing:border-box;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;font-size:13px;line-height:1.5;padding:8px 10px;resize:vertical;"></textarea>
+      <div style="text-align:right;margin-top:6px;"><button class="btn" id="_qpAnalizar">✨ Llenar ficha con este texto</button></div>
+      <div id="_qpFicha" style="margin-top:12px;"></div>
+    </div>
+    <div style="display:flex;justify-content:flex-end;gap:8px;padding:12px 18px;border-top:1px solid var(--border);">
+      <button class="btn" id="_qpCancel">Cerrar</button><button class="btn primary" id="_qpCrear">Crear proyecto</button></div></div>`;
+  document.body.appendChild(ov);
+  const $q=id=>document.getElementById(id), txt=$q("_qpTexto"), estado=$q("_qpEstado");
+  const cerrar=()=>{ try{ rec&&rec.stop(); }catch(e){} ov.remove(); };
+  $q("_qpClose").onclick=$q("_qpCancel").onclick=cerrar;
+  const pintarFicha=()=>{
+    const d=datos; if(!d){ $q("_qpFicha").innerHTML=""; return; }
+    const f=(k,l,type)=>`<div><div class="field-label">${l}</div><div class="field"><input data-qp="${k}" type="${type||"text"}" value="${escapeAttr(d[k]||"")}"></div></div>`;
+    $q("_qpFicha").innerHTML=`<div class="card" style="padding:12px 14px;"><div style="font-size:11px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;">Revisa la ficha antes de crear</div>
+      <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;" class="detail-fields-grid">
+        <div><div class="field-label">Tipo de proyecto</div><div class="field" style="padding:0 10px;"><select data-qp="linea" style="background:transparent;border:none;color:var(--text);font-family:inherit;font-size:13px;width:100%;padding:9px 0;">${LINEAS.map(([k,l])=>`<option value="${k}" ${d.linea===k?"selected":""}>${l}</option>`).join("")}</select></div></div>
+        ${f("name","Nombre del proyecto")}${f("client","Cliente")}${f("phone","WhatsApp","tel")}${f("deliveryDate","Fecha de entrega","date")}
+      </div>
+      <div style="margin-top:8px;"><div class="field-label">Descripción</div><div class="field"><textarea data-qp="notes" rows="3" style="resize:vertical;">${escapeHTML(d.notes||"")}</textarea></div></div></div>`;
+    ov.querySelectorAll("[data-qp]").forEach(el=>el.oninput=el.onchange=()=>{ datos[el.dataset.qp]=el.value; });
+  };
+  const analizar=()=>{ if(!txt.value.trim()){ estado.textContent="Primero dicta, sube una captura o escribe algo."; return; } datos=_analizarTexto(txt.value); pintarFicha(); estado.textContent="Ficha llenada. Revísala y corrige lo que haga falta."; };
+  $q("_qpAnalizar").onclick=analizar;
+  // Voz
+  if(!SR){ $q("_qpMic").disabled=false; $q("_qpMic").onclick=()=>{ estado.textContent="Este navegador no permite dictado. Usa Chrome (computadora o Android)."; }; }
+  else {
+    $q("_qpMic").onclick=()=>{
+      if(grabando){ rec.stop(); return; }
+      rec=new SR(); rec.lang="es-MX"; rec.continuous=true; rec.interimResults=true;
+      const base=txt.value ? txt.value.trim()+" " : "";
+      rec.onresult=e=>{ let fin="", tmp=""; for(let i=0;i<e.results.length;i++){ const r=e.results[i]; (r.isFinal? (fin+=r[0].transcript+" ") : (tmp+=r[0].transcript)); } txt.value=(base+fin+tmp).replace(/\s+/g," ").trim(); };
+      rec.onstart=()=>{ grabando=true; $q("_qpMic").textContent="⏹ Detener"; estado.textContent="Escuchando… habla con naturalidad."; };
+      rec.onerror=e=>{ estado.textContent= e.error==="not-allowed" ? "Permite el micrófono en el navegador para dictar." : "Error de dictado: "+e.error; };
+      rec.onend=()=>{ grabando=false; $q("_qpMic").textContent="🎤 Seguir dictando"; if(txt.value.trim()) analizar(); };
+      rec.start();
+    };
+  }
+  // Captura (OCR)
+  $q("_qpImg").onchange=async e=>{
+    const files=[...e.target.files]; if(!files.length) return;
+    try{
+      estado.textContent="Cargando lector de imágenes…"; const T=await _cargarTesseract();
+      let todo="";
+      for(const [i,file] of files.entries()){
+        estado.textContent=`Leyendo captura ${i+1} de ${files.length}…`;
+        const r=await T.recognize(file,"spa"); todo+=r.data.text+"\n";
+      }
+      txt.value=(txt.value?txt.value.trim()+"\n":"")+todo.replace(/\n{3,}/g,"\n\n").trim();
+      analizar();
+    }catch(err){ estado.textContent="No se pudo leer la imagen: "+err.message; }
+  };
+  $q("_qpCrear").onclick=()=>{
+    if(!datos) analizar(); if(!datos) return;
+    if(!String(datos.name||"").trim()){ estado.textContent="Ponle nombre al proyecto."; return; }
+    const hoy=todayISO();
+    const p={id:uid(), name:datos.name.trim(), client:(datos.client||"").trim(), phone:(datos.phone||"").trim(), linea:datos.linea||"otro",
+      createdAt:hoy, deliveryDate:datos.deliveryDate||"", notes:(datos.notes||"").trim(), stage:'cotizacion', stageUpdatedAt:hoy,
+      tipoTrabajo: datos.linea==="letrero"?"Letreros":""};
+    db.projects.unshift(p); saveProject(p); save(); cerrar();
+    try{ renderProjectsPage(); }catch(e){}
+    openProjectDetail(p.id);
+    _showSaveToast("✅ Proyecto creado. Revisa la ficha y haz la cotización.","success");
+  };
 }
 
 function _diasDesde(iso){ if(!iso) return null; return Math.round((new Date(todayISO()+"T00:00:00")-new Date(String(iso).slice(0,10)+"T00:00:00"))/86400000); }
