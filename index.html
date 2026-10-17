@@ -8691,7 +8691,8 @@ function _asisCalcular(t, s){
     const chars=String(s.texto||"").replace(/\s/g,"").length || 1;
     const lineas=Math.max(1,Number(s.lineas)||1);
     const letraH=(Number(s.alto)||0)/lineas*0.75;
-    const metros=chars*letraH*ASIS_REGLAS.neonCmPorCm[s.estilo]/100*ASIS_REGLAS.neonDesperdicio;
+    const medido=Number(s.metrosLinea)>0;
+    const metros= medido ? Number(s.metrosLinea)*ASIS_REGLAS.neonDesperdicio : chars*letraH*ASIS_REGLAS.neonCmPorCm[s.estilo]/100*ASIS_REGLAS.neonDesperdicio;
     const rollos=Math.max(1,Math.ceil(metros/5));
     const areaM2=(Number(s.ancho)||0)*(Number(s.alto)||0)/10000;
     const fracAcr=Math.ceil(((Number(s.ancho)+5)*(Number(s.alto)+5))/(122*244)*ASIS_REGLAS.mermaAcrilico*100)/100;
@@ -8716,7 +8717,7 @@ function _asisCalcular(t, s){
       s.montaje==="pared"?"• Herrajes para fijarlo a la pared":s.montaje==="colgar"?"• Cadena para colgarlo":"",
       Number(s.instalacion)>0?"• Instalación":"",
       "","Diseño previo para tu aprobación antes de fabricar."].filter((l,i,a)=>l!==""||a[i-1]!=="").join("\n");
-    notas.push(`${chars} caracteres · letra de ~${Math.round(letraH)} cm · ~${metros.toFixed(1)} m de neón → ${rollos} rollo(s) · fuente ${fuente[1]} W (${Math.round(watts)} W necesarios) · ${fracAcr} hoja de acrílico`);
+    notas.push(`${medido?`✏️ línea trazada ${Number(s.metrosLinea).toFixed(2)} m + merma (${s.tramosLinea} tramos) = ${metros.toFixed(1)} m`:`${chars} caracteres · letra de ~${Math.round(letraH)} cm · ~${metros.toFixed(1)} m de neón (estimado)`} → ${rollos} rollo(s) · fuente ${fuente[1]} W (${Math.round(watts)} W necesarios) · ${fracAcr} hoja de acrílico`);
   } else {
     const caja=ASIS_CAJAS.find(c=>c[0]===s.caja)||ASIS_CAJAS[1];
     P.push(_asisProd(caja[0],1,faltan));
@@ -8752,6 +8753,7 @@ function openAsistenteLetrero(q, onApply){
     const s=st[tipo]; const r=_asisCalcular(tipo,s); const t=r.totales;
     const campos = tipo==="neon" ? `
       ${inp("texto","Texto del letrero","text",'placeholder="Ej: One love, one heart"',true)}
+      <div style="grid-column:1/-1;display:flex;align-items:center;gap:8px;"><button class="btn small ${s.metrosLinea?"":"primary"}" id="_asLinea">✏️ Trazar línea de neón (metros exactos)</button><span style="font-size:11.5px;color:${s.metrosLinea?"var(--green)":"var(--muted)"};">${s.metrosLinea?`Medido: ${Number(s.metrosLinea).toFixed(2)} m · ${s.tramosLinea} tramos`:"Sin trazar: se usa un estimado"}</span></div>
       ${sel("lineas","Renglones",[[1,"1"],[2,"2"],[3,"3"]])}
       ${sel("estilo","Tipo de letra",[["manuscrita","Manuscrita"],["molde","Molde / bar"]])}
       ${inp("ancho","Ancho (cm)","number")}${inp("alto","Alto (cm)","number")}
@@ -8797,7 +8799,11 @@ function openAsistenteLetrero(q, onApply){
       </div></div>`;
     ov.querySelector("#_asClose").onclick=ov.querySelector("#_asCancel").onclick=()=>ov.remove();
     ov.querySelectorAll("[data-tipo]").forEach(b=>b.onclick=()=>{ tipo=b.dataset.tipo; render(); });
-    ov.querySelectorAll("[data-a]").forEach(el=>el.onchange=()=>{ const k=el.dataset.a; st[tipo][k]= el.type==="checkbox"?el.checked : el.type==="number"?Number(el.value||0) : el.value; render(); });
+    ov.querySelectorAll("[data-a]").forEach(el=>el.onchange=()=>{ const k=el.dataset.a; st[tipo][k]= el.type==="checkbox"?el.checked : el.type==="number"?Number(el.value||0) : el.value; if(tipo==="neon"&&["texto","ancho","estilo","lineas"].includes(k)) st.neon.metrosLinea=0; render(); });
+    const _bl=ov.querySelector("#_asLinea"); if(_bl) _bl.onclick=()=>{ const n=st.neon;
+      openGeneradorLinea({texto:n.texto, anchoTexto:Math.max(10,(Number(n.ancho)||60)-8), fuente:n.fuenteLinea||(n.estilo==="molde"?"HersheySans1":"EMSAllure")}, u=>{
+        Object.assign(n,{texto:u.texto.replace(/\n+/g," "), metrosLinea:Math.round(u.metros*100)/100, tramosLinea:u.tramos, fuenteLinea:u.fuente, ancho:u.anchoBase, alto:u.altoBase, lineas:u.texto.split("\n").length, estilo:/Sans|Serif/.test(u.fuente)?"molde":"manuscrita"});
+        render(); }); };
     ov.querySelector("#_asOk").onclick=()=>{
       if(((q.products||[]).length||(q.routes||[]).length||(q.extras||[]).length) && !confirm("Esto reemplaza los materiales, horas y extras actuales de la cotización. ¿Continuar?")) return;
       onApply(r); ov.remove();
@@ -8964,6 +8970,131 @@ function openProyectoRapido(){
     openProjectDetail(p.id);
     _showSaveToast("✅ Proyecto creado. Revisa la ficha y haz la cotización.","success");
   };
+}
+
+// ── GENERADOR DE LÍNEA DE NEÓN (trazo central de una sola línea) ──
+// Usa fuentes de una sola línea (Hershey / EMS, licencia OFL/MIT) del paquete hersheytext.
+// Dibuja el recorrido del neón, mide los metros exactos y descarga el SVG a tamaño real para el router.
+const NEON_FUENTES=[["EMSAllure","Manuscrita tipo neón"],["HersheyScript1","Manuscrita clásica"],["EMSFelix","Script elegante"],["HersheySans1","Molde"],["HersheySerifMed","Estilo bar (serif)"]];
+const _NEON_URL="https://cdn.jsdelivr.net/npm/hersheytext@1.1.0/svg_fonts/";
+const _fuentesLinea={};
+async function _cargarFuenteLinea(id){
+  if(_fuentesLinea[id]) return _fuentesLinea[id];
+  const res=await fetch(_NEON_URL+id+".svg"); if(!res.ok) throw new Error("No se pudo cargar la fuente "+id);
+  const doc=new DOMParser().parseFromString(await res.text(),"image/svg+xml");
+  const font=doc.querySelector("font"), ff=doc.querySelector("font-face");
+  const def=Number(font&&font.getAttribute("horiz-adv-x")||500), glyphs={};
+  doc.querySelectorAll("glyph").forEach(g=>{ const u=g.getAttribute("unicode"); if(u!=null) glyphs[u]={adv:Number(g.getAttribute("horiz-adv-x")||def), d:g.getAttribute("d")||""}; });
+  return _fuentesLinea[id]={glyphs, def, asc:Number(ff&&ff.getAttribute("ascent")||800), desc:Number(ff&&ff.getAttribute("descent")||-200)};
+}
+function _parseTrazo(d){
+  const t=String(d||"").trim().split(/[\s,]+/), polys=[]; let cur=null;
+  for(let i=0;i<t.length;){
+    if(t[i]==="M"){ cur=[[+t[i+1],+t[i+2]]]; polys.push(cur); i+=3; }
+    else if(t[i]==="L"){ if(cur) cur.push([+t[i+1],+t[i+2]]); i+=3; }
+    else i++;
+  }
+  return polys;
+}
+// Suaviza el trazo (Chaikin): el neón se dobla en curva, no en esquina.
+function _suavizar(p,n){ for(let k=0;k<n;k++){ if(p.length<3) return p; const q=[p[0]]; for(let i=0;i<p.length-1;i++){ const [x0,y0]=p[i],[x1,y1]=p[i+1]; q.push([x0*.75+x1*.25,y0*.75+y1*.25],[x0*.25+x1*.75,y0*.25+y1*.75]); } q.push(p[p.length-1]); p=q; } return p; }
+// Arma el recorrido del texto en unidades de la fuente (y hacia abajo).
+function _trazarTexto(font, texto){
+  const polys=[]; let y0=0;
+  String(texto||"").split("\n").forEach(ln=>{
+    let x=0;
+    for(const ch of ln){
+      const g=font.glyphs[ch] || font.glyphs[ch.normalize("NFD").replace(/[̀-ͯ]/g,"")];
+      if(g){ _parseTrazo(g.d).forEach(p=>polys.push(_suavizar(p.map(([px,py])=>[x+px, y0-py]),2))); x+=g.adv; } else x+=font.def;
+    }
+    y0+=(font.asc-font.desc)*1.1;
+  });
+  let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+  polys.forEach(p=>p.forEach(([x,y])=>{ if(x<minX)minX=x; if(x>maxX)maxX=x; if(y<minY)minY=y; if(y>maxY)maxY=y; }));
+  return {polys,minX,minY,maxX,maxY};
+}
+// Escala el recorrido a un ancho en cm y mide.
+function _medirLinea(tr, anchoCm){
+  const w=tr.maxX-tr.minX, h=tr.maxY-tr.minY; if(!(w>0)) return null;
+  const s=anchoCm/w; let largo=0;
+  tr.polys.forEach(p=>{ for(let i=1;i<p.length;i++) largo+=Math.hypot(p[i][0]-p[i-1][0], p[i][1]-p[i-1][1]); });
+  return {escala:s, ancho:anchoCm, alto:h*s, largoCm:largo*s, tramos:tr.polys.filter(p=>p.length>1).length};
+}
+function _svgLinea(tr, m, opts){
+  const pad=opts.pad||0, toX=x=>(x-tr.minX)*m.escala+pad, toY=y=>(y-tr.minY)*m.escala+pad;
+  const W=m.ancho+2*pad, H=m.alto+2*pad;
+  const paths=tr.polys.filter(p=>p.length>1).map(p=>"M"+p.map(([x,y])=>`${toX(x).toFixed(2)},${toY(y).toFixed(2)}`).join(" L")).join(" ");
+  return {W,H,paths};
+}
+
+function openGeneradorLinea(inicial, onUse){
+  const old=document.getElementById("_nlModal"); if(old) old.remove();
+  const st={texto:inicial&&inicial.texto||"", fuente:inicial&&inicial.fuente||"EMSAllure", ancho:Number(inicial&&inicial.anchoTexto)||50, color:"#ff4fd8", oscuro:true, margen:4};
+  const ov=document.createElement("div"); ov.id="_nlModal";
+  ov.style.cssText="position:fixed;inset:0;background:rgba(2,6,23,.6);display:flex;align-items:center;justify-content:center;z-index:10000;padding:12px;";
+  document.body.appendChild(ov);
+  let ultimo=null;
+  const pintar=async()=>{
+    const prev=document.getElementById("_nlPrev"), info=document.getElementById("_nlInfo");
+    if(!st.texto.trim()){ prev.innerHTML=`<div style="color:#94a3b8;padding:40px;text-align:center;">Escribe el texto del letrero</div>`; info.innerHTML=""; ultimo=null; return; }
+    prev.innerHTML=`<div style="color:#94a3b8;padding:40px;text-align:center;">Trazando…</div>`;
+    try{
+      const font=await _cargarFuenteLinea(st.fuente); const tr=_trazarTexto(font,st.texto); const m=_medirLinea(tr,st.ancho);
+      if(!m){ prev.innerHTML=`<div style="color:#f87171;padding:40px;text-align:center;">Esta fuente no tiene esas letras.</div>`; return; }
+      const g=_svgLinea(tr,m,{pad:st.margen});
+      const sw=Math.max(0.6, m.ancho/90);
+      prev.innerHTML=`<svg viewBox="0 0 ${g.W} ${g.H}" style="width:100%;max-height:46vh;display:block;">
+        <defs><filter id="_nlGlow" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="${sw*0.9}" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
+        <rect x="0" y="0" width="${g.W}" height="${g.H}" rx="${st.margen/2}" fill="${st.oscuro?"#0b1020":"#f8fafc"}" stroke="${st.oscuro?"#334155":"#cbd5e1"}" stroke-width="${sw/3}"/>
+        <path d="${g.paths}" fill="none" stroke="${st.color}" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round" ${st.oscuro?'filter="url(#_nlGlow)"':""}/>
+        <path d="${g.paths}" fill="none" stroke="#ffffff" stroke-opacity="${st.oscuro?.55:0}" stroke-width="${sw/3}" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>`;
+      const metros=m.largoCm/100;
+      ultimo={metros, tramos:m.tramos, anchoTexto:st.ancho, altoTexto:m.alto, anchoBase:Math.ceil(m.ancho+2*st.margen), altoBase:Math.ceil(m.alto+2*st.margen), fuente:st.fuente, texto:st.texto, tr, m};
+      info.innerHTML=`<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;">
+        <div class="kpi-box" style="padding:8px 10px;"><div class="kl">Línea de neón</div><div class="kv" style="color:var(--accent);">${metros.toFixed(2)} m</div><div style="font-size:10.5px;color:var(--muted);">+10% merma ≈ ${(metros*1.1).toFixed(2)} m · ${Math.max(1,Math.ceil(metros*1.1/5))} rollo(s)</div></div>
+        <div class="kpi-box" style="padding:8px 10px;"><div class="kl">Tramos</div><div class="kv">${m.tramos}</div><div style="font-size:10.5px;color:var(--muted);">piezas de neón a unir</div></div>
+        <div class="kpi-box" style="padding:8px 10px;"><div class="kl">Texto</div><div class="kv">${Math.round(m.ancho)} × ${Math.round(m.alto)} cm</div></div>
+        <div class="kpi-box" style="padding:8px 10px;"><div class="kl">Base de acrílico</div><div class="kv">${ultimo.anchoBase} × ${ultimo.altoBase} cm</div><div style="font-size:10.5px;color:var(--muted);">con ${st.margen} cm de margen</div></div></div>`;
+    }catch(e){ prev.innerHTML=`<div style="color:#f87171;padding:40px;text-align:center;">${escapeHTML(e.message)}. Revisa tu conexión a internet.</div>`; ultimo=null; }
+  };
+  ov.innerHTML=`<div style="background:var(--card);border-radius:16px;width:980px;max-width:100%;max-height:94vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.3);">
+    <div style="display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid var(--border);">
+      <div style="font-size:16px;font-weight:900;flex:1;">✏️ Generador de línea de neón</div><button class="btn small" id="_nlClose">✕</button></div>
+    <div style="padding:14px 18px;overflow:auto;">
+      <div style="display:grid;grid-template-columns:minmax(0,2fr) repeat(3,minmax(0,1fr));gap:8px;" class="detail-fields-grid">
+        <div><div class="field-label">Texto (Enter = otro renglón)</div><div class="field"><textarea id="_nlTexto" rows="2" style="resize:vertical;">${escapeHTML(st.texto)}</textarea></div></div>
+        <div><div class="field-label">Tipo de letra</div><div class="field" style="padding:0 10px;"><select id="_nlFuente" style="background:transparent;border:none;color:var(--text);font-family:inherit;font-size:13px;width:100%;padding:9px 0;">${NEON_FUENTES.map(([k,l])=>`<option value="${k}" ${k===st.fuente?"selected":""}>${l}</option>`).join("")}</select></div></div>
+        <div><div class="field-label">Ancho del texto (cm)</div><div class="field"><input id="_nlAncho" type="number" value="${st.ancho}"></div></div>
+        <div><div class="field-label">Color / fondo</div><div style="display:flex;gap:6px;align-items:center;"><input id="_nlColor" type="color" value="${st.color}" style="width:44px;height:36px;border:none;background:none;"><label style="font-size:12px;display:flex;gap:4px;align-items:center;"><input type="checkbox" id="_nlOscuro" checked> Encendido</label></div></div>
+      </div>
+      <div id="_nlPrev" style="margin:12px 0;border-radius:12px;overflow:hidden;"></div>
+      <div id="_nlInfo"></div>
+      <div style="font-size:11px;color:var(--muted);margin-top:8px;">Es el recorrido central del neón (una sola línea). Los tramos son las piezas separadas; entre letras unidas se puede seguir con el mismo tramo. El SVG se descarga a tamaño real (mm) para el router.</div>
+    </div>
+    <div style="display:flex;justify-content:flex-end;gap:8px;padding:12px 18px;border-top:1px solid var(--border);flex-wrap:wrap;">
+      <button class="btn" id="_nlDesc">⬇ Descargar SVG para router</button>
+      ${onUse?`<button class="btn primary" id="_nlUsar">Usar estos metros en la cotización</button>`:""}
+      <button class="btn" id="_nlCancel">Cerrar</button></div></div>`;
+  const $l=id=>document.getElementById(id);
+  $l("_nlClose").onclick=$l("_nlCancel").onclick=()=>ov.remove();
+  let tmr=null; const re=()=>{ clearTimeout(tmr); tmr=setTimeout(pintar,250); };
+  $l("_nlTexto").oninput=e=>{ st.texto=e.target.value; re(); };
+  $l("_nlFuente").onchange=e=>{ st.fuente=e.target.value; re(); };
+  $l("_nlAncho").oninput=e=>{ st.ancho=Number(e.target.value)||0; re(); };
+  $l("_nlColor").oninput=e=>{ st.color=e.target.value; re(); };
+  $l("_nlOscuro").onchange=e=>{ st.oscuro=e.target.checked; re(); };
+  $l("_nlDesc").onclick=()=>{
+    if(!ultimo){ _showSaveToast("Escribe el texto primero","warning"); return; }
+    const mm={...ultimo.m, escala:ultimo.m.escala*10, ancho:ultimo.m.ancho*10, alto:ultimo.m.alto*10};
+    const g=_svgLinea(ultimo.tr, mm, {pad:st.margen*10});
+    const svg=`<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" width="${g.W.toFixed(1)}mm" height="${g.H.toFixed(1)}mm" viewBox="0 0 ${g.W.toFixed(2)} ${g.H.toFixed(2)}">\n<!-- Línea central de neón: ${ultimo.texto.replace(/--/g,"-")} · ${ultimo.metros.toFixed(2)} m · ESMA Industrial -->\n<rect x="0" y="0" width="${g.W.toFixed(2)}" height="${g.H.toFixed(2)}" fill="none" stroke="#0000ff" stroke-width="0.2"/>\n<path d="${g.paths}" fill="none" stroke="#ff0000" stroke-width="0.2"/>\n</svg>`;
+    const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([svg],{type:"image/svg+xml"}));
+    a.download=`neon-${ultimo.texto.replace(/[^\wáéíóúñ]+/gi,"-").replace(/^-|-$/g,"").slice(0,30)||"linea"}-${Math.round(ultimo.anchoBase)}x${Math.round(ultimo.altoBase)}cm.svg`;
+    document.body.appendChild(a); a.click(); a.remove();
+  };
+  if(onUse) $l("_nlUsar").onclick=()=>{ if(!ultimo) return; onUse(ultimo); ov.remove(); };
+  pintar();
 }
 
 function _diasDesde(iso){ if(!iso) return null; return Math.round((new Date(todayISO()+"T00:00:00")-new Date(String(iso).slice(0,10)+"T00:00:00"))/86400000); }
