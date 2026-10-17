@@ -9002,14 +9002,57 @@ function importarPlantillasESMA(){
   });
   return nuevas;
 }
-// Descripción para el cliente armada con los conceptos de la cotización (sin precios).
+// Descripción para el cliente, redactada en lenguaje comercial a partir de la cotización (sin precios).
+// Agrupa, traduce y omite lo que al cliente no le importa (consumibles, tornillería).
+const DESC_OMITIR = /soldadura|cianoacrilato|resistol|kola|silic[oó]n|cinta doble|tornillo|taquete|pija|grapa|clavo|navaja|corrector|thiner|lija|papel para plantilla|adhesivo|chapacinta|inserto|m[eé]nsula|cable cal 22|cable para letrero|tinta/i;
+const DESC_REGLAS = [
+  [/caja de luz circular (\d+) ?cm/i, m=>`Caja de luz circular de ${m[1]} cm con iluminación LED`],
+  [/caja de luz rectangular (\d+) ?x ?(\d+)/i, m=>`Caja de luz rectangular de ${m[2]} x ${m[1]} cm con iluminación LED`],
+  [/marco de luz ([\d x]+cm)/i, m=>`Marco de luz LED de ${m[1].replace(/x/," x ")}`],
+  [/ne[oó]n/i, ()=>"Neón LED flexible"],
+  [/m[oó]dulo led|tira led|tira cob|led para exterior|led neon|riel para led/i, ()=>"Iluminación LED"],
+  [/fuente|eliminador/i, ()=>"Fuente de poder y cable para conectar a un contacto normal"],
+  [/cable thw|apagador/i, ()=>"Cableado eléctrico y apagador"],
+  [/acr[ií]l\w*\s.*espejo/i, ()=>"Acrílico espejo cortado a la medida"],
+  [/acr[ií]l\w*\s.*transl[uú]cido/i, ()=>"Acrílico translúcido para iluminación pareja"],
+  [/acr[ií]l\w*\s.*(cristal|transparente)/i, ()=>"Acrílico transparente cortado a la medida"],
+  [/acr[ií]l/i, ()=>"Acrílico cortado a la medida"],
+  [/vinil/i, (m,r)=>`Gráfico en vinil de alta resistencia${Number(r.qty)>1?` (${Math.round(r.qty)} colores)`:""}`],
+  [/trovicel/i, ()=>"Trovicel (PVC rígido) cortado a la medida"],
+  [/canto aluminio|l[aá]mina (de )?aluminio|tira de aluminio/i, ()=>"Estructura y acabado en aluminio"],
+  [/estructura/i, ()=>"Estructura metálica"],
+  [/mdf/i, ()=>"MDF cortado a la medida"],
+  [/melamina\D*(\d+) ?mm/i, m=>`Melamina de ${m[1]} mm`],
+  [/melamina/i, ()=>"Melamina"],
+  [/madera|pino|lambr[ií]n/i, ()=>"Madera natural"],
+  [/enchapado|corte y/i, ()=>"Corte y enchapado de piezas"],
+  [/corredera|bisagra|jaladera|caj[oó]n met|riel oculto|brazo elevable|escuadra/i, ()=>"Herrajes de calidad (correderas, bisagras y jaladeras)"],
+  [/chapet[oó]n/i, ()=>"Herrajes de acero inoxidable para fijar a la pared"],
+  [/cadena|argolla/i, ()=>"Cadena para colgar"],
+  [/pintura|barniz|aceite/i, ()=>"Acabado con pintura o barniz"],
+  [/cubierta/i, ()=>"Cubierta"],
+];
+function _descLinea(r){
+  const d=String(r.desc||r.matPick||"");
+  if(!d.trim() || DESC_OMITIR.test(d)) return "";
+  for(const [re,fn] of DESC_REGLAS){ const m=d.match(re); if(m) return fn(m,r); }
+  return d.replace(/\s*\([^)]*\)/g,"").replace(/\s*·\s*piezas:.*$/,"").trim();
+}
 function _qDescAuto(q){
-  const limpio = s => String(s||"").replace(/\s*\((sin gráfico|instalación|1 m por color|para letrero|rollo[^)]*)\)/gi,"").replace(/\s+/g," ").trim();
-  const lineas = [];
-  (q.products||[]).forEach(r=>{ const d=limpio(r.desc||r.matPick); if(d && !lineas.includes(d)) lineas.push(d); });
-  const extras = (q.extras||[]).map(e=>limpio(e.label)).filter(Boolean);
-  return [String(q.name||"Proyecto").trim(), "", "Incluye:", ...lineas.map(l=>"• "+l), ...extras.map(e=>"• "+e),
-          "", "Diseño previo para tu aprobación antes de fabricar."].join("\n");
+  const lineas=[];
+  const add=l=>{ if(l && !lineas.includes(l)) lineas.push(l); };
+  (q.products||[]).forEach(r=>add(_descLinea(r)));
+  (q.routes||[]).forEach(r=>{
+    const n=String(r.routeName||"");
+    if(/router/i.test(n)) add("Corte de precisión en router CNC");
+    else if(/l[aá]ser/i.test(n)) add("Corte y grabado láser");
+    else if(/habilitado|armado|carpinter/i.test(n)) add("Armado y acabado a mano en nuestro taller");
+  });
+  (q.extras||[]).forEach(e=>{
+    const l=String(e.label||"").trim(); if(!l) return;
+    add(/gasolina|flete|traslado|vi[aá]tico|env[ií]o/i.test(l) ? "Traslado al lugar de instalación" : /instalaci/i.test(l) ? "Instalación incluida" : l);
+  });
+  return [String(q.name||"Proyecto").trim(), "", "Incluye:", ...lineas.map(l=>"• "+l), "", "Diseño previo para tu aprobación antes de fabricar."].join("\n");
 }
 
 // Al usar una plantilla, toma los precios vigentes del catálogo (si el material o la ruta existen).
