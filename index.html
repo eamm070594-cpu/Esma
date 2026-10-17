@@ -8801,8 +8801,8 @@ function openAsistenteLetrero(q, onApply){
     ov.querySelectorAll("[data-tipo]").forEach(b=>b.onclick=()=>{ tipo=b.dataset.tipo; render(); });
     ov.querySelectorAll("[data-a]").forEach(el=>el.onchange=()=>{ const k=el.dataset.a; st[tipo][k]= el.type==="checkbox"?el.checked : el.type==="number"?Number(el.value||0) : el.value; if(tipo==="neon"&&["texto","ancho","estilo","lineas"].includes(k)) st.neon.metrosLinea=0; render(); });
     const _bl=ov.querySelector("#_asLinea"); if(_bl) _bl.onclick=()=>{ const n=st.neon;
-      openGeneradorLinea({texto:n.texto, anchoTexto:Math.max(10,(Number(n.ancho)||60)-8), fuente:n.fuenteLinea||(n.estilo==="molde"?"HersheySans1":"EMSAllure")}, u=>{
-        Object.assign(n,{texto:u.texto.replace(/\n+/g," "), metrosLinea:Math.round(u.metros*100)/100, tramosLinea:u.tramos, fuenteLinea:u.fuente, ancho:u.anchoBase, alto:u.altoBase, lineas:u.texto.split("\n").length, estilo:/Sans|Serif/.test(u.fuente)?"molde":"manuscrita"});
+      openGeneradorLinea({texto:n.texto, anchoTexto:Math.max(10,(Number(n.ancho)||60)-8), fuente:n.fuenteLinea||(n.estilo==="molde"?"Quicksand":"Sacramento")}, u=>{
+        Object.assign(n,{texto:u.texto.replace(/\n+/g," "), metrosLinea:Math.round(u.metros*100)/100, tramosLinea:u.tramos, fuenteLinea:u.fuente, ancho:u.anchoBase, alto:u.altoBase, lineas:u.texto.split("\n").length, estilo:u.estilo});
         render(); }); };
     ov.querySelector("#_asOk").onclick=()=>{
       if(((q.products||[]).length||(q.routes||[]).length||(q.extras||[]).length) && !confirm("Esto reemplaza los materiales, horas y extras actuales de la cotización. ¿Continuar?")) return;
@@ -8973,128 +8973,234 @@ function openProyectoRapido(){
 }
 
 // ── GENERADOR DE LÍNEA DE NEÓN (trazo central de una sola línea) ──
-// Usa fuentes de una sola línea (Hershey / EMS, licencia OFL/MIT) del paquete hersheytext.
-// Dibuja el recorrido del neón, mide los metros exactos y descarga el SVG a tamaño real para el router.
-const NEON_FUENTES=[["EMSAllure","Manuscrita tipo neón"],["HersheyScript1","Manuscrita clásica"],["EMSFelix","Script elegante"],["HersheySans1","Molde"],["HersheySerifMed","Estilo bar (serif)"]];
-const _NEON_URL="https://cdn.jsdelivr.net/npm/hersheytext@1.1.0/svg_fonts/";
-const _fuentesLinea={};
-async function _cargarFuenteLinea(id){
-  if(_fuentesLinea[id]) return _fuentesLinea[id];
-  const res=await fetch(_NEON_URL+id+".svg"); if(!res.ok) throw new Error("No se pudo cargar la fuente "+id);
-  const doc=new DOMParser().parseFromString(await res.text(),"image/svg+xml");
-  const font=doc.querySelector("font"), ff=doc.querySelector("font-face");
-  const def=Number(font&&font.getAttribute("horiz-adv-x")||500), glyphs={};
-  doc.querySelectorAll("glyph").forEach(g=>{ const u=g.getAttribute("unicode"); if(u!=null) glyphs[u]={adv:Number(g.getAttribute("horiz-adv-x")||def), d:g.getAttribute("d")||""}; });
-  return _fuentesLinea[id]={glyphs, def, asc:Number(ff&&ff.getAttribute("ascent")||800), desc:Number(ff&&ff.getAttribute("descent")||-200)};
+// Dibuja el texto con una fuente real (Google Fonts), saca su esqueleto (línea central exacta de cada letra),
+// lo limpia y suaviza, mide los metros de neón y exporta la línea a SVG / DXF a tamaño real.
+// [familia, nombre en el catálogo, peso, estilo para el asistente]
+const NEON_FUENTES=[
+  ["Sacramento","Clásica neón","400","manuscrita"],["Satisfy","Manuscrita","400","manuscrita"],["Great Vibes","Elegante","400","manuscrita"],
+  ["Allura","Caligráfica","400","manuscrita"],["Yellowtail","Retro","400","manuscrita"],["Kaushan Script","Brush","400","manuscrita"],["Dancing Script","Casual","500","manuscrita"],
+  ["Quicksand","Moderna","500","molde"],["Comfortaa","Redonda","400","molde"],["Josefin Sans","Minimalista","300","molde"],["Poiret One","Delgada","400","molde"],
+  ["Orbitron","Tecnológica","500","molde"],["Bebas Neue","Industrial","400","molde"],["Montserrat","Bloque","500","molde"]];
+const _fNeon=fam=>NEON_FUENTES.find(f=>f[0]===fam)||NEON_FUENTES[0];
+let _neonCssP=null;
+function _neonCss(){
+  return _neonCssP||(_neonCssP=new Promise((ok,ko)=>{
+    const l=document.createElement("link"); l.rel="stylesheet";
+    l.href="https://fonts.googleapis.com/css2?"+NEON_FUENTES.map(f=>"family="+f[0].replace(/ /g,"+")+(f[2]!=="400"?":wght@"+f[2]:"")).join("&")+"&display=swap";
+    l.onload=ok; l.onerror=()=>{ _neonCssP=null; l.remove(); ko(new Error("No se pudieron cargar las letras")); };
+    document.head.appendChild(l);
+  }));
 }
-function _parseTrazo(d){
-  const t=String(d||"").trim().split(/[\s,]+/), polys=[]; let cur=null;
-  for(let i=0;i<t.length;){
-    if(t[i]==="M"){ cur=[[+t[i+1],+t[i+2]]]; polys.push(cur); i+=3; }
-    else if(t[i]==="L"){ if(cur) cur.push([+t[i+1],+t[i+2]]); i+=3; }
-    else i++;
-  }
-  return polys;
+async function _cargarFuenteNeon(f, texto){
+  await _neonCss();
+  const faces=await document.fonts.load(`${f[2]} 100px "${f[0]}"`, texto||"Neón");
+  if(!faces.length) throw new Error("No se pudo cargar la letra "+f[1]);
+}
+
+// Adelgazamiento Zhang-Suen: deja la tinta en una línea de 1 pixel por el centro del trazo.
+function _adelgazar(b,W,H,x0,y0,x1,y1){
+  const del=[]; let cambio=true;
+  while(cambio){ cambio=false;
+    for(let pas=0;pas<2;pas++){ del.length=0;
+      for(let y=y0;y<=y1;y++) for(let x=x0;x<=x1;x++){ const i=y*W+x; if(!b[i]) continue;
+        const p2=b[i-W],p3=b[i-W+1],p4=b[i+1],p5=b[i+W+1],p6=b[i+W],p7=b[i+W-1],p8=b[i-1],p9=b[i-W-1];
+        const B=p2+p3+p4+p5+p6+p7+p8+p9; if(B<2||B>6) continue;
+        const A=(!p2&&p3)+(!p3&&p4)+(!p4&&p5)+(!p5&&p6)+(!p6&&p7)+(!p7&&p8)+(!p8&&p9)+(!p9&&p2); if(A!==1) continue;
+        if(pas===0){ if(p2&&p4&&p6) continue; if(p4&&p6&&p8) continue; } else { if(p2&&p4&&p8) continue; if(p2&&p6&&p8) continue; }
+        del.push(i); }
+      if(del.length){ cambio=true; for(const i of del) b[i]=0; }
+    } }
+}
+function _rdp(p,eps){
+  if(p.length<3) return p;
+  const a=p[0], b=p[p.length-1], dx=b[0]-a[0], dy=b[1]-a[1], L=Math.hypot(dx,dy); let dm=0, im=0;
+  for(let i=1;i<p.length-1;i++){ const d=L?Math.abs(dy*p[i][0]-dx*p[i][1]+b[0]*a[1]-b[1]*a[0])/L:Math.hypot(p[i][0]-a[0],p[i][1]-a[1]); if(d>dm){ dm=d; im=i; } }
+  return dm>eps ? _rdp(p.slice(0,im+1),eps).slice(0,-1).concat(_rdp(p.slice(im),eps)) : [a,b];
 }
 // Suaviza el trazo (Chaikin): el neón se dobla en curva, no en esquina.
 function _suavizar(p,n){ for(let k=0;k<n;k++){ if(p.length<3) return p; const q=[p[0]]; for(let i=0;i<p.length-1;i++){ const [x0,y0]=p[i],[x1,y1]=p[i+1]; q.push([x0*.75+x1*.25,y0*.75+y1*.25],[x0*.25+x1*.75,y0*.25+y1*.75]); } q.push(p[p.length-1]); p=q; } return p; }
-// Arma el recorrido del texto en unidades de la fuente (y hacia abajo).
-function _trazarTexto(font, texto){
-  const polys=[]; let y0=0;
-  String(texto||"").split("\n").forEach(ln=>{
-    let x=0;
-    for(const ch of ln){
-      const g=font.glyphs[ch] || font.glyphs[ch.normalize("NFD").replace(/[̀-ͯ]/g,"")];
-      if(g){ _parseTrazo(g.d).forEach(p=>polys.push(_suavizar(p.map(([px,py])=>[x+px, y0-py]),2))); x+=g.adv; } else x+=font.def;
-    }
-    y0+=(font.asc-font.desc)*1.1;
-  });
+const _largo=p=>{ let s=0; for(let i=1;i<p.length;i++) s+=Math.hypot(p[i][0]-p[i-1][0],p[i][1]-p[i-1][1]); return s; };
+
+// Texto → línea central (en pixeles, y hacia abajo).
+const _esqCache={};
+function _trazarTexto(f, texto){
+  const key=f[0]+"|"+texto; if(_esqCache[key]) return _esqCache[key];
+  const px=200, lines=String(texto||"").split("\n");
+  const c=document.createElement("canvas"), ctx=c.getContext("2d",{willReadFrequently:true});
+  const font=`${f[2]} ${px}px "${f[0]}"`; ctx.font=font;
+  const ms=lines.map(l=>ctx.measureText(l||" ")), wl=ms.map(m=>m.actualBoundingBoxLeft+m.actualBoundingBoxRight);
+  const Wt=Math.max(1,...wl), pad=Math.ceil(px*0.3), lh=px*1.25;
+  const asc=Math.max(...ms.map(m=>m.actualBoundingBoxAscent)), des=Math.max(...ms.map(m=>m.actualBoundingBoxDescent));
+  const W=c.width=Math.ceil(Wt+2*pad), H=c.height=Math.ceil(asc+des+lh*(lines.length-1)+2*pad);
+  ctx.font=font; ctx.fillStyle="#000";
+  lines.forEach((l,i)=>ctx.fillText(l, pad+(Wt-wl[i])/2+ms[i].actualBoundingBoxLeft, pad+asc+i*lh));
+  const data=ctx.getImageData(0,0,W,H).data, b=new Uint8Array(W*H); let tinta=0;
+  for(let y=1;y<H-1;y++) for(let x=1;x<W-1;x++){ const i=y*W+x; if(data[i*4+3]>=110){ b[i]=1; tinta++; } }
+  // Distancia al borde de cada pixel de tinta (sirve para saber qué ramitas son basura del adelgazado)
+  const dt=new Float32Array(W*H); for(let i=0;i<W*H;i++) dt[i]=b[i]?1e9:0;
+  for(let y=1;y<H-1;y++) for(let x=1;x<W-1;x++){ const i=y*W+x; if(!dt[i]) continue; dt[i]=Math.min(dt[i],dt[i-1]+1,dt[i-W]+1,dt[i-W-1]+1.414,dt[i-W+1]+1.414); }
+  for(let y=H-2;y>0;y--) for(let x=W-2;x>0;x--){ const i=y*W+x; if(!dt[i]) continue; dt[i]=Math.min(dt[i],dt[i+1]+1,dt[i+W]+1,dt[i+W+1]+1.414,dt[i+W-1]+1.414); }
+  _adelgazar(b,W,H,1,1,W-2,H-2);
+  // Grafo de pixeles: vecinos en cruz primero; la diagonal solo si no hay un vecino en cruz que ya los une.
+  const nb=i=>{ const r=[]; for(const d of [1,-1,W,-W]) if(b[i+d]) r.push(i+d);
+    for(const [dx,dy] of [[1,1],[1,-1],[-1,1],[-1,-1]]){ const j=i+dx+dy*W; if(b[j]&&!b[i+dx]&&!b[i+dy*W]) r.push(j); } return r; };
+  const idx=[]; for(let i=0;i<W*H;i++) if(b[i]) idx.push(i);
+  const deg=new Uint8Array(W*H); idx.forEach(i=>deg[i]=nb(i).length);
+  const sw=tinta/Math.max(1,idx.length);   // grosor promedio del trazo
+  const P=i=>[i%W,(i/W)|0];
+  // Nodos: grupos de cruces (3+ vecinos) y puntas (1 vecino)
+  const nodo=new Int32Array(W*H).fill(-1), nodos=[], radio=[];
+  for(const i of idx) if(deg[i]>=3&&nodo[i]<0){ const id=nodos.length, st=[i]; let sx=0,sy=0,n=0,r=0; nodo[i]=id;
+    while(st.length){ const k=st.pop(); sx+=k%W; sy+=(k/W)|0; n++; r=Math.max(r,dt[k]); for(const j of nb(k)) if(deg[j]>=3&&nodo[j]<0){ nodo[j]=id; st.push(j); } }
+    nodos.push([sx/n,sy/n]); radio[id]=r; }
+  for(const i of idx) if(deg[i]<=1){ nodo[i]=nodos.length; nodos.push(P(i)); }
+  // Tramos entre nodos
+  const vis=new Uint8Array(W*H), edges=[];
+  for(const p of idx){ if(deg[p]===2) continue; const np=nodo[p];
+    if(deg[p]===0){ edges.push({a:np,b:np,pts:[P(p)]}); continue; }
+    for(const q of nb(p)){
+      if(deg[q]!==2){ if(nodo[q]!==np&&p<q) edges.push({a:np,b:nodo[q],pts:[nodos[np],nodos[nodo[q]]]}); continue; }
+      if(vis[q]) continue;
+      const pts=[nodos[np]]; let prev=p, cur=q;
+      while(deg[cur]===2&&!vis[cur]){ vis[cur]=1; pts.push(P(cur)); const n2=nb(cur), nx=n2[0]===prev?n2[1]:n2[0]; prev=cur; cur=nx; }
+      if(deg[cur]===2) continue;
+      pts.push(nodos[nodo[cur]]); edges.push({a:np,b:nodo[cur],pts});
+    } }
+  for(const p of idx) if(deg[p]===2&&!vis[p]){ // anillos cerrados (o, 0)
+    const pts=[]; let prev=-1, cur=p;
+    while(!vis[cur]){ vis[cur]=1; pts.push(P(cur)); const n2=nb(cur), nx=n2[0]===prev?n2[1]:n2[0]; prev=cur; cur=nx; }
+    pts.push(P(p)); const id=nodos.length; nodos.push(P(p)); edges.push({a:id,b:id,pts,anillo:true}); }
+  // Poda de "pelitos": ramitas cortas que salen de una punta del trazo
+  for(let cambio=true;cambio;){ cambio=false;
+    const dg=new Map(); edges.forEach(e=>{ dg.set(e.a,(dg.get(e.a)||0)+1); dg.set(e.b,(dg.get(e.b)||0)+1); });
+    for(let k=edges.length-1;k>=0;k--){ const e=edges[k], L=_largo(e.pts);
+      if(e.a===e.b){ if(!e.anillo&&e.pts.length>1&&L<sw*1.5){ edges.splice(k,1); cambio=true; } continue; }
+      const da=dg.get(e.a), db=dg.get(e.b);
+      const rj=da>=3?radio[e.a]:radio[e.b];
+      if(((da===1&&db>=3)||(db===1&&da>=3))&&L<(rj||sw/2)*1.45+1){ edges.splice(k,1); dg.set(e.a,da-1); dg.set(e.b,db-1); cambio=true; } } }
+  // Unir tramos en los cruces siguiendo la dirección más recta (así se cuentan las piezas reales de neón)
+  const en=new Map(); edges.forEach((e,k)=>{ [[e.a,0],[e.b,1]].forEach(([n,lado])=>{ if(!en.has(n)) en.set(n,[]); en.get(n).push([k,lado]); }); });
+  const link=new Int32Array(edges.length*2).fill(-1), une=(x,y)=>{ link[x]=y; link[y]=x; };
+  const orient=(k,lado)=>lado===0?edges[k].pts:edges[k].pts.slice().reverse();
+  const dir=(k,lado)=>{ const p=orient(k,lado), o=p[0]; let q=p[p.length-1], acc=0;
+    for(let i=1;i<p.length;i++){ acc+=Math.hypot(p[i][0]-p[i-1][0],p[i][1]-p[i-1][1]); if(acc>=sw*2){ q=p[i]; break; } }
+    const dx=q[0]-o[0], dy=q[1]-o[1], L=Math.hypot(dx,dy)||1; return [dx/L,dy/L]; };
+  for(const [,L] of en){
+    if(L.length===2){ une(L[0][0]*2+L[0][1], L[1][0]*2+L[1][1]); continue; }
+    if(L.length<3) continue;
+    const ds=L.map(([k,l])=>dir(k,l)), pares=[];
+    for(let i=0;i<L.length;i++) for(let j=i+1;j<L.length;j++) pares.push([ds[i][0]*ds[j][0]+ds[i][1]*ds[j][1],i,j]);
+    pares.sort((x,y)=>x[0]-y[0]); const usado=new Set();
+    for(const [dot,i,j] of pares){ if(dot>-0.5) break; if(usado.has(i)||usado.has(j)) continue; usado.add(i); usado.add(j); une(L[i][0]*2+L[i][1], L[j][0]*2+L[j][1]); }
+  }
+  const hecho=new Uint8Array(edges.length), out=[];
+  const recorrer=(k,lado)=>{ let pts=orient(k,lado).slice(); hecho[k]=1; let ex=k*2+(1-lado);
+    while(link[ex]>=0){ const pr=link[ex], k2=pr>>1, l2=pr&1; if(hecho[k2]) break; hecho[k2]=1; pts=pts.concat(orient(k2,l2).slice(1)); ex=k2*2+(1-l2); }
+    return pts; };
+  edges.forEach((e,k)=>{ if(hecho[k]) return; if(link[k*2]<0) out.push(recorrer(k,0)); else if(link[k*2+1]<0) out.push(recorrer(k,1)); });
+  edges.forEach((e,k)=>{ if(!hecho[k]) out.push(recorrer(k,0)); });
+  const polys=out.map(p=>p.length>2?_suavizar(_rdp(p,1.1),3):p).filter(p=>p.length===1||_largo(p)>=sw*0.5);
   let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
   polys.forEach(p=>p.forEach(([x,y])=>{ if(x<minX)minX=x; if(x>maxX)maxX=x; if(y<minY)minY=y; if(y>maxY)maxY=y; }));
-  return {polys,minX,minY,maxX,maxY};
+  return _esqCache[key]={polys,minX,minY,maxX,maxY,sw};
 }
 // Escala el recorrido a un ancho en cm y mide.
 function _medirLinea(tr, anchoCm){
   const w=tr.maxX-tr.minX, h=tr.maxY-tr.minY; if(!(w>0)) return null;
-  const s=anchoCm/w; let largo=0;
-  tr.polys.forEach(p=>{ for(let i=1;i<p.length;i++) largo+=Math.hypot(p[i][0]-p[i-1][0], p[i][1]-p[i-1][1]); });
-  return {escala:s, ancho:anchoCm, alto:h*s, largoCm:largo*s, tramos:tr.polys.filter(p=>p.length>1).length};
+  const s=anchoCm/w; let largo=0; tr.polys.forEach(p=>largo+=_largo(p));
+  return {escala:s, ancho:anchoCm, alto:h*s, largoCm:largo*s, tramos:tr.polys.length};
 }
 function _svgLinea(tr, m, opts){
   const pad=opts.pad||0, toX=x=>(x-tr.minX)*m.escala+pad, toY=y=>(y-tr.minY)*m.escala+pad;
-  const W=m.ancho+2*pad, H=m.alto+2*pad;
-  const paths=tr.polys.filter(p=>p.length>1).map(p=>"M"+p.map(([x,y])=>`${toX(x).toFixed(2)},${toY(y).toFixed(2)}`).join(" L")).join(" ");
-  return {W,H,paths};
+  const paths=tr.polys.map(p=>(p.length===1?[p[0],p[0]]:p)).map(p=>"M"+p.map(([x,y])=>`${toX(x).toFixed(2)},${toY(y).toFixed(2)}`).join(" L")).join(" ");
+  return {W:m.ancho+2*pad, H:m.alto+2*pad, paths};
+}
+// DXF (R12, milímetros) solo con la línea central: una polilínea por tramo de neón, capa NEON.
+function _dxfLinea(tr, m){
+  const s=m.escala*10, H=m.alto*10;
+  const L=["0","SECTION","2","HEADER","9","$ACADVER","1","AC1009","9","$INSUNITS","70","4","0","ENDSEC",
+           "0","SECTION","2","TABLES","0","TABLE","2","LAYER","70","1","0","LAYER","2","NEON","70","0","62","1","6","CONTINUOUS","0","ENDTAB","0","ENDSEC",
+           "0","SECTION","2","ENTITIES"];
+  tr.polys.filter(p=>p.length>1).forEach(p=>{
+    L.push("0","POLYLINE","8","NEON","66","1","70","0","10","0","20","0","30","0");
+    p.forEach(([x,y])=>L.push("0","VERTEX","8","NEON","10",((x-tr.minX)*s).toFixed(3),"20",(H-(y-tr.minY)*s).toFixed(3),"30","0"));
+    L.push("0","SEQEND","8","NEON"); });
+  L.push("0","ENDSEC","0","EOF"); return L.join("\r\n")+"\r\n";
 }
 
 function openGeneradorLinea(inicial, onUse){
   const old=document.getElementById("_nlModal"); if(old) old.remove();
-  const st={texto:inicial&&inicial.texto||"", fuente:inicial&&inicial.fuente||"EMSAllure", ancho:Number(inicial&&inicial.anchoTexto)||50, color:"#ff4fd8", oscuro:true, margen:4};
+  const st={texto:inicial&&inicial.texto||"", fuente:_fNeon(inicial&&inicial.fuente)[0], ancho:Number(inicial&&inicial.anchoTexto)||50, color:"#ff4fd8", oscuro:true, margen:4};
   const ov=document.createElement("div"); ov.id="_nlModal";
   ov.style.cssText="position:fixed;inset:0;background:rgba(2,6,23,.6);display:flex;align-items:center;justify-content:center;z-index:10000;padding:12px;";
   document.body.appendChild(ov);
-  let ultimo=null;
+  let ultimo=null, turno=0;
   const pintar=async()=>{
-    const prev=document.getElementById("_nlPrev"), info=document.getElementById("_nlInfo");
+    const prev=document.getElementById("_nlPrev"), info=document.getElementById("_nlInfo"), yo=++turno;
     if(!st.texto.trim()){ prev.innerHTML=`<div style="color:#94a3b8;padding:40px;text-align:center;">Escribe el texto del letrero</div>`; info.innerHTML=""; ultimo=null; return; }
-    prev.innerHTML=`<div style="color:#94a3b8;padding:40px;text-align:center;">Trazando…</div>`;
+    prev.innerHTML=`<div style="color:#94a3b8;padding:40px;text-align:center;">Trazando la línea central…</div>`;
     try{
-      const font=await _cargarFuenteLinea(st.fuente); const tr=_trazarTexto(font,st.texto); const m=_medirLinea(tr,st.ancho);
-      if(!m){ prev.innerHTML=`<div style="color:#f87171;padding:40px;text-align:center;">Esta fuente no tiene esas letras.</div>`; return; }
-      const g=_svgLinea(tr,m,{pad:st.margen});
-      const sw=Math.max(0.6, m.ancho/90);
-      prev.innerHTML=`<svg viewBox="0 0 ${g.W} ${g.H}" style="width:100%;max-height:46vh;display:block;">
-        <defs><filter id="_nlGlow" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="${sw*0.9}" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
-        <rect x="0" y="0" width="${g.W}" height="${g.H}" rx="${st.margen/2}" fill="${st.oscuro?"#0b1020":"#f8fafc"}" stroke="${st.oscuro?"#334155":"#cbd5e1"}" stroke-width="${sw/3}"/>
+      const f=_fNeon(st.fuente); await _cargarFuenteNeon(f, st.texto); if(yo!==turno) return;
+      const tr=_trazarTexto(f, st.texto), m=_medirLinea(tr, st.ancho);
+      if(!m){ prev.innerHTML=`<div style="color:#f87171;padding:40px;text-align:center;">No se pudo trazar ese texto.</div>`; ultimo=null; return; }
+      const g=_svgLinea(tr,m,{pad:st.margen}), sw=0.8;   // tubo de neón ~8 mm
+      prev.innerHTML=`<svg viewBox="0 0 ${g.W} ${g.H}" style="width:100%;max-height:44vh;display:block;">
+        <defs><filter id="_nlGlow" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="${sw*1.1}" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
+        <rect x="0" y="0" width="${g.W}" height="${g.H}" rx="${st.margen/2}" fill="${st.oscuro?"#0b1020":"#f8fafc"}" stroke="${st.oscuro?"#334155":"#cbd5e1"}" stroke-width="0.2"/>
         <path d="${g.paths}" fill="none" stroke="${st.color}" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round" ${st.oscuro?'filter="url(#_nlGlow)"':""}/>
-        <path d="${g.paths}" fill="none" stroke="#ffffff" stroke-opacity="${st.oscuro?.55:0}" stroke-width="${sw/3}" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="${g.paths}" fill="none" stroke="#ffffff" stroke-opacity="${st.oscuro?.6:0}" stroke-width="${sw/3}" stroke-linecap="round" stroke-linejoin="round"/>
       </svg>`;
       const metros=m.largoCm/100;
-      ultimo={metros, tramos:m.tramos, anchoTexto:st.ancho, altoTexto:m.alto, anchoBase:Math.ceil(m.ancho+2*st.margen), altoBase:Math.ceil(m.alto+2*st.margen), fuente:st.fuente, texto:st.texto, tr, m};
+      ultimo={metros, tramos:m.tramos, anchoTexto:st.ancho, altoTexto:m.alto, anchoBase:Math.ceil(m.ancho+2*st.margen), altoBase:Math.ceil(m.alto+2*st.margen), fuente:f[0], estilo:f[3], texto:st.texto, tr, m};
       info.innerHTML=`<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;">
         <div class="kpi-box" style="padding:8px 10px;"><div class="kl">Línea de neón</div><div class="kv" style="color:var(--accent);">${metros.toFixed(2)} m</div><div style="font-size:10.5px;color:var(--muted);">+10% merma ≈ ${(metros*1.1).toFixed(2)} m · ${Math.max(1,Math.ceil(metros*1.1/5))} rollo(s)</div></div>
         <div class="kpi-box" style="padding:8px 10px;"><div class="kl">Tramos</div><div class="kv">${m.tramos}</div><div style="font-size:10.5px;color:var(--muted);">piezas de neón a unir</div></div>
         <div class="kpi-box" style="padding:8px 10px;"><div class="kl">Texto</div><div class="kv">${Math.round(m.ancho)} × ${Math.round(m.alto)} cm</div></div>
         <div class="kpi-box" style="padding:8px 10px;"><div class="kl">Base de acrílico</div><div class="kv">${ultimo.anchoBase} × ${ultimo.altoBase} cm</div><div style="font-size:10.5px;color:var(--muted);">con ${st.margen} cm de margen</div></div></div>`;
-    }catch(e){ prev.innerHTML=`<div style="color:#f87171;padding:40px;text-align:center;">${escapeHTML(e.message)}. Revisa tu conexión a internet.</div>`; ultimo=null; }
+    }catch(e){ if(yo!==turno) return; prev.innerHTML=`<div style="color:#f87171;padding:40px;text-align:center;">${escapeHTML(e.message)}. Revisa tu conexión a internet.</div>`; ultimo=null; }
   };
-  ov.innerHTML=`<div style="background:var(--card);border-radius:16px;width:980px;max-width:100%;max-height:94vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.3);">
+  const chips=()=>NEON_FUENTES.map(f=>`<button type="button" data-nf="${escapeHTML(f[0])}" style="background:#0b1020;border:2px solid ${f[0]===st.fuente?"var(--accent)":"#1e293b"};border-radius:10px;padding:6px 4px 4px;cursor:pointer;min-width:0;">
+      <div style="font-family:'${f[0]}';font-weight:${f[2]};font-size:22px;line-height:1.3;color:#fff;text-shadow:0 0 6px ${st.color},0 0 14px ${st.color};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHTML((st.texto.split("\n")[0]||"Neón").slice(0,12))}</div>
+      <div style="font-size:10px;color:#94a3b8;font-weight:700;">${f[1]}</div></button>`).join("");
+  ov.innerHTML=`<div style="background:var(--card);border-radius:16px;width:1040px;max-width:100%;max-height:95vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.3);">
     <div style="display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid var(--border);">
       <div style="font-size:16px;font-weight:900;flex:1;">✏️ Generador de línea de neón</div><button class="btn small" id="_nlClose">✕</button></div>
     <div style="padding:14px 18px;overflow:auto;">
-      <div style="display:grid;grid-template-columns:minmax(0,2fr) repeat(3,minmax(0,1fr));gap:8px;" class="detail-fields-grid">
+      <div style="display:grid;grid-template-columns:minmax(0,2fr) repeat(2,minmax(0,1fr));gap:8px;" class="detail-fields-grid">
         <div><div class="field-label">Texto (Enter = otro renglón)</div><div class="field"><textarea id="_nlTexto" rows="2" style="resize:vertical;">${escapeHTML(st.texto)}</textarea></div></div>
-        <div><div class="field-label">Tipo de letra</div><div class="field" style="padding:0 10px;"><select id="_nlFuente" style="background:transparent;border:none;color:var(--text);font-family:inherit;font-size:13px;width:100%;padding:9px 0;">${NEON_FUENTES.map(([k,l])=>`<option value="${k}" ${k===st.fuente?"selected":""}>${l}</option>`).join("")}</select></div></div>
         <div><div class="field-label">Ancho del texto (cm)</div><div class="field"><input id="_nlAncho" type="number" value="${st.ancho}"></div></div>
         <div><div class="field-label">Color / fondo</div><div style="display:flex;gap:6px;align-items:center;"><input id="_nlColor" type="color" value="${st.color}" style="width:44px;height:36px;border:none;background:none;"><label style="font-size:12px;display:flex;gap:4px;align-items:center;"><input type="checkbox" id="_nlOscuro" checked> Encendido</label></div></div>
       </div>
+      <div class="field-label" style="margin-top:10px;">Estilo de letra</div>
+      <div id="_nlChips" style="display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px;">${chips()}</div>
       <div id="_nlPrev" style="margin:12px 0;border-radius:12px;overflow:hidden;"></div>
       <div id="_nlInfo"></div>
-      <div style="font-size:11px;color:var(--muted);margin-top:8px;">Es el recorrido central del neón (una sola línea). Los tramos son las piezas separadas; entre letras unidas se puede seguir con el mismo tramo. El SVG se descarga a tamaño real (mm) para el router.</div>
+      <div style="font-size:11px;color:var(--muted);margin-top:8px;">Es el recorrido central del neón (una sola línea), sacado del centro de cada letra. Los tramos son las piezas separadas que hay que unir. SVG y DXF salen a tamaño real en milímetros.</div>
     </div>
     <div style="display:flex;justify-content:flex-end;gap:8px;padding:12px 18px;border-top:1px solid var(--border);flex-wrap:wrap;">
-      <button class="btn" id="_nlDesc">⬇ Descargar SVG para router</button>
+      <button class="btn" id="_nlDxf">⬇ DXF (línea central)</button>
+      <button class="btn" id="_nlDesc">⬇ SVG</button>
       ${onUse?`<button class="btn primary" id="_nlUsar">Usar estos metros en la cotización</button>`:""}
       <button class="btn" id="_nlCancel">Cerrar</button></div></div>`;
   const $l=id=>document.getElementById(id);
+  const refrescarChips=()=>{ $l("_nlChips").innerHTML=chips(); $l("_nlChips").querySelectorAll("[data-nf]").forEach(b=>b.onclick=()=>{ st.fuente=b.dataset.nf; refrescarChips(); pintar(); }); };
   $l("_nlClose").onclick=$l("_nlCancel").onclick=()=>ov.remove();
-  let tmr=null; const re=()=>{ clearTimeout(tmr); tmr=setTimeout(pintar,250); };
-  $l("_nlTexto").oninput=e=>{ st.texto=e.target.value; re(); };
-  $l("_nlFuente").onchange=e=>{ st.fuente=e.target.value; re(); };
+  let tmr=null; const re=()=>{ clearTimeout(tmr); tmr=setTimeout(pintar,300); };
+  $l("_nlTexto").oninput=e=>{ st.texto=e.target.value; refrescarChips(); re(); };
   $l("_nlAncho").oninput=e=>{ st.ancho=Number(e.target.value)||0; re(); };
-  $l("_nlColor").oninput=e=>{ st.color=e.target.value; re(); };
+  $l("_nlColor").oninput=e=>{ st.color=e.target.value; refrescarChips(); re(); };
   $l("_nlOscuro").onchange=e=>{ st.oscuro=e.target.checked; re(); };
+  const nombre=ext=>`neon-${ultimo.texto.replace(/[^\wáéíóúñ]+/gi,"-").replace(/^-|-$/g,"").slice(0,30)||"linea"}-${Math.round(ultimo.m.ancho)}x${Math.round(ultimo.m.alto)}cm.${ext}`;
+  const bajar=(txt,tipo,arch)=>{ const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([txt],{type:tipo})); a.download=arch; document.body.appendChild(a); a.click(); a.remove(); };
+  $l("_nlDxf").onclick=()=>{ if(!ultimo){ _showSaveToast("Escribe el texto primero","warning"); return; } bajar(_dxfLinea(ultimo.tr, ultimo.m),"application/dxf",nombre("dxf")); };
   $l("_nlDesc").onclick=()=>{
     if(!ultimo){ _showSaveToast("Escribe el texto primero","warning"); return; }
     const mm={...ultimo.m, escala:ultimo.m.escala*10, ancho:ultimo.m.ancho*10, alto:ultimo.m.alto*10};
     const g=_svgLinea(ultimo.tr, mm, {pad:st.margen*10});
-    const svg=`<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" width="${g.W.toFixed(1)}mm" height="${g.H.toFixed(1)}mm" viewBox="0 0 ${g.W.toFixed(2)} ${g.H.toFixed(2)}">\n<!-- Línea central de neón: ${ultimo.texto.replace(/--/g,"-")} · ${ultimo.metros.toFixed(2)} m · ESMA Industrial -->\n<rect x="0" y="0" width="${g.W.toFixed(2)}" height="${g.H.toFixed(2)}" fill="none" stroke="#0000ff" stroke-width="0.2"/>\n<path d="${g.paths}" fill="none" stroke="#ff0000" stroke-width="0.2"/>\n</svg>`;
-    const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([svg],{type:"image/svg+xml"}));
-    a.download=`neon-${ultimo.texto.replace(/[^\wáéíóúñ]+/gi,"-").replace(/^-|-$/g,"").slice(0,30)||"linea"}-${Math.round(ultimo.anchoBase)}x${Math.round(ultimo.altoBase)}cm.svg`;
-    document.body.appendChild(a); a.click(); a.remove();
+    bajar(`<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" width="${g.W.toFixed(1)}mm" height="${g.H.toFixed(1)}mm" viewBox="0 0 ${g.W.toFixed(2)} ${g.H.toFixed(2)}">\n<!-- Línea central de neón: ${ultimo.texto.replace(/--/g,"-")} · ${ultimo.metros.toFixed(2)} m · ESMA Industrial -->\n<rect x="0" y="0" width="${g.W.toFixed(2)}" height="${g.H.toFixed(2)}" fill="none" stroke="#0000ff" stroke-width="0.2"/>\n<path d="${g.paths}" fill="none" stroke="#ff0000" stroke-width="0.2"/>\n</svg>`,"image/svg+xml",nombre("svg"));
   };
   if(onUse) $l("_nlUsar").onclick=()=>{ if(!ultimo) return; onUse(ultimo); ov.remove(); };
-  pintar();
+  refrescarChips(); _neonCss().catch(()=>{}); pintar();
 }
 
 function _diasDesde(iso){ if(!iso) return null; return Math.round((new Date(todayISO()+"T00:00:00")-new Date(String(iso).slice(0,10)+"T00:00:00"))/86400000); }
