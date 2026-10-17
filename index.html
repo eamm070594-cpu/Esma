@@ -6507,7 +6507,7 @@ function openQuoteEditorPage(q){
   if(_descEl) _descEl.addEventListener("blur",()=>{ q.clientDesc=_descEl.value.trim(); saveQuote(q); });
   document.getElementById("btnGenDesc").addEventListener("click",()=>{
     if(_descEl.value.trim() && !confirm("¿Reemplazar la descripción actual por una generada desde la cotización?")) return;
-    _descEl.value=_qDescAuto(q); q.clientDesc=_descEl.value; saveQuote(q);
+    _descEl.value=_qDescAuto(q,p); q.clientDesc=_descEl.value; saveQuote(q);
   });
 
   document.getElementById("btnQuoteWa").addEventListener("click",()=>{
@@ -6613,8 +6613,9 @@ function openQuoteEditorPage(q){
   document.getElementById("addProd").addEventListener("click",()=>{ q.products=q.products||[]; q.products.push({id:uid(),matPick:"",desc:"",qty:1,unitPrice:0}); saveQuote(q); renderLines(); });
   if(_lineaDe(p)!=="letrero"){ const _ba=document.getElementById("btnAsistente"); if(_ba) _ba.style.display="none"; const _bn=document.getElementById("btnNest"); if(_bn) _bn.classList.add("primary"); }
   document.getElementById("btnAsistente").addEventListener("click",()=>openAsistenteLetrero(q, r=>{
-    q.products=r.products; q.routes=r.routes; q.extras=r.extras; q.marginPct=r.marginPct; q.clientDesc=r.desc;
+    q.products=r.products; q.routes=r.routes; q.extras=r.extras; q.marginPct=r.marginPct; q.asis=r.asis||null;
     if(!q.name || /^Cotizaci[oó]n( \d+)?$/.test(q.name)) q.name=r.nombre;
+    q.clientDesc=_qDescAuto(q,p);
     saveQuote(q); save(); openQuoteEditorPage(q);
     _showSaveToast("⚡ Cotización armada con el asistente. Revisa y ajusta lo que necesites.","success");
   }));
@@ -8732,7 +8733,8 @@ function _asisCalcular(t, s){
   }
   const q={products:P,routes:R,extras:E,marginPct:Number(s.utilidad)||60,qty:1};
   const t2=quoteSellTotals(q);
-  return {products:P,routes:R,extras:E,nombre,desc,faltan,notas,totales:t2,marginPct:q.marginPct};
+  const asis = t==="neon" ? {tipo:"neon", texto:s.texto, ancho:Number(s.ancho), alto:Number(s.alto), estilo:s.estilo, color:s.color, base:s.base, uso:s.uso, montaje:s.montaje} : null;
+  return {products:P,routes:R,extras:E,nombre,desc,faltan,notas,totales:t2,marginPct:q.marginPct,asis};
 }
 
 function openAsistenteLetrero(q, onApply){
@@ -9038,7 +9040,47 @@ function _descLinea(r){
   for(const [re,fn] of DESC_REGLAS){ const m=d.match(re); if(m) return fn(m,r); }
   return d.replace(/\s*\([^)]*\)/g,"").replace(/\s*·\s*piezas:.*$/,"").trim();
 }
-function _qDescAuto(q){
+// "Cómo se verá": párrafo que describe el resultado visual, a partir de los datos del asistente
+// (q.asis) o, si no los hay, de lo que se pueda deducir de la cotización y del proyecto.
+const _COLORES=/\b(blanco cálido|blanco frío|blanco|negro|rojo|azul|verde|amarillo|rosa|morado|dorado|plata|turquesa|magenta|naranja|café|crema)\b/gi;
+function _datosVisuales(q,p){
+  if(q.asis) return q.asis;
+  const txt=[q.name, p&&p.name, p&&p.notes].join(" ");
+  const prods=(q.products||[]).map(r=>String(r.desc||r.matPick||"")).join(" | ");
+  const dims=(q.name||"").match(/(\d+)\s*x\s*(\d+)\s*cm/i);
+  const texto=(q.name||"").match(/["“]([^"”]+)["”]/);
+  const colores=[...new Set((txt.match(_COLORES)||[]).map(c=>c.toLowerCase()))];
+  const vinil=(q.products||[]).find(r=>/vinil/i.test(r.desc||""));
+  if(/ne[oó]n/i.test(prods)) return {tipo:"neon", texto:texto?texto[1]:"", ancho:dims?Number(dims[1]):0, alto:dims?Number(dims[2]):0,
+    estilo:/manuscrit|firma|cursiv/i.test(q.name||"")?"manuscrita":/bar|molde/i.test(q.name||"")?"molde":"", color:((q.name||"").match(_COLORES)||[""])[0].toLowerCase(), base:/negro/i.test(prods)?"negro":"transparente",
+    uso:/exterior|ip67.*exterior/i.test(txt)?"exterior":"interior", montaje:/chapet/i.test(prods)?"pared":/cadena/i.test(prods)?"colgar":""};
+  const caja=prods.match(/caja de luz (circular|rectangular) (\d+)(?: ?x ?(\d+))?/i);
+  if(caja) return {tipo:"caja", forma:caja[1].toLowerCase(), medida:caja[3]?`${caja[3]} x ${caja[2]} cm`:`${caja[2]} cm de diámetro`,
+    bandera:/bandera/i.test(txt), negocio:(p&&p.name||"").split("·")[0].trim(), colores:colores.slice(0,3), nColores:vinil?Math.round(vinil.qty):0};
+  return {tipo:"otro", colores};
+}
+function _qDescVisual(q,p){
+  const d=_datosVisuales(q,p);
+  const lista=a=>a.length>1?a.slice(0,-1).join(", ")+" y "+a[a.length-1]:(a[0]||"");
+  if(d.tipo==="neon"){
+    const tam= !d.ancho ? "" : d.ancho<=50 ? "Su tamaño es ideal para una repisa, una barra o un rincón especial." : d.ancho<=90 ? "Tiene el tamaño justo para una pared, una mesa de postres o detrás de la barra." : "Es una pieza protagonista que se ve desde lejos.";
+    return [
+      `Un letrero de neón LED${d.texto?` con la frase "${d.texto}"`:""}${d.estilo==="manuscrita"?" en letra manuscrita, como una firma":d.estilo==="molde"?" en letra de molde estilo bar":""}${d.color?`, en color ${d.color}`:""}${d.ancho?`, de aproximadamente ${d.ancho} x ${d.alto} cm`:""}.`,
+      d.base==="negro" ? "Va montado sobre acrílico negro que hace resaltar la luz." : "Va montado sobre acrílico transparente que casi no se nota, así las letras parecen flotar sobre la pared.",
+      tam,
+      `Encendido da una luz pareja y suave que crea ambiente${d.uso==="exterior"?", resiste la intemperie":""} y se ve increíble en fotos.`,
+    ].filter(Boolean).join(" ");
+  }
+  if(d.tipo==="caja"){
+    return [
+      `Un letrero luminoso ${d.forma} de ${d.medida}${d.bandera?", tipo bandera: sale de la pared hacia la calle y se lee desde los dos sentidos":""}.`,
+      `${d.negocio?`El logo de ${d.negocio}`:"Tu logo"}${d.colores&&d.colores.length?` en ${lista(d.colores)}`:""} queda sobre una cara blanca que se ilumina de forma pareja.`,
+      "De día se ve limpio y profesional, y de noche ilumina tu fachada para que tu negocio se distinga desde lejos.",
+    ].join(" ");
+  }
+  return `Diseñado y fabricado a la medida en nuestro taller${d.colores&&d.colores.length?`, en ${lista(d.colores)}`:""}, con acabados limpios y profesionales pensados para el espacio donde va a estar.`;
+}
+function _qDescAuto(q,p){
   const lineas=[];
   const add=l=>{ if(l && !lineas.includes(l)) lineas.push(l); };
   (q.products||[]).forEach(r=>add(_descLinea(r)));
@@ -9052,7 +9094,8 @@ function _qDescAuto(q){
     const l=String(e.label||"").trim(); if(!l) return;
     add(/gasolina|flete|traslado|vi[aá]tico|env[ií]o/i.test(l) ? "Traslado al lugar de instalación" : /instalaci/i.test(l) ? "Instalación incluida" : l);
   });
-  return [String(q.name||"Proyecto").trim(), "", "Incluye:", ...lineas.map(l=>"• "+l), "", "Diseño previo para tu aprobación antes de fabricar."].join("\n");
+  if(!p) p=db.projects.find(x=>x.id===q.projectId);
+  return [String(q.name||"Proyecto").trim(), "", "Cómo se verá:", _qDescVisual(q,p), "", "Incluye:", ...lineas.map(l=>"• "+l), "", "Diseño previo para tu aprobación antes de fabricar."].join("\n");
 }
 
 // Al usar una plantilla, toma los precios vigentes del catálogo (si el material o la ruta existen).
