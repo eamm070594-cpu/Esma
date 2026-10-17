@@ -6419,7 +6419,7 @@ function openQuoteEditorPage(q){
       <div>
         <div class="card" style="margin-bottom:10px;padding:0;overflow:hidden;">
           <div class="qe-head"><span><span class="qe-sec">1 · Materiales</span><span class="qe-sub" id="stProd"></span></span>
-            <button class="btn small primary" id="addProd"><i class="ti ti-plus"></i> Material</button></div>
+            <span style="display:flex;gap:6px;"><button class="btn small" id="btnNest" title="Calcula cuánta hoja usan tus piezas">📐 Calcular hoja</button><button class="btn small primary" id="addProd"><i class="ti ti-plus"></i> Material</button></span></div>
           <div class="table-wrap" style="border:none;border-radius:0;">
             <table><thead><tr><th>Material del catálogo</th><th>Descripción</th><th>Cant.</th><th>Costo unit.</th><th>Total</th><th></th></tr></thead>
             <tbody id="tbProd"></tbody></table>
@@ -6602,6 +6602,7 @@ function openQuoteEditorPage(q){
   }
 
   document.getElementById("addProd").addEventListener("click",()=>{ q.products=q.products||[]; q.products.push({id:uid(),matPick:"",desc:"",qty:1,unitPrice:0}); saveQuote(q); renderLines(); });
+  document.getElementById("btnNest").addEventListener("click",()=>openNestSim(row=>{ q.products=q.products||[]; q.products.push(row); saveQuote(q); renderLines(); }));
   document.getElementById("addRoute").addEventListener("click",()=>{ q.routes=q.routes||[]; const first=db.settings.routeDB[0]?.name||""; const rate=first?(routeByName(first)?.costPerHour||0):0; q.routes.push({id:uid(),routeName:first,hours:1,rate:Number(rate||0)}); saveQuote(q); renderLines(); });
   document.getElementById("addExtra").addEventListener("click",()=>{ q.extras=q.extras||[]; q.extras.push({id:uid(),label:"",amount:0}); saveQuote(q); renderLines(); });
   document.getElementById("qMarginPct").addEventListener("blur",()=>{ q.marginPct=Number(document.getElementById("qMarginPct").value||0); saveQuote(q); renderQuoteBreakdown(q); });
@@ -8478,6 +8479,166 @@ function _bindRenderCard(p){
   });
 }
 
+// ── SIMULADOR DE CONSUMO DE HOJA ─────────────────────────────
+// Acomoda piezas rectangulares en hojas (acomodo por filas, con giro opcional),
+// dibuja el resultado y calcula cuánta hoja se cobra.
+
+// Tamaño de hoja en cm a partir del nombre del material: "1.22x2.44", "1.20 x 1.80", "4x8".
+function _hojaDeMaterial(desc){
+  const d=String(desc||"");
+  const m=d.match(/(\d+(?:\.\d+)?)\s*[x×]\s*(\d+(?:\.\d+)?)/i);
+  if(m){
+    let a=Number(m[1]), b=Number(m[2]);
+    if(a===4 && (b===8||b===10)) return {w:122, h:b===8?244:305};
+    if(a<10 && b<10){ a*=100; b*=100; }          // metros → cm
+    if(a>=20 && b>=20) return {w:Math.min(a,b), h:Math.max(a,b)};
+  }
+  return {w:122, h:244};
+}
+
+// Acomodo por filas. pieces: [{w,h,label}], medidas en cm. Devuelve hojas con posiciones.
+function _acomodarPiezas(pieces, W, H, sep, girar){
+  const items=[];
+  pieces.forEach((p,i)=>{ for(let k=0;k<p.qty;k++) items.push({w:p.w, h:p.h, label:p.label||`${p.w}×${p.h}`, color:i}); });
+  const fits=(w,h)=>w+sep<=W+1e-9 && h+sep<=H+1e-9;
+  // Orientación: la cara larga a lo ancho (filas más bajas) si cabe
+  items.forEach(it=>{
+    if(girar && it.h>it.w && fits(it.h,it.w)){ const t=it.w; it.w=it.h; it.h=t; it.rot=true; }
+    if(!fits(it.w,it.h) && girar && fits(it.h,it.w)){ const t=it.w; it.w=it.h; it.h=t; it.rot=!it.rot; }
+  });
+  const imposibles=items.filter(it=>!fits(it.w,it.h));
+  const ok=items.filter(it=>fits(it.w,it.h)).sort((a,b)=>b.h-a.h || b.w-a.w);
+  const hojas=[];
+  const nuevaHoja=()=>{ const s={rows:[], usedY:0, piezas:[]}; hojas.push(s); return s; };
+  ok.forEach(it=>{
+    const pw=it.w+sep, ph=it.h+sep;
+    let placed=false;
+    for(const s of hojas){
+      for(const r of s.rows){
+        if(r.x+pw<=W+1e-9 && ph<=r.h+1e-9){ s.piezas.push({...it,x:r.x,y:r.y}); r.x+=pw; placed=true; break; }
+        if(girar && r.x+ph<=W+1e-9 && pw<=r.h+1e-9){ s.piezas.push({...it,w:it.h,h:it.w,rot:!it.rot,x:r.x,y:r.y}); r.x+=ph; placed=true; break; }
+      }
+      if(placed) break;
+      if(s.usedY+ph<=H+1e-9){ const r={y:s.usedY,h:ph,x:pw}; s.rows.push(r); s.usedY+=ph; s.piezas.push({...it,x:0,y:r.y}); placed=true; break; }
+    }
+    if(!placed){ const s=nuevaHoja(); const r={y:0,h:ph,x:pw}; s.rows.push(r); s.usedY=ph; s.piezas.push({...it,x:0,y:0}); }
+  });
+  const areaPiezas=ok.reduce((a,it)=>a+(it.w+sep)*(it.h+sep),0);
+  return {hojas, imposibles, areaPiezas, totalPiezas:ok.length};
+}
+
+const _NEST_COLORES=["#2563eb","#16a34a","#d97706","#7c3aed","#dc2626","#0891b2","#db2777","#65a30d"];
+function _svgHoja(s, W, H, idx){
+  const esc=520/Math.max(W,H);
+  const vw=W, vh=H;
+  return `<div style="margin-bottom:10px;">
+    <div style="font-size:11px;font-weight:700;color:var(--muted);margin-bottom:4px;">Hoja ${idx+1} · ${s.piezas.length} pieza${s.piezas.length!==1?"s":""} · franja usada ${Math.round(s.usedY)} de ${H} cm</div>
+    <svg viewBox="0 0 ${vw} ${vh}" style="width:100%;max-width:${Math.round(W*esc)}px;background:#f8fafc;border:2px solid #94a3b8;border-radius:4px;display:block;">
+      <rect x="0" y="${s.usedY}" width="${W}" height="${Math.max(0,H-s.usedY)}" fill="#e2e8f0" opacity=".6"/>
+      ${s.piezas.map(p=>{ const c=_NEST_COLORES[p.color%_NEST_COLORES.length]; const fs=Math.max(3,Math.min(p.w,p.h)/4.5);
+        return `<rect x="${p.x}" y="${p.y}" width="${p.w}" height="${p.h}" fill="${c}" fill-opacity=".22" stroke="${c}" stroke-width="${Math.max(0.4,W/400)}"/>
+        <text x="${p.x+p.w/2}" y="${p.y+p.h/2}" font-size="${fs}" text-anchor="middle" dominant-baseline="middle" fill="${c}" font-weight="700">${escapeHTML(p.label)}${p.rot?" ↻":""}</text>`; }).join("")}
+    </svg></div>`;
+}
+
+// Abre el simulador. onAdd(row) recibe el renglón de material listo para la cotización.
+function openNestSim(onAdd){
+  const old=document.getElementById("_nestModal"); if(old) old.remove();
+  const mats=(db.settings.materialDB||[]).filter(m=>/hoja|acr[ií]l|mdf|melamina|trovicel|l[aá]mina|alumin/i.test((m.uom||"")+" "+(m.desc||"")+" "+(m.cat||"")));
+  const st={mat:mats[0]?.desc||"", W:122, H:244, sep:0.5, merma:10, girar:true, modo:"area",
+            piezas:[{label:"",w:80,h:40,qty:1}]};
+  const setMat=d=>{ st.mat=d; const h=_hojaDeMaterial(d); st.W=h.w; st.H=h.h; };
+  setMat(st.mat);
+  const ov=document.createElement("div"); ov.id="_nestModal";
+  ov.style.cssText="position:fixed;inset:0;background:rgba(2,6,23,.6);display:flex;align-items:center;justify-content:center;z-index:9999;padding:12px;";
+  document.body.appendChild(ov);
+  const calc=()=>{
+    const pz=st.piezas.filter(p=>p.w>0&&p.h>0&&p.qty>0);
+    const r=_acomodarPiezas(pz, st.W, st.H, st.sep, st.girar);
+    const areaHoja=st.W*st.H;
+    const m=materialByDesc(st.mat); const precio=m?Number(m.cost||0):0;
+    const fracArea=Math.ceil(r.areaPiezas*(1+st.merma/100)/areaHoja*100)/100;
+    const ult=r.hojas[r.hojas.length-1];
+    const fracFranja=r.hojas.length ? Math.ceil(((r.hojas.length-1)+(ult.usedY/st.H))*(1+st.merma/100)*100)/100 : 0;
+    const completas=r.hojas.length;
+    const cobrar= st.modo==="completa" ? completas : st.modo==="franja" ? fracFranja : fracArea;
+    const aprov= r.hojas.length ? Math.round(r.areaPiezas/(r.hojas.length*areaHoja)*100) : 0;
+    return {r, precio, fracArea, fracFranja, completas, cobrar, aprov, costo:cobrar*precio, m};
+  };
+  const render=()=>{
+    const c=calc();
+    ov.innerHTML=`<div style="background:var(--card);border-radius:16px;width:980px;max-width:100%;max-height:94vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.3);">
+      <div style="display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid var(--border);">
+        <div style="font-size:16px;font-weight:900;flex:1;">📐 Simulador de consumo de hoja</div>
+        <button class="btn small" id="_nsClose">✕</button>
+      </div>
+      <div style="display:grid;grid-template-columns:minmax(0,380px) minmax(0,1fr);gap:16px;padding:14px 18px;overflow:auto;" class="quote-editor-grid">
+        <div>
+          <div class="field-label">Material (del catálogo)</div>
+          <div class="field" style="padding:0 10px;"><select id="_nsMat" style="background:transparent;border:none;color:var(--text);font-family:inherit;font-size:13px;width:100%;padding:9px 0;">
+            ${mats.map(m=>`<option ${m.desc===st.mat?"selected":""}>${escapeHTML(m.desc)}</option>`).join("")}</select></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;">
+            <div><div class="field-label">Hoja ancho (cm)</div><div class="field"><input id="_nsW" type="number" value="${st.W}"></div></div>
+            <div><div class="field-label">Hoja largo (cm)</div><div class="field"><input id="_nsH" type="number" value="${st.H}"></div></div>
+            <div><div class="field-label">Separación de corte (cm)</div><div class="field"><input id="_nsSep" type="number" step="0.1" value="${st.sep}"></div></div>
+            <div><div class="field-label">Merma (%)</div><div class="field"><input id="_nsMerma" type="number" value="${st.merma}"></div></div>
+          </div>
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;margin-top:8px;"><input type="checkbox" id="_nsGirar" ${st.girar?"checked":""}> Permitir girar piezas</label>
+          <div class="field-label" style="margin-top:12px;">Piezas (cm)</div>
+          <table style="width:100%;font-size:12px;border-collapse:collapse;">
+            <tr style="color:var(--muted);"><th style="text-align:left;width:42%;">Nombre</th><th>Ancho</th><th>Alto</th><th>Cant.</th><th></th></tr>
+            ${st.piezas.map((p,i)=>`<tr>
+              <td><input data-np="${i}" data-f="label" value="${escapeAttr(p.label)}" placeholder="opcional" style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:4px 6px;color:var(--text);font-family:inherit;"></td>
+              <td><input data-np="${i}" data-f="w" type="number" value="${p.w}" style="width:62px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:4px 6px;color:var(--text);font-family:inherit;"></td>
+              <td><input data-np="${i}" data-f="h" type="number" value="${p.h}" style="width:62px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:4px 6px;color:var(--text);font-family:inherit;"></td>
+              <td><input data-np="${i}" data-f="qty" type="number" value="${p.qty}" style="width:48px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:4px 6px;color:var(--text);font-family:inherit;"></td>
+              <td><button class="btn small danger" data-npdel="${i}">✕</button></td></tr>`).join("")}
+          </table>
+          <button class="btn small" id="_nsAdd" style="margin-top:6px;">＋ Pieza</button>
+          <div class="field-label" style="margin-top:12px;">¿Cómo se cobra?</div>
+          <div style="display:flex;flex-direction:column;gap:4px;font-size:12px;">
+            <label><input type="radio" name="_nsModo" value="area" ${st.modo==="area"?"checked":""}> Área de las piezas + merma <b>(${c.fracArea} hoja)</b></label>
+            <label><input type="radio" name="_nsModo" value="franja" ${st.modo==="franja"?"checked":""}> Franja de hoja que se corta + merma <b>(${c.fracFranja} hoja)</b></label>
+            <label><input type="radio" name="_nsModo" value="completa" ${st.modo==="completa"?"checked":""}> Hojas completas <b>(${c.completas} hoja${c.completas!==1?"s":""})</b></label>
+          </div>
+        </div>
+        <div>
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px;">
+            <div class="kpi-box" style="padding:8px 10px;"><div class="kl">Hojas físicas</div><div class="kv">${c.completas}</div></div>
+            <div class="kpi-box" style="padding:8px 10px;"><div class="kl">Aprovechamiento de hoja</div><div class="kv" style="color:${c.aprov>=70?"var(--green)":c.aprov>=40?"var(--amber)":"var(--red)"};">${c.aprov}%</div></div>
+            <div class="kpi-box" style="padding:8px 10px;"><div class="kl">Se cobra</div><div class="kv">${c.cobrar} hoja</div></div>
+            <div class="kpi-box" style="padding:8px 10px;"><div class="kl">Costo material</div><div class="kv" style="color:var(--accent);">$${money(c.costo)}</div><div style="font-size:10px;color:var(--muted);">hoja a $${money(c.precio)}</div></div>
+          </div>
+          ${c.r.imposibles.length?`<div style="color:var(--red);font-size:12px;font-weight:700;margin-bottom:8px;">⚠️ ${c.r.imposibles.length} pieza(s) no caben en la hoja de ${st.W}×${st.H} cm.</div>`:""}
+          <div style="max-height:56vh;overflow:auto;">${c.r.hojas.map((s,i)=>_svgHoja(s,st.W,st.H,i)).join("") || `<div style="color:var(--muted);font-size:13px;">Agrega piezas para ver el acomodo.</div>`}</div>
+          <div style="font-size:11px;color:var(--muted);">Gris = hoja que sobra. ↻ = pieza girada. El acomodo es por filas; en el router puedes acomodar igual o mejor.</div>
+        </div>
+      </div>
+      <div style="display:flex;justify-content:flex-end;gap:8px;padding:12px 18px;border-top:1px solid var(--border);">
+        <button class="btn" id="_nsCancel">Cerrar</button>
+        <button class="btn primary" id="_nsOk" ${!c.m||!c.cobrar?"disabled":""}>Agregar a la cotización · ${c.cobrar} hoja = $${money(c.costo)}</button>
+      </div>
+    </div>`;
+    const $n=id=>document.getElementById(id);
+    $n("_nsClose").onclick=$n("_nsCancel").onclick=()=>ov.remove();
+    $n("_nsMat").onchange=e=>{ setMat(e.target.value); render(); };
+    [["_nsW","W"],["_nsH","H"],["_nsSep","sep"],["_nsMerma","merma"]].forEach(([id,k])=>{ $n(id).onchange=e=>{ st[k]=Number(e.target.value||0); render(); }; });
+    $n("_nsGirar").onchange=e=>{ st.girar=e.target.checked; render(); };
+    ov.querySelectorAll('input[name="_nsModo"]').forEach(r=>r.onchange=()=>{ st.modo=r.value; render(); });
+    ov.querySelectorAll("[data-np]").forEach(el=>el.onchange=()=>{ const p=st.piezas[Number(el.dataset.np)]; const f=el.dataset.f; p[f]= f==="label" ? el.value : Number(el.value||0); render(); });
+    ov.querySelectorAll("[data-npdel]").forEach(b=>b.onclick=()=>{ st.piezas.splice(Number(b.dataset.npdel),1); if(!st.piezas.length) st.piezas.push({label:"",w:0,h:0,qty:1}); render(); });
+    $n("_nsAdd").onclick=()=>{ st.piezas.push({label:"",w:0,h:0,qty:1}); render(); };
+    $n("_nsOk").onclick=()=>{
+      const resumen=st.piezas.filter(p=>p.w&&p.h&&p.qty).map(p=>`${p.qty}× ${p.w}×${p.h}`).join(", ");
+      onAdd({id:uid(), matPick:st.mat, desc:`${st.mat} · piezas: ${resumen} cm`, qty:c.cobrar, unitPrice:c.precio,
+             nest:{W:st.W,H:st.H,sep:st.sep,merma:st.merma,modo:st.modo,piezas:st.piezas, resumen}});
+      ov.remove();
+      _showSaveToast(`📐 Agregado: ${c.cobrar} hoja de ${st.mat} (${resumen})`,"success");
+    };
+  };
+  render();
+}
+
 function _diasDesde(iso){ if(!iso) return null; return Math.round((new Date(todayISO()+"T00:00:00")-new Date(String(iso).slice(0,10)+"T00:00:00"))/86400000); }
 
 // Categoría sugerida por palabras clave, para materiales que ya existían sin categoría.
@@ -8536,6 +8697,7 @@ const GUIA_COTIZAR_HTML = `
   <ol style="margin:6px 0 0 18px;padding:0;font-size:12.5px;line-height:1.6;">
     <li><b>Empieza con una plantilla</b> (botón <i>Plantilla</i>) si ya existe el tipo de trabajo. Ajusta cantidades.</li>
     <li><b>Materiales:</b> elige del <i>Catálogo de costos</i>. Si un material no está o su precio es viejo, búscalo en la web o pregunta al proveedor y <b>actualízalo en el catálogo</b>.</li>
+    <li><b>Hojas (acrílico, MDF, melamina, trovicel, aluminio):</b> no calcules a ojo. Usa <b>📐 Calcular hoja</b> en Materiales: pones las piezas y la app las acomoda, dibuja la hoja y agrega la fracción exacta.</li>
     <li><b>Vinil:</b> 1 metro por cada color del diseño.</li>
     <li><b>Mano de obra:</b> Plotter = cortar vinil · <b>Habilitado de letreros</b> = colocar vinil, armar y alambrar (un letrero de 60 cm ≈ 2 h).</li>
     <li><b>Letrero con luz que se instala:</b> suma mínimo <b>10 m de cable + apagador + grapas</b> (plantilla <i>Kit eléctrico</i>).</li>
