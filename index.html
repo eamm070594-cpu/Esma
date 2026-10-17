@@ -9019,13 +9019,29 @@ function _rdp(p,eps){
 }
 // Suaviza el trazo (Chaikin): el neón se dobla en curva, no en esquina.
 function _suavizar(p,n){ for(let k=0;k<n;k++){ if(p.length<3) return p; const q=[p[0]]; for(let i=0;i<p.length-1;i++){ const [x0,y0]=p[i],[x1,y1]=p[i+1]; q.push([x0*.75+x1*.25,y0*.75+y1*.25],[x0*.25+x1*.75,y0*.25+y1*.75]); } q.push(p[p.length-1]); p=q; } return p; }
+// Remuestrea a pasos iguales y suaviza con un filtro gaussiano: rectas quedan rectas y curvas parejas.
+function _remuestrear(p,paso){
+  if(p.length<2) return p; const o=[p[0]]; let resto=0;
+  for(let i=1;i<p.length;i++){ const [x0,y0]=p[i-1],[x1,y1]=p[i], d=Math.hypot(x1-x0,y1-y0); if(!d) continue; let t=paso-resto;
+    while(t<=d){ o.push([x0+(x1-x0)*t/d, y0+(y1-y0)*t/d]); t+=paso; } resto=d-(t-paso); }
+  const u=p[p.length-1], l=o[o.length-1]; if(Math.hypot(u[0]-l[0],u[1]-l[1])>paso*0.3) o.push(u); else o[o.length-1]=u;
+  return o;
+}
+function _gauss(p,sig,cerrado){
+  const n=p.length; if(n<4) return p; const r=Math.ceil(sig*2.5), w=[]; for(let k=-r;k<=r;k++) w.push(Math.exp(-k*k/(2*sig*sig)));
+  const en=j=>{ if(cerrado) return p[((j%n)+n)%n];
+    if(j<0){ const q=p[Math.min(n-1,-j)]; return [2*p[0][0]-q[0],2*p[0][1]-q[1]]; }
+    if(j>=n){ const q=p[Math.max(0,2*(n-1)-j)]; return [2*p[n-1][0]-q[0],2*p[n-1][1]-q[1]]; } return p[j]; };
+  return p.map((_,i)=>{ if(!cerrado&&(i===0||i===n-1)) return p[i]; let sx=0,sy=0,sw=0;
+    for(let k=-r;k<=r;k++){ const q=en(i+k), wk=w[k+r]; sx+=q[0]*wk; sy+=q[1]*wk; sw+=wk; } return [sx/sw,sy/sw]; });
+}
 const _largo=p=>{ let s=0; for(let i=1;i<p.length;i++) s+=Math.hypot(p[i][0]-p[i-1][0],p[i][1]-p[i-1][1]); return s; };
 
 // Texto → línea central (en pixeles, y hacia abajo).
 const _esqCache={};
 function _trazarTexto(f, texto){
   const key=f[0]+"|"+texto; if(_esqCache[key]) return _esqCache[key];
-  const px=200, lines=String(texto||"").split("\n");
+  const px=280, lines=String(texto||"").split("\n");
   const c=document.createElement("canvas"), ctx=c.getContext("2d",{willReadFrequently:true});
   const font=`${f[2]} ${px}px "${f[0]}"`; ctx.font=font;
   const ms=lines.map(l=>ctx.measureText(l||" ")), wl=ms.map(m=>m.actualBoundingBoxLeft+m.actualBoundingBoxRight);
@@ -9094,12 +9110,32 @@ function _trazarTexto(f, texto){
     for(const [dot,i,j] of pares){ if(dot>-0.5) break; if(usado.has(i)||usado.has(j)) continue; usado.add(i); usado.add(j); une(L[i][0]*2+L[i][1], L[j][0]*2+L[j][1]); }
   }
   const hecho=new Uint8Array(edges.length), out=[];
-  const recorrer=(k,lado)=>{ let pts=orient(k,lado).slice(); hecho[k]=1; let ex=k*2+(1-lado);
-    while(link[ex]>=0){ const pr=link[ex], k2=pr>>1, l2=pr&1; if(hecho[k2]) break; hecho[k2]=1; pts=pts.concat(orient(k2,l2).slice(1)); ex=k2*2+(1-l2); }
-    return pts; };
+  // En cada unión se quitan los pixeles cercanos al cruce (ahí el esqueleto se jala) y se puentea derecho.
+  const nodoDe=x=>(x&1)?edges[x>>1].b:edges[x>>1].a, Rn=n=>radio[n]?radio[n]*1.4+1:0;
+  const cerca=(q,n)=>Math.hypot(q[0]-nodos[n][0],q[1]-nodos[n][1])<Rn(n);
+  const sinCola=(p,n)=>{ let j=p.length; while(j>2&&cerca(p[j-1],n)) j--; return p.slice(0,j); };
+  const sinCabeza=(p,n)=>{ let j=0; while(j<p.length-2&&cerca(p[j],n)) j++; return p.slice(j); };
+  const recorrer=(k,lado)=>{ const s0=k*2+lado; let pts=orient(k,lado).slice(), cerrado=false; hecho[k]=1; let ex=k*2+(1-lado);
+    while(link[ex]>=0){ const pr=link[ex], k2=pr>>1, l2=pr&1, n=nodoDe(ex);
+      if(hecho[k2]){ if(pr===s0){ cerrado=true; pts=sinCabeza(sinCola(pts,n),n); } break; }
+      hecho[k2]=1; pts=sinCola(pts,n).concat(sinCabeza(orient(k2,l2),n)); ex=k2*2+(1-l2); }
+    let ja=-1, jb=-1;
+    if(!cerrado){ const a=nodoDe(s0), b=nodoDe(ex);
+      if(Rn(a)){ pts=[nodos[a]].concat(sinCabeza(pts,a)); ja=a; } if(Rn(b)){ pts=sinCola(pts,b).concat([nodos[b]]); jb=b; } }
+    return {pts,cerrado,ja,jb}; };
   edges.forEach((e,k)=>{ if(hecho[k]) return; if(link[k*2]<0) out.push(recorrer(k,0)); else if(link[k*2+1]<0) out.push(recorrer(k,1)); });
   edges.forEach((e,k)=>{ if(!hecho[k]) out.push(recorrer(k,0)); });
-  const polys=out.map(p=>p.length>2?_suavizar(_rdp(p,1.1),3):p).filter(p=>p.length===1||_largo(p)>=sw*0.5);
+  const lisas=out.map(o=>{ let q=o.pts; if(q.length>=3){
+      q=_remuestrear(q,1.5); if(o.cerrado&&q.length>3) q=q.slice(0,-1);
+      q=_gauss(_gauss(q,4,o.cerrado),4,o.cerrado); if(o.cerrado) q.push(q[0]); }
+    return {...o,q}; }).filter(o=>o.q.length===1||_largo(o.q)>=sw*0.5);
+  // Las puntas que llegan a un cruce se pegan exacto a la línea con la que se unen (sin huecos ni encimados).
+  const pegar=(o,i,n)=>{ const P0=o.q[i]; let best=null, bd=Rn(n)*2.5;
+    lisas.forEach(t=>{ if(t===o) return; for(let j=1;j<t.q.length;j++){ const A=t.q[j-1], B=t.q[j], dx=B[0]-A[0], dy=B[1]-A[1], L2=dx*dx+dy*dy||1;
+      const u=Math.max(0,Math.min(1,((P0[0]-A[0])*dx+(P0[1]-A[1])*dy)/L2)), X=[A[0]+u*dx,A[1]+u*dy], d=Math.hypot(X[0]-P0[0],X[1]-P0[1]); if(d<bd){ bd=d; best=X; } } });
+    if(best) o.q[i]=best; };
+  lisas.forEach(o=>{ if(o.q.length<2) return; if(o.ja>=0) pegar(o,0,o.ja); if(o.jb>=0) pegar(o,o.q.length-1,o.jb); });
+  const polys=lisas.map(o=>o.q.length>2?_rdp(o.q,0.3):o.q);
   let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
   polys.forEach(p=>p.forEach(([x,y])=>{ if(x<minX)minX=x; if(x>maxX)maxX=x; if(y<minY)minY=y; if(y>maxY)maxY=y; }));
   return _esqCache[key]={polys,minX,minY,maxX,maxY,sw};
@@ -9130,7 +9166,7 @@ function _dxfLinea(tr, m){
 
 function openGeneradorLinea(inicial, onUse){
   const old=document.getElementById("_nlModal"); if(old) old.remove();
-  const st={texto:inicial&&inicial.texto||"", fuente:_fNeon(inicial&&inicial.fuente)[0], ancho:Number(inicial&&inicial.anchoTexto)||50, color:"#ff4fd8", oscuro:true, margen:4};
+  const st={texto:inicial&&inicial.texto||"", fuente:_fNeon(inicial&&inicial.fuente)[0], ancho:Number(inicial&&inicial.anchoTexto)||50, color:"#ffffff", oscuro:true, margen:4};
   const ov=document.createElement("div"); ov.id="_nlModal";
   ov.style.cssText="position:fixed;inset:0;background:rgba(2,6,23,.6);display:flex;align-items:center;justify-content:center;z-index:10000;padding:12px;";
   document.body.appendChild(ov);
