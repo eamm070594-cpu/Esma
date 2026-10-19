@@ -3817,7 +3817,7 @@ function buildQuotePDFHTML(p, q, extraQuotes, includeIVA, includePhoto){
 
   allQuotes.forEach((cot, ci) => {
     const t = quoteSellTotals(cot);
-    const cotName = escapeHTML(cot.name || ("Cotización "+(ci+1)));
+    const cotName = (allQuotes.length>1 ? `<b style="color:#1e3a8a;margin-right:4px;">${ci+1}.</b>` : "") + escapeHTML(cot.name || ("Cotización "+(ci+1)));
     const qty = Math.max(1, Number(cot.qty||1));
     const unitPrice = t.venta;
     const totalConQty = unitPrice * qty;
@@ -3834,24 +3834,33 @@ function buildQuotePDFHTML(p, q, extraQuotes, includeIVA, includePhoto){
   const iva = includeIVA ? subtotal * 0.16 : 0;
   const total = subtotal + iva;
 
-  // Foto de referencia de ESTA cotización — va en la página 2, junto a sus datos.
-  // "Propuesta visual": render grande + descripción para el cliente.
+  // "Propuesta visual": una tarjeta por cotización (foto + descripción para el cliente).
+  // Con varias cotizaciones, cada tarjeta lleva su número, nombre y precio, igual que la tabla.
+  const _descPDF = desc => desc.split("\n").map(l=>{
+    const t=l.trim(); if(!t) return `<div style="height:6px;"></div>`;
+    if(/^[•\-\*]/.test(t)) return `<div style="display:flex;gap:7px;margin:2px 0;"><span style="color:#2563eb;font-weight:900;">•</span><span>${escapeHTML(t.replace(/^[•\-\*]\s*/,""))}</span></div>`;
+    return `<div style="margin:2px 0;${/:$/.test(t)?"font-weight:800;color:#0f172a;margin-top:4px;":""}">${escapeHTML(t)}</div>`;
+  }).join("");
   const refPhotoHTML = (()=>{
-    const refPhoto = includePhoto ? (q.refPhoto || "") : "";
-    const desc = String(q.clientDesc||"").trim();
-    if(!refPhoto && !desc) return "";
-    const descHTML = desc ? desc.split("\n").map(l=>{
-      const t=l.trim(); if(!t) return `<div style="height:6px;"></div>`;
-      if(/^[•\-\*]/.test(t)) return `<div style="display:flex;gap:7px;margin:2px 0;"><span style="color:#2563eb;font-weight:900;">•</span><span>${escapeHTML(t.replace(/^[•\-\*]\s*/,""))}</span></div>`;
-      return `<div style="margin:2px 0;${/:$/.test(t)?"font-weight:800;color:#0f172a;margin-top:4px;":""}">${escapeHTML(t)}</div>`;
-    }).join("") : "";
-    return `<div style="margin:6px 0 16px;page-break-inside:avoid;break-inside:avoid;">
-      <div style="font-size:9px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:#94a3b8;margin-bottom:8px;">Propuesta visual</div>
-      ${refPhoto?`<div style="border-radius:10px;overflow:hidden;line-height:0;box-shadow:0 4px 20px rgba(0,0,0,.15);margin-bottom:10px;">
-        <img src="${refPhoto}" style="width:100%;max-height:330px;object-fit:contain;display:block;background:#f8faff;">
-      </div>`:""}
-      ${descHTML?`<div style="border:1px solid #e2e8f0;border-left:4px solid #2563eb;border-radius:8px;padding:10px 14px;font-size:11.5px;line-height:1.5;color:#334155;background:#f8fafc;">${descHTML}</div>`:""}
-    </div>`;
+    const varias = allQuotes.length>1;
+    // Con varias, el nombre ya va en el encabezado de la tarjeta: si la descripción empieza con él, no se repite.
+    const sinTitulo = (cot, d) => { const ls=d.split("\n"); return varias && ls[0].trim()===String(cot.name||"").trim() ? ls.slice(1).join("\n").trim() : d; };
+    const items = allQuotes.map((cot,i)=>({cot, n:i+1, foto: includePhoto ? (cot.refPhoto||"") : "", desc: sinTitulo(cot, String(cot.clientDesc||"").trim())})).filter(x=>x.foto||x.desc);
+    if(!items.length) return "";
+    return `<div style="font-size:9px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:#94a3b8;margin:6px 0 8px;">${items.length>1?"Propuestas visuales":"Propuesta visual"}</div>` +
+      items.map(x=>{
+        const precio = quoteSellTotals(x.cot).venta * Math.max(1, Number(x.cot.qty||1));
+        const head = varias ? `<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:8px;">
+            <div style="font-size:13px;font-weight:800;color:#0f172a;"><span style="display:inline-block;min-width:20px;text-align:center;background:#1e3a8a;color:#fff;border-radius:999px;font-size:10.5px;padding:2px 7px;margin-right:7px;">${x.n}</span>${escapeHTML(x.cot.name||"Cotización")}</div>
+            <div style="font-size:13px;font-weight:900;color:#1e3a8a;white-space:nowrap;">$${money(precio)}</div></div>` : "";
+        return `<div style="margin:0 0 18px;page-break-inside:avoid;break-inside:avoid;${varias?"border:1px solid #e2e8f0;border-radius:12px;padding:12px;":""}">
+          ${head}
+          ${x.foto?`<div style="border-radius:10px;overflow:hidden;line-height:0;box-shadow:0 4px 20px rgba(0,0,0,.15);margin-bottom:10px;">
+            <img src="${x.foto}" style="width:100%;max-height:${varias?260:330}px;object-fit:contain;display:block;background:#f8faff;">
+          </div>`:""}
+          ${x.desc?`<div style="border:1px solid #e2e8f0;border-left:4px solid #2563eb;border-radius:8px;padding:10px 14px;font-size:11.5px;line-height:1.5;color:#334155;background:#f8fafc;">${_descPDF(x.desc)}</div>`:""}
+        </div>`;
+      }).join("");
   })();
 
   // Portada (página 1): banda con datos de la cotización arriba + foto de
@@ -8092,7 +8101,7 @@ function openPDFSelector(projectId){
   ]);
 
   function _updatePdfPhotoPreview(){
-    // Mirrors the actual PDF logic: only the FIRST checked quote's photo is ever used.
+    // Igual que el PDF: cada cotización seleccionada lleva su propia foto y descripción.
     const previewEl = document.getElementById("pdfPhotoPreview");
     const includeEl = document.getElementById("pdfIncludePhoto");
     if(!previewEl) return;
@@ -8102,18 +8111,11 @@ function openPDFSelector(projectId){
       previewEl.innerHTML = `<div style="font-size:11px;color:var(--muted);">Selecciona al menos una cotización.</div>`;
       return;
     }
-    const firstChecked = checkedEls[0];
-    const photo = firstChecked.dataset.pdfPhoto;
-    const firstQ = quotes.find(q=>q.id===firstChecked.dataset.pdfQ);
-    const firstName = escapeHTML(firstQ?firstQ.name||"Cotización":"—");
-    if(!photo){
-      previewEl.innerHTML = `<div style="font-size:11px;color:var(--muted);">La primera cotización seleccionada (<b>${firstName}</b>) no tiene foto — no se incluirá ninguna imagen, aunque otras seleccionadas sí tengan.</div>`;
-      return;
-    }
-    previewEl.innerHTML = `<div style="display:flex;align-items:center;gap:10px;">
-      <img src="${escapeAttr(photo)}" style="width:48px;height:48px;object-fit:cover;border-radius:8px;border:1px solid var(--border);">
-      <div style="font-size:11px;color:var(--muted);">Se usará la foto de: <b>${firstName}</b></div>
-    </div>`;
+    const conFoto = checkedEls.filter(el=>el.dataset.pdfPhoto);
+    if(!conFoto.length){ previewEl.innerHTML = `<div style="font-size:11px;color:var(--muted);">Ninguna de las seleccionadas tiene foto.</div>`; return; }
+    previewEl.innerHTML = `<div style="font-size:11px;color:var(--muted);margin-bottom:6px;">Cada cotización sale con su foto y su descripción:</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">${conFoto.map(el=>{ const qq=quotes.find(q=>q.id===el.dataset.pdfQ);
+        return `<div style="display:flex;align-items:center;gap:6px;"><img src="${escapeAttr(el.dataset.pdfPhoto)}" style="width:44px;height:44px;object-fit:cover;border-radius:8px;border:1px solid var(--border);"><span style="font-size:11px;font-weight:700;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHTML(qq?qq.name||"Cotización":"")}</span></div>`; }).join("")}</div>`;
   }
   document.querySelectorAll("input[data-pdf-q]").forEach(el=>el.addEventListener("change", _updatePdfPhotoPreview));
   const pdfIncludeEl = document.getElementById("pdfIncludePhoto");
