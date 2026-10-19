@@ -5660,7 +5660,15 @@ const ETAPAS = {
   vendido:   {label:"Vendido",     color:"#16a34a", bg:"rgba(22,163,74,.13)"},
   entregado: {label:"Entregado",   color:"#7c3aed", bg:"rgba(124,58,237,.12)"},
   perdido:   {label:"Perdido",     color:"#dc2626", bg:"rgba(220,38,38,.10)"},
+  dormido:   {label:"Sin respuesta", color:"#94a3b8", bg:"rgba(148,163,184,.16)"},
 };
+// Proyectos sin venta que llevan más de estos días sin ningún movimiento comercial se apartan de "Activos".
+const PV2_SIN_MOV_DIAS = 20;
+// Último movimiento comercial: alta, reactivación, cotización hecha, enviada, seguimiento o autorización.
+function _ultimoMovimiento(p, qs){
+  return [p.createdAt, p.reactivadoAt, ...qs.flatMap(q=>[q.createdAt, q.sentAt, q.lastFollowUp, q.authorizedAt])]
+    .filter(Boolean).map(x=>String(x).slice(0,10)).sort().pop() || "";
+}
 const TONOS = {red:"var(--red)", amber:"var(--amber)", green:"var(--green)", accent:"var(--accent)", muted:"var(--muted)"};
 
 function _fechaCorta(iso){ if(!iso) return ""; return new Date(iso.slice(0,10)+"T12:00:00").toLocaleDateString("es-MX",{day:"numeric",month:"short"}); }
@@ -5686,7 +5694,7 @@ function _pm(p){
     const sinEnviar=open.filter(q=>!q.pipelineStatus);
     const enviadas=open.filter(q=>q.pipelineStatus);
     const due=enviadas.map(q=>q.nextFollowUp||_hoyAddDays(q.sentAt||q.createdAt||hoy,HOY_SEGUIMIENTO_DIAS[0])).sort()[0]||"";
-    const edad=Math.min(...open.map(q=>_hoyDiasDesde(q.sentAt||q.createdAt)??0));
+    const edad=Math.min(...open.map(q=>_hoyDiasDesde([q.sentAt||q.createdAt, q.lastFollowUp, p.reactivadoAt].filter(Boolean).map(x=>String(x).slice(0,10)).sort().pop())??0));
     if(sinEnviar.length && edad<=HOY_VIEJA_DIAS){ accion="Enviar cotización"; prio=3; tono="amber"; fecha=sinEnviar[0].createdAt; fechaLbl="Hecha"; }
     else if(edad>HOY_VIEJA_DIAS){ accion=`Sin movimiento ${edad} días: ciérrala`; prio=8; tono="red"; }
     else if(due && due<=hoy){ accion="Dar seguimiento hoy"; prio=4; tono="accent"; fecha=due; fechaLbl="Seguimiento"; }
@@ -5694,19 +5702,24 @@ function _pm(p){
   } else if(etapa==="cotizar"){ accion="Hacer la cotización"; prio=5; tono="amber"; fecha=p.createdAt||""; fechaLbl="Alta"; }
   else if(etapa==="entregado"){ accion = p.payStatus==="anticipo" ? "Cobrar saldo" : "Pedir referido / reseña"; prio = p.payStatus==="anticipo" ? 7 : 90; tono = p.payStatus==="anticipo" ? "green" : "muted"; }
   else { accion="Perdido"; prio=99; }
-  return {p, etapa, monto, accion, prio, tono, fecha, fechaLbl, quotes:qs};
+  const ultimo=_ultimoMovimiento(p,qs), quieto=ultimo?_hoyDiasDesde(ultimo):null;
+  const estancado = (etapa==="cotizar"||etapa==="cotizado") && quieto!=null && quieto>PV2_SIN_MOV_DIAS;
+  if(estancado){ accion=`Sin respuesta · ${quieto} días sin movimiento`; prio=60; tono="muted"; fecha=ultimo; fechaLbl="Último mov."; }
+  return {p, etapa, monto, accion, prio, tono, fecha, fechaLbl, quotes:qs, estancado, quieto};
 }
 
 let _pv2Filtro = "activos", _pv2Busca = "";
-const PV2_FILTROS = [["activos","Activos"],["cotizar","Por cotizar"],["cotizado","Cotizados"],["vendido","Vendidos"],["entregado","Entregados"],["perdido","Perdidos"],["todos","Todos"]];
+const PV2_FILTROS = [["activos","Activos"],["cotizar","Por cotizar"],["cotizado","Cotizados"],["vendido","Vendidos"],["dormidos","😴 Sin respuesta +"+PV2_SIN_MOV_DIAS+" días"],["entregado","Entregados"],["perdido","Perdidos"],["todos","Todos"]];
 
 function renderProjectsPage(){
   const box=document.getElementById("projV2"); if(!box || !db) return;
   const todos=db.projects.map(_pm);
-  const cuenta=k=>todos.filter(m=>k==="todos"||(k==="activos"?["cotizar","cotizado","vendido"].includes(m.etapa):m.etapa===k));
+  const cuenta=k=>todos.filter(m=>k==="todos" || (k==="dormidos" ? m.estancado
+    : k==="activos" ? ["cotizar","cotizado","vendido"].includes(m.etapa) && !m.estancado
+    : m.etapa===k && !m.estancado));
   const cnt=document.getElementById("projCount");
-  const activos=cuenta("activos");
-  if(cnt) cnt.textContent=`${activos.length} activos · ${activos.filter(m=>m.prio<=8).length} requieren acción`;
+  const activos=cuenta("activos"), dormidos=cuenta("dormidos");
+  if(cnt) cnt.textContent=`${activos.length} activos · ${activos.filter(m=>m.prio<=8).length} requieren acción${dormidos.length?` · ${dormidos.length} sin respuesta`:""}`;
   if(!box.dataset.ready){
     box.dataset.ready="1";
     box.innerHTML=`
@@ -5737,7 +5750,7 @@ function renderProjectsPage(){
   document.getElementById("pv2Chips").innerHTML = PV2_FILTROS.map(([k,l])=>{
     const arr=cuenta(k); const tot=arr.reduce((s,m)=>s+m.monto,0);
     const on=_pv2Filtro===k;
-    return `<button class="btn small ${on?"primary":""}" data-pv2f="${k}">${l} <b style="margin-left:4px;">${arr.length}</b>${["cotizado","vendido"].includes(k)&&tot?`<span style="margin-left:6px;opacity:.75;">$${money(tot).split(".")[0]}</span>`:""}</button>`;
+    return `<button class="btn small ${on?"primary":""}" data-pv2f="${k}">${l} <b style="margin-left:4px;">${arr.length}</b>${["cotizado","vendido","dormidos"].includes(k)&&tot?`<span style="margin-left:6px;opacity:.75;">$${money(tot).split(".")[0]}</span>`:""}</button>`;
   }).join("");
   document.querySelectorAll("#pv2Chips [data-pv2f]").forEach(b=>b.onclick=()=>{ _pv2Filtro=b.dataset.pv2f; renderProjectsPage(); });
 
@@ -5751,10 +5764,11 @@ function renderProjectsPage(){
 
   const list=document.getElementById("pv2List");
   if(!items.length){ list.innerHTML=`<div style="padding:28px;text-align:center;color:var(--muted);font-size:13px;">${t?"Sin resultados para “"+escapeHTML(_pv2Busca)+"”.":"No hay proyectos en este filtro."}</div>`; return; }
-  list.innerHTML = `<div class="pv-row pv-head"><span></span><span>Proyecto</span><span class="pv-hide">Etapa</span><span class="pv-hide">Siguiente acción</span><span class="pv-hide">Fecha</span><span style="text-align:right;">Monto</span><span class="pv-hide"></span></div>` +
+  const ayuda = _pv2Filtro==="dormidos" && !t ? `<div style="padding:10px 14px;font-size:12px;color:var(--muted);background:var(--bg3);border-bottom:1px solid var(--border);">Proyectos sin venta con más de ${PV2_SIN_MOV_DIAS} días sin movimiento (sin cotización nueva, envío ni seguimiento). No cuentan en Activos. Si alguno revive, dale <b>↩ Reactivar</b>, registra un seguimiento o márcalo como perdido.</div>` : "";
+  list.innerHTML = ayuda + `<div class="pv-row pv-head"><span></span><span>Proyecto</span><span class="pv-hide">Etapa</span><span class="pv-hide">Siguiente acción</span><span class="pv-hide">Fecha</span><span style="text-align:right;">Monto</span><span class="pv-hide"></span></div>` +
     items.map(m=>{
-      const e=ETAPAS[m.etapa]; const tono=TONOS[m.tono]||TONOS.muted;
-      return `<div class="pv-row" data-open-p="${m.p.id}">
+      const e=ETAPAS[m.estancado?"dormido":m.etapa]; const tono=TONOS[m.tono]||TONOS.muted;
+      return `<div class="pv-row" data-open-p="${m.p.id}"${m.estancado?' style="opacity:.8;"':""}>
         <span style="width:6px;height:34px;border-radius:3px;background:${m.prio<=8?tono:"transparent"};"></span>
         <div style="min-width:0;">
           <div style="font-size:13.5px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${(LINEAS.find(x=>x[0]===_lineaDe(m.p))||["",""])[1].split(" ")[0]} ${escapeHTML(m.p.name||"Proyecto")}</div>
@@ -5767,11 +5781,13 @@ function renderProjectsPage(){
         <span style="text-align:right;font-size:14px;font-weight:800;${m.monto?"":"color:var(--muted);"}">${m.monto?"$"+money(m.monto):"—"}</span>
         <span class="pv-hide" style="display:flex;gap:4px;justify-content:flex-end;">
           <button class="btn small" data-wa-p="${m.p.id}" title="WhatsApp" style="background:#16a34a;color:#fff;border-color:#16a34a;min-width:34px;justify-content:center;">✆</button>
-          <button class="btn small" data-open-p="${m.p.id}" title="Abrir">Abrir</button>
+          ${m.estancado?`<button class="btn small" data-react-p="${m.p.id}" title="Regresar a Activos">↩ Reactivar</button>`:`<button class="btn small" data-open-p="${m.p.id}" title="Abrir">Abrir</button>`}
         </span>
       </div>`;
     }).join("");
-  list.querySelectorAll(".pv-row[data-open-p]").forEach(r=>r.addEventListener("click",e=>{ if(e.target.closest("[data-wa-p]")) return; openProjectDetail(r.dataset.openP); }));
+  list.querySelectorAll(".pv-row[data-open-p]").forEach(r=>r.addEventListener("click",e=>{ if(e.target.closest("[data-wa-p],[data-react-p]")) return; openProjectDetail(r.dataset.openP); }));
+  list.querySelectorAll("[data-react-p]").forEach(b=>b.addEventListener("click",e=>{ e.stopPropagation(); const p=db.projects.find(x=>x.id===b.dataset.reactP); if(!p) return;
+    p.reactivadoAt=todayISO(); saveProject(p); _showSaveToast("↩ "+(p.name||"Proyecto")+" regresó a Activos","success"); renderProjectsPage(); }));
   list.querySelectorAll("[data-wa-p]").forEach(b=>b.addEventListener("click",e=>{ e.stopPropagation(); _hoyWhats(b.dataset.waP,"hola"); }));
   // La acción también se ve en la columna; en pantallas anchas ocultamos la línea móvil
   if(window.innerWidth>900) list.querySelectorAll(".pv-mob").forEach(x=>x.style.display="none");
@@ -5787,10 +5803,11 @@ function renderTableroPage(){
     ["cotizado","Cotizado","Envía y da seguimiento"],
     ["vendido","Vendido · producción","Cobra y entrega a tiempo"],
     ["entregado","Entregado (60 días)","Pide referidos"],
+    ["dormido","Sin respuesta +"+PV2_SIN_MOV_DIAS+" días","Reactívalos o ciérralos"],
   ];
-  el.innerHTML = `<div style="display:grid;grid-template-columns:repeat(4,minmax(220px,1fr));gap:10px;align-items:start;overflow-x:auto;padding-bottom:6px;">` +
+  el.innerHTML = `<div style="display:grid;grid-template-columns:repeat(5,minmax(200px,1fr));gap:10px;align-items:start;overflow-x:auto;padding-bottom:6px;">` +
     cols.map(([k,l,sub])=>{
-      let arr=todos.filter(m=>m.etapa===k);
+      let arr = k==="dormido" ? todos.filter(m=>m.estancado) : todos.filter(m=>m.etapa===k && !m.estancado);
       if(k==="entregado") arr=arr.filter(m=>String(m.p.deliveryDate||m.p.createdAt||"")>=hace60);
       arr.sort((a,b)=>a.prio-b.prio||b.monto-a.monto);
       const e=ETAPAS[k]; const tot=arr.reduce((s,m)=>s+m.monto,0);
