@@ -6431,6 +6431,7 @@ function openQuoteEditorPage(q){
         </select></label>`:''}
       <label class="qe-tool">Cantidad <input id="qQtyInput" type="number" min="1" value="${Number(q.qty||1)}" style="width:44px;text-align:center;"> u.</label>
       <button class="btn small primary" id="btnAsistente" title="Arma la cotización con unos cuantos datos">⚡ Asistente de letrero</button>
+      <button class="btn small" id="btnAlu3D" title="Mide el contorno de las letras y calcula tiras, lámina, LED y herrajes">📏 Letras 3D aluminio</button>
       <button class="btn small" id="btnLoadTemplate"><i class="ti ti-folder-open"></i> Usar plantilla</button>
       <button class="btn small" id="btnSaveTemplate"><i class="ti ti-star"></i> Guardar como plantilla</button>
       <details class="qe-guide" style="margin-left:auto;position:relative;">
@@ -6628,13 +6629,19 @@ function openQuoteEditorPage(q){
   }
 
   document.getElementById("addProd").addEventListener("click",()=>{ q.products=q.products||[]; q.products.push({id:uid(),matPick:"",desc:"",qty:1,unitPrice:0}); saveQuote(q); renderLines(); });
-  if(_lineaDe(p)!=="letrero"){ const _ba=document.getElementById("btnAsistente"); if(_ba) _ba.style.display="none"; const _bn=document.getElementById("btnNest"); if(_bn) _bn.classList.add("primary"); }
+  if(_lineaDe(p)!=="letrero"){ const _ba=document.getElementById("btnAsistente"); if(_ba) _ba.style.display="none"; const _b3=document.getElementById("btnAlu3D"); if(_b3) _b3.style.display="none"; const _bn=document.getElementById("btnNest"); if(_bn) _bn.classList.add("primary"); }
   document.getElementById("btnAsistente").addEventListener("click",()=>openAsistenteLetrero(q, r=>{
     q.products=r.products; q.routes=r.routes; q.extras=r.extras; q.marginPct=r.marginPct; q.asis=r.asis||null;
     if(!q.name || /^Cotizaci[oó]n( \d+)?$/.test(q.name)) q.name=r.nombre;
     q.clientDesc=_qDescAuto(q,p);
     saveQuote(q); save(); openQuoteEditorPage(q);
     _showSaveToast("⚡ Cotización armada con el asistente. Revisa y ajusta lo que necesites.","success");
+  }));
+  document.getElementById("btnAlu3D").addEventListener("click",()=>openLetras3D(q, c=>{
+    q.products=(q.products||[]).concat(c.rows);
+    q.routes=q.routes||[]; c.routes.forEach(r=>{ const ex=q.routes.find(x=>x.routeName===r.routeName); if(ex) ex.hours=Math.round((Number(ex.hours||0)+r.hours)*10)/10; else q.routes.push(r); });
+    q.extras=q.extras||[]; c.extras.forEach(e=>{ if(!q.extras.some(x=>/instal/i.test(x.label||""))) q.extras.push(e); });
+    saveQuote(q); renderLines(); _showSaveToast("📏 Letras 3D agregadas: "+c.tiras.length+" tiras y "+c.fracFrente+" hoja de frente","success");
   }));
   document.getElementById("btnNest").addEventListener("click",()=>openNestSim(row=>{ q.products=q.products||[]; q.products.push(row); saveQuote(q); renderLines(); }));
   document.getElementById("addRoute").addEventListener("click",()=>{ q.routes=q.routes||[]; const first=db.settings.routeDB[0]?.name||""; const rate=first?(routeByName(first)?.costPerHour||0):0; q.routes.push({id:uid(),routeName:first,hours:1,rate:Number(rate||0)}); saveQuote(q); renderLines(); });
@@ -9365,6 +9372,198 @@ function openGeneradorLinea(inicial, onUse){
       +D.lines.map(l=>`<path d="${mm(l.pts.length===1?[l.pts[0],l.pts[0]]:l.pts)}" fill="none" stroke="#ff0000" stroke-width="0.2"/>`).join("\n")+"\n</svg>","image/svg+xml",nombre("diseno","svg")); };
   if(onUse) $l("_nlUsar").onclick=()=>{ if(!ultimo) return; onUse(ultimo); ov.remove(); };
   refrescarChips(); refrescarSw(); NEON_FUENTES.forEach(f=>_neonCss(f).catch(()=>{})); pintar();
+}
+
+// ── LETRAS 3D DE ALUMINIO: contorno real → tiras, lámina del frente, LED y herrajes ──
+// Cómo trabaja ESMA (dueño, 19/10/2026): las tiras del canto salen de la MISMA hoja de aluminio,
+// cortadas a lo largo (2.44 m). Hoja natural de 0.90×2.44 → 18 tiras de 5 cm o 9 de 10 cm. La dorada igual, pero más cara.
+const ALU_HOJAS = {
+  natural: {desc:"Hoja aluminio natural 0.90x2.44", w:90, h:244, costoDefault:630, vendor:"Dueño ESMA (tira de 5 cm a $35 × 18)"},
+  dorado:  {desc:"Lámina aluminio oro cepillado cal 23 4x8", w:122, h:244, costoDefault:4270, vendor:"El Anunciero (catálogo abril 2026)"},
+};
+// Reglas de cálculo (ajustables). Horas: estimado inicial, calibrar con trabajos reales.
+const ALU_REGLAS = {
+  traslapeM: 0.05,          // m extra por cada tramo de tira (unión)
+  sepFrenteCm: 1,           // separación entre piezas al acomodar el frente en la hoja
+  ledPorM: 1.0,             // m de LED por m de contorno iluminado (va por dentro, siguiendo el contorno)
+  routerBaseH: 0.5, routerHporM: 0.12,          // corte del frente en router
+  habBaseH: 1, habHporM3D: 1.0, habHporPieza: 0.25, habHporMLed: 0.3,  // doblar/pegar tiras, armar, LED
+  escuadrasPorPieza: 2, escuadrasExtraSiAltoCm: 40,
+};
+const ALU_FUENTES=[["Cinzel","Clásica romana (tipo TRÍA)","600"],["Playfair Display","Elegante serif","600"],["Cormorant Garamond","Serif fina","600"],
+  ["Montserrat","Moderna","600"],["Poppins","Redonda moderna","600"],["Bebas Neue","Industrial","400"],["Oswald","Condensada","500"],["Raleway","Minimalista","600"],["Lora","Serif clásica","600"]];
+const _fAlu=fam=>ALU_FUENTES.find(f=>f[0]===fam)||ALU_FUENTES[0];
+
+// Perímetro (px) y área (px²) de una imagen en canvas: marching squares con interpolación (contornos de afuera y huecos)
+function _perimetroAlfa(data,W,H){
+  const v=(x,y)=>data[(y*W+x)*4+3]/255; let per=0, area=0, minX=W,minY=H,maxX=-1,maxY=-1;
+  for(let y=0;y<H;y++) for(let x=0;x<W;x++){ const a=v(x,y); area+=a; if(a>0.5){ if(x<minX)minX=x; if(x>maxX)maxX=x; if(y<minY)minY=y; if(y>maxY)maxY=y; } }
+  for(let y=0;y<H-1;y++) for(let x=0;x<W-1;x++){
+    const c=[v(x,y),v(x+1,y),v(x+1,y+1),v(x,y+1)], P=[[x,y],[x+1,y],[x+1,y+1],[x,y+1]], pts=[];
+    for(let k=0;k<4;k++){ const a=c[k]-0.5, b=c[(k+1)%4]-0.5; if((a<0)!==(b<0)){ const t=a/(a-b), p=P[k], q=P[(k+1)%4]; pts.push([p[0]+(q[0]-p[0])*t, p[1]+(q[1]-p[1])*t]); } }
+    if(pts.length===2) per+=Math.hypot(pts[0][0]-pts[1][0],pts[0][1]-pts[1][1]);
+    else if(pts.length===4) per+=Math.hypot(pts[0][0]-pts[1][0],pts[0][1]-pts[1][1])+Math.hypot(pts[2][0]-pts[3][0],pts[2][1]-pts[3][1]);
+  }
+  return {per, area, w:maxX>=minX?maxX-minX+1:0, h:maxY>=minY?maxY-minY+1:0};
+}
+// Mide cada letra de un renglón con la fuente real. anchoCm = ancho total del renglón.
+async function _medirRenglon(texto, fam, anchoCm){
+  const f=_fAlu(fam); await _cargarFuenteNeon([f[0],f[1],f[2]], texto);
+  const px=300, c=document.createElement("canvas"), ctx=c.getContext("2d",{willReadFrequently:true});
+  const font=`${f[2]} ${px}px "${f[0]}"`; ctx.font=font; const m=ctx.measureText(texto);
+  const anchoPx=m.actualBoundingBoxLeft+m.actualBoundingBoxRight; if(!(anchoPx>0)) return null;
+  const esc=anchoCm/anchoPx, letras=[];
+  for(const ch of texto){ if(!ch.trim()) continue;
+    ctx.font=font; const mc=ctx.measureText(ch); const pad=8;
+    const w=Math.ceil(mc.actualBoundingBoxLeft+mc.actualBoundingBoxRight)+2*pad, h=Math.ceil(mc.actualBoundingBoxAscent+mc.actualBoundingBoxDescent)+2*pad;
+    if(w<=2*pad||h<=2*pad) continue; c.width=w; c.height=h; ctx.font=font; ctx.fillStyle="#000";
+    ctx.fillText(ch, pad+mc.actualBoundingBoxLeft, pad+mc.actualBoundingBoxAscent);
+    const r=_perimetroAlfa(ctx.getImageData(0,0,w,h).data,w,h);
+    letras.push({label:ch, perM:r.per*esc/100, areaCm2:r.area*esc*esc, w:Math.ceil(r.w*esc), h:Math.ceil(r.h*esc)});
+  }
+  return {letras, alto:Math.max(0,...letras.map(l=>l.h))};
+}
+// Mide una pieza de un SVG (logo) escalada a anchoCm
+function _medirSVG(svgTxt, anchoCm){
+  return new Promise((ok,ko)=>{ const img=new Image(), url=URL.createObjectURL(new Blob([svgTxt],{type:"image/svg+xml"}));
+    img.onload=()=>{ const W=1200, H=Math.max(1,Math.round(W*(img.naturalHeight||img.height)/(img.naturalWidth||img.width))), pad=8;
+      const c=document.createElement("canvas"); c.width=W+2*pad; c.height=H+2*pad; const ctx=c.getContext("2d",{willReadFrequently:true}); ctx.drawImage(img,pad,pad,W,H);
+      const r=_perimetroAlfa(ctx.getImageData(0,0,c.width,c.height).data,c.width,c.height); URL.revokeObjectURL(url);
+      const esc=anchoCm/Math.max(1,r.w); ok({perM:r.per*esc/100, areaCm2:r.area*esc*esc, w:Math.ceil(r.w*esc), h:Math.ceil(r.h*esc)}); };
+    img.onerror=()=>{ URL.revokeObjectURL(url); ko(new Error("No pude leer el SVG")); }; img.src=url; });
+}
+// Acomoda los tramos de canto en tiras de 2.44 m (primero los más largos)
+function _cortarTiras(piezas, largoTira){
+  const tramos=[]; piezas.forEach((p,i)=>{ let resto=p.perM; while(resto>1e-6){ const t=Math.min(resto,largoTira-ALU_REGLAS.traslapeM); tramos.push({label:p.label, m:t+ALU_REGLAS.traslapeM, color:i}); resto-=t; } });
+  tramos.sort((a,b)=>b.m-a.m); const tiras=[];
+  tramos.forEach(t=>{ let tira=tiras.find(x=>x.libre>=t.m-1e-9); if(!tira){ tira={libre:largoTira, cortes:[]}; tiras.push(tira); } tira.cortes.push(t); tira.libre-=t.m; });
+  return tiras;
+}
+function _svgTiras(tiras, largo){
+  const hBar=14, gap=5, W=600, esc=W/largo;
+  return `<svg viewBox="0 0 ${W+60} ${tiras.length*(hBar+gap)+4}" style="width:100%;display:block;">${tiras.map((t,i)=>{ let x=0; const y=i*(hBar+gap)+2;
+    return `<text x="0" y="${y+hBar-3}" font-size="10" fill="#64748b">#${i+1}</text>`+t.cortes.map(c=>{ const w=c.m*esc, col=_NEST_COLORES[c.color%_NEST_COLORES.length]; const s=`<rect x="${30+x}" y="${y}" width="${w-1}" height="${hBar}" rx="2" fill="${col}" fill-opacity=".75"/><text x="${30+x+w/2}" y="${y+hBar-3.5}" font-size="9.5" text-anchor="middle" fill="#fff" font-weight="700">${escapeHTML(c.label)} ${(c.m*100).toFixed(0)}</text>`; x+=w; return s; }).join("")
+      +`<rect x="${30+x}" y="${y}" width="${Math.max(0,t.libre*esc-1)}" height="${hBar}" rx="2" fill="#e2e8f0"/><text x="${30+largo*esc+4}" y="${y+hBar-3}" font-size="9.5" fill="#94a3b8">sobra ${(t.libre*100).toFixed(0)}</text>`; }).join("")}</svg>`;
+}
+function _aluHoja(tipo){ const h=ALU_HOJAS[tipo]; const m=materialByDesc(h.desc); return {...h, costo:m?Number(m.cost||0):h.costoDefault, enCatalogo:!!m}; }
+
+function openLetras3D(q, onApply){
+  const old=document.getElementById("_aluModal"); if(old) old.remove();
+  const st={tipo:"natural", tira:5, uso:"interior", instalacion:800, pintar:false,
+    piezas:[{modo:"texto", texto:"", fuente:"Cinzel", ancho:100, d3:true, luz:true}], horas:null};
+  const ov=document.createElement("div"); ov.id="_aluModal";
+  ov.style.cssText="position:fixed;inset:0;background:rgba(2,6,23,.6);display:flex;align-items:center;justify-content:center;z-index:9999;padding:12px;";
+  document.body.appendChild(ov);
+  let calc=null, turno=0;
+  const selS="background:transparent;border:none;color:var(--text);font-family:inherit;font-size:13px;width:100%;padding:8px 0;";
+  const filaPieza=(p,i)=>`<div style="display:grid;grid-template-columns:110px minmax(0,2fr) minmax(0,1.3fr) 90px auto auto 30px;gap:6px;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);">
+      <select data-p="${i}" data-k="modo" class="field" style="padding:6px;">${[["texto","Texto"],["svg","Logo (SVG)"],["manual","Pieza a mano"]].map(([v,l])=>`<option value="${v}" ${p.modo===v?"selected":""}>${l}</option>`).join("")}</select>
+      ${p.modo==="texto"?`<input data-p="${i}" data-k="texto" class="field" style="padding:7px;" placeholder="Ej: TRÍA" value="${escapeAttr(p.texto)}">
+        <select data-p="${i}" data-k="fuente" class="field" style="padding:6px;">${ALU_FUENTES.map(f=>`<option value="${f[0]}" ${p.fuente===f[0]?"selected":""}>${f[1]}</option>`).join("")}</select>`
+      : p.modo==="svg"?`<input type="file" accept=".svg,image/svg+xml" data-p="${i}" data-k="svg" style="font-size:11.5px;"><span style="font-size:11.5px;color:var(--muted);">${p.svgNombre?escapeHTML(p.svgNombre):"Sube el logo en SVG"}</span>`
+      : `<input data-p="${i}" data-k="nombre" class="field" style="padding:7px;" placeholder="Nombre (ej: Flor)" value="${escapeAttr(p.nombre||"")}"><span style="display:flex;gap:4px;align-items:center;font-size:11px;">Contorno <input data-p="${i}" data-k="perM" type="number" step="0.1" class="field" style="padding:6px;width:64px;" value="${p.perM||""}"> m · alto <input data-p="${i}" data-k="alto" type="number" class="field" style="padding:6px;width:54px;" value="${p.alto||""}"></span>`}
+      <span style="display:flex;align-items:center;gap:3px;font-size:11px;"><input data-p="${i}" data-k="ancho" type="number" class="field" style="padding:6px;width:60px;" value="${p.ancho}"> cm</span>
+      <label style="font-size:11.5px;display:flex;gap:3px;align-items:center;" title="Con canto de tiras (volumen)"><input type="checkbox" data-p="${i}" data-k="d3" ${p.d3?"checked":""}>3D</label>
+      <label style="font-size:11.5px;display:flex;gap:3px;align-items:center;" title="LED por detrás (halo)"><input type="checkbox" data-p="${i}" data-k="luz" ${p.luz?"checked":""}>Luz</label>
+      <button class="btn small" data-del="${i}" title="Quitar">✕</button></div>`;
+  const calcular=async()=>{
+    const yo=++turno, res=document.getElementById("_aluRes");
+    try{
+      const piezas=[]; // {label, perM, areaCm2, w, h, d3, luz}
+      for(const p of st.piezas){
+        if(p.modo==="texto" && p.texto.trim()){ const r=await _medirRenglon(p.texto.trim(), p.fuente, Number(p.ancho)||0); if(r) r.letras.forEach(l=>piezas.push({...l, d3:p.d3, luz:p.luz})); }
+        else if(p.modo==="svg" && p.svgTxt){ const r=await _medirSVG(p.svgTxt, Number(p.ancho)||0); piezas.push({label:p.svgNombre?p.svgNombre.replace(/\.svg$/i,"").slice(0,12):"Logo", ...r, d3:p.d3, luz:p.luz}); }
+        else if(p.modo==="manual" && Number(p.perM)>0){ const w=Number(p.ancho)||0, h=Number(p.alto)||w; piezas.push({label:p.nombre||"Pieza", perM:Number(p.perM), areaCm2:w*h*0.6, w, h, d3:p.d3, luz:p.luz}); }
+      }
+      if(yo!==turno) return;
+      if(!piezas.length){ res.innerHTML=`<div style="color:var(--muted);padding:20px;text-align:center;">Agrega el texto o las piezas del letrero.</div>`; calc=null; return; }
+      const hoja=_aluHoja(st.tipo), tpH=Math.floor(hoja.w/st.tira), precioTira=hoja.costo/tpH, largo=hoja.h/100;
+      const p3d=piezas.filter(p=>p.d3), tiras=_cortarTiras(p3d, largo);
+      const nest=_acomodarPiezas(piezas.map(p=>({w:p.w,h:p.h,qty:1,label:p.label})), hoja.w, hoja.h, ALU_REGLAS.sepFrenteCm, true);
+      const fracFrente=nest.hojas.length ? Math.ceil(((nest.hojas.length-1)+nest.hojas[nest.hojas.length-1].usedY/hoja.h)*100)/100 : 0;
+      const per3D=p3d.reduce((a,p)=>a+p.perM,0), perLuz=piezas.filter(p=>p.luz).reduce((a,p)=>a+p.perM,0), perTot=piezas.reduce((a,p)=>a+p.perM,0);
+      const ledM=perLuz*ALU_REGLAS.ledPorM, rollos=ledM>0?Math.max(1,Math.ceil(ledM*1.1/5)):0;
+      const watts=ledM*ASIS_REGLAS.wattsPorMetro*ASIS_REGLAS.margenFuente, lista=ASIS_FUENTES[st.uso], fuente=ledM>0?(lista.find(f=>f[1]>=watts)||lista[lista.length-1]):null;
+      const nEsc=p3d.reduce((a,p)=>a+ALU_REGLAS.escuadrasPorPieza+(p.h>ALU_REGLAS.escuadrasExtraSiAltoCm?1:0),0);
+      const hRouter=Math.round((ALU_REGLAS.routerBaseH+perTot*ALU_REGLAS.routerHporM)*10)/10;
+      const hHab=Math.round((ALU_REGLAS.habBaseH+per3D*ALU_REGLAS.habHporM3D+piezas.length*ALU_REGLAS.habHporPieza+ledM*ALU_REGLAS.habHporMLed)*2)/2;
+      if(!st.horas) st.horas={router:hRouter, hab:hHab};
+      calc={piezas, hoja, tpH, precioTira, tiras, fracFrente, per3D, perLuz, ledM, rollos, fuente, nEsc, nest, hRouter, hHab};
+      const faltan=[]; const P=(d,qn)=>_asisProd(d,qn,faltan);
+      const rows=[];
+      const hojaRow={id:uid(), desc:hoja.desc, matPick:hoja.enCatalogo?hoja.desc:"", qty:fracFrente, unitPrice:hoja.costo, nest:{uso:"frente de las letras"}};
+      rows.push(hojaRow);
+      if(tiras.length) rows.push({id:uid(), desc:`Tira de aluminio ${st.tipo==="dorado"?"dorado":"natural"} ${st.tira} cm × 2.44 m (${tpH} por hoja)`, matPick:"", qty:tiras.length, unitPrice:Math.round(precioTira*100)/100});
+      if(st.pintar) rows.push(P("pintura",1));
+      if(ledM>0){ rows.push(P(st.uso==="exterior"?"led para exterior":"Tira COB 12V interior (rollo 5 m)",rollos)); rows.push(P(fuente[0],1)); rows.push(P("Cable cal 22 cobre (para letrero)",Math.ceil(5+piezas.filter(p=>p.luz).length))); }
+      rows.push(P("silicon",Math.max(1,Math.ceil(piezas.length/10)))); rows.push(P("kola Loca",1)); rows.push(P("Papel para plantilla",1));
+      if(nEsc){ rows.push(P("Escuadra natural",nEsc)); rows.push(P("tornillos para letreros",nEsc)); rows.push(P("tornillo para taquete",nEsc)); rows.push(P("Taquete de madera",nEsc)); }
+      if(ledM>0 && Number(st.instalacion)>0){ rows.push(P("Cable THW cal 14 (instalación)",10)); rows.push(P("Apagador sencillo con placa",1)); rows.push(P("Grapas para cable",1)); }
+      const routes=[_asisRuta("Router de Cama",st.horas.router), _asisRuta("Habilitado de letreros",st.horas.hab)];
+      const extras=Number(st.instalacion)>0?[{id:uid(),label:"Instalación",amount:Number(st.instalacion)}]:[];
+      const qq={products:rows,routes,extras,marginPct:Number(q.marginPct)||60,qty:1}; const t=quoteSellTotals(qq);
+      calc.rows=rows; calc.routes=routes; calc.extras=extras; calc.tot=t; calc.faltan=faltan;
+      res.innerHTML=`
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px;">
+          <div class="kpi-box" style="padding:8px 10px;"><div class="kl">Contorno con canto</div><div class="kv">${per3D.toFixed(2)} m</div><div style="font-size:10.5px;color:var(--muted);">${p3d.length} pieza(s) 3D de ${piezas.length}</div></div>
+          <div class="kpi-box" style="padding:8px 10px;"><div class="kl">Tiras de ${st.tira} cm</div><div class="kv" style="color:var(--accent);">${tiras.length}</div><div style="font-size:10.5px;color:var(--muted);">${(tiras.length/tpH).toFixed(2)} hoja · $${money(precioTira)} c/u</div></div>
+          <div class="kpi-box" style="padding:8px 10px;"><div class="kl">Lámina del frente</div><div class="kv">${fracFrente} hoja</div><div style="font-size:10.5px;color:var(--muted);">${hoja.w}×${hoja.h} · $${money(hoja.costo)}${hoja.enCatalogo?"":" (precio supuesto)"}</div></div>
+          <div class="kpi-box" style="padding:8px 10px;"><div class="kl">Precio de venta</div><div class="kv" style="color:var(--accent);">$${money(t.venta)}</div><div style="font-size:10.5px;color:var(--muted);">MP $${money(t.mp)} · MO $${money(t.ruta)}</div></div>
+        </div>
+        ${faltan.length?`<div style="font-size:12px;color:var(--red);font-weight:700;margin-bottom:8px;">⚠️ Faltan en el catálogo (precio $0): ${escapeHTML(faltan.join(", "))}</div>`:""}
+        <div style="display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:12px;">
+          <div><div class="field-label">Cortes en tiras de 2.44 m (cm por letra)</div>${tiras.length?_svgTiras(tiras,largo):`<div style="font-size:12px;color:var(--muted);">Sin piezas 3D.</div>`}
+            <div style="font-size:11px;color:var(--muted);margin-top:6px;">Contorno por pieza: ${piezas.map(p=>`<b>${escapeHTML(p.label)}</b> ${(p.perM*100).toFixed(0)} cm`).join(" · ")}</div></div>
+          <div><div class="field-label">Frente en la hoja</div>${nest.hojas.map((s,i)=>_svgHoja(s,hoja.w,hoja.h,i)).join("")}</div>
+        </div>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:8px;font-size:12px;">
+          <span>LED ${ledM.toFixed(1)} m → ${rollos} rollo(s)${fuente?` · fuente ${fuente[1]} W`:""} · ${nEsc} escuadras</span>
+          <span style="margin-left:auto;">Router <input id="_aluHR" type="number" step="0.5" class="field" style="width:64px;padding:5px;" value="${st.horas.router}"> h</span>
+          <span>Habilitado <input id="_aluHH" type="number" step="0.5" class="field" style="width:64px;padding:5px;" value="${st.horas.hab}"> h</span>
+          <span style="color:var(--muted);font-size:11px;">(sugerido ${hRouter} / ${hHab} h)</span>
+        </div>`;
+      document.getElementById("_aluHR").onchange=e=>{ st.horas.router=Number(e.target.value)||0; calcular(); };
+      document.getElementById("_aluHH").onchange=e=>{ st.horas.hab=Number(e.target.value)||0; calcular(); };
+      document.getElementById("_aluOk").textContent=`Agregar a la cotización · $${money(t.venta)}`;
+    }catch(e){ if(yo===turno){ res.innerHTML=`<div style="color:var(--red);padding:20px;">${escapeHTML(e.message)}. Revisa tu conexión.</div>`; calc=null; } }
+  };
+  const pintar=()=>{
+    ov.innerHTML=`<div style="background:var(--card);border-radius:16px;width:1080px;max-width:100%;max-height:95vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.3);">
+      <div style="display:flex;align-items:center;gap:10px;padding:12px 18px;border-bottom:1px solid var(--border);">
+        <div style="font-size:16px;font-weight:900;flex:1;">📏 Letras 3D de aluminio</div><button class="btn small" id="_aluClose">✕</button></div>
+      <div style="padding:12px 18px;overflow:auto;">
+        <div style="display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;">
+          <div><div class="field-label">Aluminio</div><div class="field" style="padding:0 10px;"><select id="_aluTipo" style="${selS}"><option value="natural">Natural (hoja 0.90×2.44)</option><option value="dorado">Dorado (hoja 1.22×2.44)</option></select></div></div>
+          <div><div class="field-label">Ancho de tira (fondo)</div><div class="field" style="padding:0 10px;"><select id="_aluTira" style="${selS}"><option value="5">5 cm</option><option value="10">10 cm</option></select></div></div>
+          <div><div class="field-label">Uso</div><div class="field" style="padding:0 10px;"><select id="_aluUso" style="${selS}"><option value="interior">Interior</option><option value="exterior">Exterior</option></select></div></div>
+          <div><div class="field-label">Instalación ($, 0 = no)</div><div class="field"><input id="_aluInst" type="number" value="${st.instalacion}"></div></div>
+          <div style="display:flex;align-items:end;padding-bottom:8px;"><label style="font-size:12px;display:flex;gap:5px;align-items:center;"><input type="checkbox" id="_aluPint" ${st.pintar?"checked":""}> Pintar (1 L)</label></div>
+        </div>
+        <div class="field-label" style="margin-top:10px;">Piezas del letrero <span style="font-weight:400;">· ancho = medida total de esa pieza o renglón</span></div>
+        <div id="_aluPiezas">${st.piezas.map(filaPieza).join("")}</div>
+        <button class="btn small" id="_aluAdd" style="margin-top:6px;">+ Pieza</button>
+        <div id="_aluRes" style="margin-top:12px;"></div>
+        <div style="font-size:11px;color:var(--muted);margin-top:8px;">Las tiras salen de la misma hoja, cortadas a lo largo (2.44 m): ancho de la hoja ÷ ancho de tira (natural 0.90 m → 18 de 5 cm; dorada 1.22 m → 24 de 5 cm). El contorno se mide sobre la letra real (afuera y huecos). Se suman ${Math.round(ALU_REGLAS.traslapeM*100)} cm por unión. Las horas son un estimado: ajústalas si hace falta.</div>
+      </div>
+      <div style="display:flex;justify-content:flex-end;gap:8px;padding:12px 18px;border-top:1px solid var(--border);">
+        <button class="btn" id="_aluCancel">Cerrar</button><button class="btn primary" id="_aluOk">Agregar a la cotización</button></div></div>`;
+    const $a=id=>document.getElementById(id);
+    $a("_aluTipo").value=st.tipo; $a("_aluTira").value=String(st.tira); $a("_aluUso").value=st.uso;
+    $a("_aluClose").onclick=$a("_aluCancel").onclick=()=>ov.remove();
+    $a("_aluTipo").onchange=e=>{ st.tipo=e.target.value; calcular(); };
+    $a("_aluTira").onchange=e=>{ st.tira=Number(e.target.value); calcular(); };
+    $a("_aluUso").onchange=e=>{ st.uso=e.target.value; calcular(); };
+    $a("_aluInst").onchange=e=>{ st.instalacion=Number(e.target.value)||0; calcular(); };
+    $a("_aluPint").onchange=e=>{ st.pintar=e.target.checked; calcular(); };
+    $a("_aluAdd").onclick=()=>{ st.piezas.push({modo:"texto",texto:"",fuente:"Cinzel",ancho:60,d3:true,luz:true}); st.horas=null; pintar(); };
+    ov.querySelectorAll("[data-del]").forEach(b=>b.onclick=()=>{ st.piezas.splice(Number(b.dataset.del),1); st.horas=null; pintar(); });
+    ov.querySelectorAll("[data-p]").forEach(el=>{ const i=Number(el.dataset.p), k=el.dataset.k, p=st.piezas[i];
+      if(k==="svg"){ el.onchange=async()=>{ const f=el.files[0]; if(!f) return; p.svgTxt=await f.text(); p.svgNombre=f.name; st.horas=null; pintar(); }; return; }
+      el.onchange=()=>{ p[k]= el.type==="checkbox"?el.checked : el.type==="number"?Number(el.value||0) : el.value; st.horas=null; if(k==="modo") pintar(); else calcular(); }; });
+    $a("_aluOk").onclick=()=>{ if(!calc){ _showSaveToast("Agrega las piezas primero","warning"); return; } onApply(calc); ov.remove(); };
+    calcular();
+  };
+  pintar();
 }
 
 function _diasDesde(iso){ if(!iso) return null; return Math.round((new Date(todayISO()+"T00:00:00")-new Date(String(iso).slice(0,10)+"T00:00:00"))/86400000); }
