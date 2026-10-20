@@ -6441,6 +6441,7 @@ function openQuoteEditorPage(q){
       <label class="qe-tool">Cantidad <input id="qQtyInput" type="number" min="1" value="${Number(q.qty||1)}" style="width:44px;text-align:center;"> u.</label>
       <button class="btn small primary" id="btnAsistente" title="Arma la cotización con unos cuantos datos">⚡ Asistente de letrero</button>
       <button class="btn small" id="btnAlu3D" title="Mide el contorno de las letras y calcula tiras, lámina, LED y herrajes">📏 Letras 3D aluminio</button>
+      <button class="btn small" id="btnDesdoblado" title="Desdobla el canto de cada letra: dónde, cuánto y hacia qué lado doblar">📐 Desdoblado</button>
       <button class="btn small" id="btnLoadTemplate"><i class="ti ti-folder-open"></i> Usar plantilla</button>
       <button class="btn small" id="btnSaveTemplate"><i class="ti ti-star"></i> Guardar como plantilla</button>
       <details class="qe-guide" style="margin-left:auto;position:relative;">
@@ -6638,7 +6639,7 @@ function openQuoteEditorPage(q){
   }
 
   document.getElementById("addProd").addEventListener("click",()=>{ q.products=q.products||[]; q.products.push({id:uid(),matPick:"",desc:"",qty:1,unitPrice:0}); saveQuote(q); renderLines(); });
-  if(_lineaDe(p)!=="letrero"){ const _ba=document.getElementById("btnAsistente"); if(_ba) _ba.style.display="none"; const _b3=document.getElementById("btnAlu3D"); if(_b3) _b3.style.display="none"; const _bn=document.getElementById("btnNest"); if(_bn) _bn.classList.add("primary"); }
+  if(_lineaDe(p)!=="letrero"){ const _ba=document.getElementById("btnAsistente"); if(_ba) _ba.style.display="none"; const _b3=document.getElementById("btnAlu3D"); if(_b3) _b3.style.display="none"; const _bd=document.getElementById("btnDesdoblado"); if(_bd) _bd.style.display="none"; const _bn=document.getElementById("btnNest"); if(_bn) _bn.classList.add("primary"); }
   document.getElementById("btnAsistente").addEventListener("click",()=>openAsistenteLetrero(q, r=>{
     q.products=r.products; q.routes=r.routes; q.extras=r.extras; q.marginPct=r.marginPct; q.asis=r.asis||null;
     if(!q.name || /^Cotizaci[oó]n( \d+)?$/.test(q.name)) q.name=r.nombre;
@@ -6646,6 +6647,7 @@ function openQuoteEditorPage(q){
     saveQuote(q); save(); openQuoteEditorPage(q);
     _showSaveToast("⚡ Cotización armada con el asistente. Revisa y ajusta lo que necesites.","success");
   }));
+  document.getElementById("btnDesdoblado").addEventListener("click",()=>openDesdoblado({}));
   document.getElementById("btnAlu3D").addEventListener("click",()=>openLetras3D(q, c=>{
     q.products=(q.products||[]).concat(c.rows);
     q.routes=q.routes||[]; c.routes.forEach(r=>{ const ex=q.routes.find(x=>x.routeName===r.routeName); if(ex) ex.hours=Math.round((Number(ex.hours||0)+r.hours)*10)/10; else q.routes.push(r); });
@@ -9566,6 +9568,229 @@ function openLetras3D(q, onApply){
     calcular();
   };
   pintar();
+}
+
+// ── DESDOBLADO DE LETRAS: el canto de cada letra como tira recta con sus dobleces ──
+// La tira sigue el contorno de la letra con un offset hacia adentro (1 mm por defecto, pedido del dueño 20/10/2026).
+// Por cada contorno (afuera y huecos) da: dónde doblar (cm desde el inicio), cuántos grados y hacia qué lado.
+// "Adentro" = hacia el cuerpo de la letra (esquinas de afuera); "afuera" = alejándose (esquinas metidas).
+const DESD = { offsetMm:1, esquinaGrados:30, curvaCadaCm:2, traslapeCm:5, tiraCm:5, pxPorMm:2.5 };
+
+// Máscara → contornos (en mm) ya con el offset hacia adentro
+function _contornosMascara(data, W, H, ppm, offMm){
+  const N=W*H, ink=new Uint8Array(N);
+  for(let i=0;i<N;i++) ink[i]=data[i*4+3]>=128?1:0;
+  const dt=new Float32Array(N); for(let i=0;i<N;i++) dt[i]=ink[i]?1e9:0;
+  for(let y=1;y<H-1;y++) for(let x=1;x<W-1;x++){ const i=y*W+x; if(!dt[i]) continue; dt[i]=Math.min(dt[i],dt[i-1]+1,dt[i-W]+1,dt[i-W-1]+1.414,dt[i-W+1]+1.414); }
+  for(let y=H-2;y>0;y--) for(let x=W-2;x>0;x--){ const i=y*W+x; if(!dt[i]) continue; dt[i]=Math.min(dt[i],dt[i+1]+1,dt[i+W]+1,dt[i+W+1]+1.414,dt[i+W-1]+1.414); }
+  const r=offMm*ppm, e=new Uint8Array(N); for(let i=0;i<N;i++) e[i]=dt[i]>r?1:0;
+  const vecinos=(k)=>{ const x=k%W, o=[]; if(x>0) o.push(k-1); if(x<W-1) o.push(k+1); if(k>=W) o.push(k-W); if(k<N-W) o.push(k+W); return o; };
+  const aMm=b=>{ let p=b.map(([x,y])=>[(x+0.5)/ppm,(y+0.5)/ppm]); p=_remuestrear(p.concat([p[0]]),0.5).slice(0,-1); if(p.length>8) p=_gauss(p,2,true); p.push(p[0]); return _rdp(p,0.1); };
+  const res=[];
+  const lab=new Int32Array(N); let id=0;
+  for(let i=0;i<N;i++) if(e[i]&&!lab[i]){ id++; const st=[i]; lab[i]=id; while(st.length){ const k=st.pop(); for(const j of vecinos(k)) if(e[j]&&!lab[j]){ lab[j]=id; st.push(j); } }
+    const b=_bordeMoore(lab,W,H,id,i%W,(i/W)|0); if(b.length>=12) res.push({tipo:"exterior", pts:aMm(b)}); }
+  const lb=new Int32Array(N); let id2=0;
+  for(let i=0;i<N;i++) if(!e[i]&&!lb[i]){ id2++; const st=[i]; lb[i]=id2; let borde=false;
+    while(st.length){ const k=st.pop(), x=k%W; if(x===0||x===W-1||k<W||k>=N-W) borde=true; for(const j of vecinos(k)) if(!e[j]&&!lb[j]){ lb[j]=id2; st.push(j); } }
+    if(!borde){ const b=_bordeMoore(lb,W,H,id2,i%W,(i/W)|0); if(b.length>=12) res.push({tipo:"hueco", pts:aMm(b)}); } }
+  const esTinta=(xmm,ymm)=>{ const x=Math.round(xmm*ppm-0.5), y=Math.round(ymm*ppm-0.5); return x>=0&&y>=0&&x<W&&y<H&&ink[y*W+x]===1; };
+  return {contornos:res, esTinta};
+}
+
+// Un contorno cerrado (mm) → dobleces sobre la tira
+function _analizarDoblez(poly, esTinta, o){
+  let pts=poly.slice(0,-1); if(pts.length<4) return null;
+  let si=0; pts.forEach((p,i)=>{ const b=pts[si]; if(p[1]>b[1]+0.5 || (Math.abs(p[1]-b[1])<=0.5 && p[0]<b[0])) si=i; });
+  pts=pts.slice(si).concat(pts.slice(0,si)); pts.push(pts[0]);
+  const Q=_remuestrear(pts,1), n=Q.length-1; if(n<10) return null;
+  const head=[]; for(let i=0;i<n;i++) head[i]=Math.atan2(Q[i+1][1]-Q[i][1], Q[i+1][0]-Q[i][0]);
+  const wrap=a=>{ while(a>Math.PI) a-=2*Math.PI; while(a<-Math.PI) a+=2*Math.PI; return a; };
+  const turn=[]; for(let i=0;i<n;i++) turn[i]=wrap(head[i]-head[(i-1+n)%n]);
+  const sumT=(a,b)=>{ let s=0; for(let k=a;k<=b;k++) s+=turn[((k%n)+n)%n]; return s; };
+  const w=3, T=[]; for(let i=0;i<n;i++) T[i]=sumT(i-w,i+w);
+  const thr=o.esquinaGrados*Math.PI/180, used=new Uint8Array(n), bends=[], curvas=[];
+  const lado=(i,ang)=>{ const a=Q[((i-6)%n+n)%n], b=Q[((i-5)%n+n)%n]; let dx=b[0]-a[0], dy=b[1]-a[1]; const L=Math.hypot(dx,dy)||1; dx/=L; dy/=L;
+    const nl=[-dy,dx], tN = ang>0 ? nl : [dy,-dx]; const mat = esTinta(a[0]+nl[0]*1.5, a[1]+nl[1]*1.5) ? nl : [-nl[0],-nl[1]];
+    return (tN[0]*mat[0]+tN[1]*mat[1])>0 ? "adentro" : "afuera"; };
+  const orden=[...Array(n).keys()].sort((a,b)=>Math.abs(T[b])-Math.abs(T[a]));
+  for(const i of orden){ if(Math.abs(T[i])<=thr) break; if(used[i]) continue;
+    const ang=sumT(i-3,i+3); for(let k=-4;k<=4;k++) used[((i+k)%n+n)%n]=1;
+    bends.push({s:i, ang:Math.abs(ang)*180/Math.PI, dir:lado(i,ang)}); }
+  bends.sort((a,b)=>a.s-b.s);
+  // Dobleces muy juntos (remates o puntas finas) se juntan en una "punta" con su ángulo total
+  for(let k=bends.length-1;k>0;k--){ const a=bends[k-1], b=bends[k];
+    if(b.s-(a.s2||a.s)<12){ a.s2=b.s2||b.s; a.n=(a.n||1)+(b.n||1); a.punta=true; const t=sumT(a.s-4,a.s2+4); a.ang=Math.abs(t)*180/Math.PI; a.dir=lado(a.s,t); bends.splice(k,1); } }
+  const kmin=(4*Math.PI/180)/10; let i=0;
+  while(i<n){ if(used[i]||Math.abs(T[i]/(2*w+1))<kmin){ i++; continue; }
+    const sg=Math.sign(T[i]); let j=i; while(j<n && !used[j] && Math.abs(T[j]/(2*w+1))>=kmin && Math.sign(T[j])===sg) j++;
+    if(j-i>=15){ const ang=sumT(i,j-1), paso=o.curvaCadaCm*10, ticks=[]; for(let s=i;s<=j;s+=paso) ticks.push(s);
+      curvas.push({s0:i, s1:j, ang:Math.abs(ang)*180/Math.PI, radio:(j-i)/Math.max(1e-6,Math.abs(ang))/10, dir:lado(Math.round((i+j)/2),ang), ticks}); }
+    i=j; }
+  // Une curvas seguidas del mismo lado (separadas por menos de 6 mm)
+  for(let k=curvas.length-1;k>0;k--){ const a=curvas[k-1], b=curvas[k];
+    if(a.dir===b.dir && b.s0-a.s1<=6){ a.s1=b.s1; a.ang+=b.ang; a.radio=(a.s1-a.s0)/Math.max(1e-6,a.ang*Math.PI/180)/10; curvas.splice(k,1); } }
+  curvas.forEach(cv=>{ cv.ticks=[]; for(let t=cv.s0;t<=cv.s1;t+=o.curvaCadaCm*10) cv.ticks.push(t); });
+  // El inicio (y el cierre con traslape) va a la mitad del tramo recto más largo
+  const feats=[...bends.map(b=>[b.s-4,b.s+4]), ...curvas.map(c=>[c.s0,c.s1])].sort((x,y)=>x[0]-y[0]);
+  let off=0;
+  if(feats.length){ let mejor=-1; for(let k=0;k<feats.length;k++){ const fin=feats[k][1], ini=k+1<feats.length?feats[k+1][0]:feats[0][0]+n, gap=ini-fin; if(gap>mejor){ mejor=gap; off=Math.round(fin+gap/2); } } }
+  off=((off%n)+n)%n;
+  if(off){ const mv=x=>((x-off)%n+n)%n;
+    const Q2=Q.slice(off,n).concat(Q.slice(0,off)); Q2.push(Q2[0]);
+    bends.forEach(b=>{ const largo=(b.s2||b.s)-b.s; b.s=mv(b.s); if(b.punta) b.s2=b.s+largo; }); bends.sort((a,b)=>a.s-b.s);
+    curvas.forEach(c=>{ const largo=c.s1-c.s0, d=mv(c.s0)-c.s0; c.s0+=d; c.s1=c.s0+largo; c.ticks=c.ticks.map(t=>t+d); });
+    curvas.sort((a,b)=>a.s0-b.s0);
+    return {Q:Q2, n, bends, curvas}; }
+  return {Q, n, bends, curvas};
+}
+
+// Letras de un renglón → contornos por letra
+async function _desdoblarTexto(texto, fam, anchoCm, o){
+  const f=_fAlu(fam); await _cargarFuenteNeon([f[0],f[1],f[2]], texto);
+  const c=document.createElement("canvas"), ctx=c.getContext("2d",{willReadFrequently:true});
+  ctx.font=`${f[2]} 300px "${f[0]}"`; const m=ctx.measureText(texto); const anchoPx=m.actualBoundingBoxLeft+m.actualBoundingBoxRight; if(!(anchoPx>0)) return [];
+  const cmPorPx300=anchoCm/anchoPx, out=[];
+  for(const ch of texto){ if(!ch.trim()) continue;
+    let fp=300*cmPorPx300*10*o.pxPorMm; ctx.font=`${f[2]} ${fp}px "${f[0]}"`; let mc=ctx.measureText(ch);
+    const alto=mc.actualBoundingBoxAscent+mc.actualBoundingBoxDescent, ancho=mc.actualBoundingBoxLeft+mc.actualBoundingBoxRight;
+    const k=Math.min(1, 2200/Math.max(alto,ancho,1)); fp*=k; const ppm=o.pxPorMm*k;
+    ctx.font=`${f[2]} ${fp}px "${f[0]}"`; mc=ctx.measureText(ch);
+    const pad=Math.ceil(o.offsetMm*ppm)+8, W=Math.ceil(mc.actualBoundingBoxLeft+mc.actualBoundingBoxRight)+2*pad, H=Math.ceil(mc.actualBoundingBoxAscent+mc.actualBoundingBoxDescent)+2*pad;
+    c.width=W; c.height=H; ctx.font=`${f[2]} ${fp}px "${f[0]}"`; ctx.fillStyle="#000"; ctx.fillText(ch, pad+mc.actualBoundingBoxLeft, pad+mc.actualBoundingBoxAscent);
+    const r=_contornosMascara(ctx.getImageData(0,0,W,H).data, W, H, ppm, o.offsetMm);
+    out.push({label:ch, W:W/ppm, H:H/ppm, contornos:r.contornos.map(ct=>({...ct, an:_analizarDoblez(ct.pts, r.esTinta, o)})).filter(ct=>ct.an)});
+  }
+  return out;
+}
+async function _desdoblarSVG(svgTxt, anchoCm, nombre, o){
+  const img=await new Promise((ok,ko)=>{ const im=new Image(), url=URL.createObjectURL(new Blob([svgTxt],{type:"image/svg+xml"})); im.onload=()=>ok(im); im.onerror=()=>ko(new Error("No pude leer el SVG")); im.src=url; });
+  const ppm=o.pxPorMm, Wmm=anchoCm*10, Hmm=Wmm*(img.naturalHeight||img.height)/(img.naturalWidth||img.width), pad=Math.ceil(o.offsetMm*ppm)+8;
+  const W=Math.ceil(Wmm*ppm)+2*pad, H=Math.ceil(Hmm*ppm)+2*pad, c=document.createElement("canvas"); c.width=W; c.height=H;
+  const ctx=c.getContext("2d",{willReadFrequently:true}); ctx.drawImage(img,pad,pad,W-2*pad,H-2*pad);
+  const r=_contornosMascara(ctx.getImageData(0,0,W,H).data, W, H, ppm, o.offsetMm);
+  return [{label:nombre||"Logo", W:W/ppm, H:H/ppm, contornos:r.contornos.map(ct=>({...ct, an:_analizarDoblez(ct.pts, r.esTinta, o)})).filter(ct=>ct.an)}];
+}
+
+const _DES_ADENTRO="#0f9d6b", _DES_AFUERA="#d9532b", _DES_CURVA="#c98a0b";
+function _svgLetraDes(L){
+  const pad=8, vb=`${-pad} ${-pad} ${L.W+2*pad} ${L.H+2*pad}`, r=Math.max(L.W,L.H)/45;
+  const path=p=>"M"+p.map(q=>q[0].toFixed(1)+","+q[1].toFixed(1)).join(" L")+"Z";
+  let marcas=""; L.contornos.forEach((ct,ci)=>{ const Q=ct.an.Q;
+    marcas+=`<circle cx="${Q[0][0]}" cy="${Q[0][1]}" r="${r*0.8}" fill="#334155"/>`;
+    ct.an.curvas.forEach(cv=>{ marcas+=`<polyline points="${Q.slice(cv.s0,cv.s1+1).map(q=>q.join(",")).join(" ")}" fill="none" stroke="${_DES_CURVA}" stroke-width="${r*0.9}" stroke-opacity=".55"/>`; });
+    ct.an.bends.forEach((b,bi)=>{ const p=Q[b.s], col=b.dir==="adentro"?_DES_ADENTRO:_DES_AFUERA;
+      marcas+=`<circle cx="${p[0]}" cy="${p[1]}" r="${r*1.6}" fill="${col}"/><text x="${p[0]}" y="${p[1]}" font-size="${r*1.9}" text-anchor="middle" dominant-baseline="central" fill="#fff" font-weight="800">${L.contornos.length>1?(ci+1)+".":""}${bi+1}</text>`; }); });
+  return `<svg viewBox="${vb}" style="width:100%;max-height:230px;display:block;background:#f8fafc;border-radius:8px;">
+    ${L.contornos.map(ct=>`<path d="${path(ct.pts)}" fill="${ct.tipo==="hueco"?"#fff":"#e2e8f0"}" stroke="#475569" stroke-width="${r*0.35}"/>`).join("")}${marcas}</svg>`;
+}
+function _svgTiraDes(an, o){
+  const L=an.n/10+o.traslapeCm, W=640, esc=(W-20)/L, x=s=>10+s/10*esc;
+  let g=`<rect x="10" y="22" width="${W-20}" height="26" rx="3" fill="#e2e8f0" stroke="#94a3b8" stroke-width=".6"/>
+    <rect x="${x(an.n)}" y="22" width="${o.traslapeCm*esc}" height="26" fill="#cbd5e1"/><text x="${x(an.n)+2}" y="58" font-size="9.5" fill="#64748b">traslape</text>`;
+  an.curvas.forEach(cv=>{ g+=`<rect x="${x(cv.s0)}" y="22" width="${(cv.s1-cv.s0)/10*esc}" height="26" fill="${_DES_CURVA}" fill-opacity=".22"/>`+cv.ticks.map(s=>`<line x1="${x(s)}" x2="${x(s)}" y1="22" y2="48" stroke="${_DES_CURVA}" stroke-width=".8"/>`).join(""); });
+  an.bends.forEach((b,i)=>{ const col=b.dir==="adentro"?_DES_ADENTRO:_DES_AFUERA; g+=`<line x1="${x(b.s)}" x2="${x(b.s)}" y1="14" y2="56" stroke="${col}" stroke-width="2" ${b.dir==="afuera"?'stroke-dasharray="4 3"':""}/><text x="${x(b.s)}" y="11" font-size="10" text-anchor="middle" fill="${col}" font-weight="800">${i+1}</text>`; });
+  g+=`<text x="10" y="70" font-size="10" fill="#64748b">0 cm</text><text x="${W-10}" y="70" font-size="10" text-anchor="end" fill="#64748b">${L.toFixed(1)} cm</text>`;
+  return `<svg viewBox="0 0 ${W} 76" style="width:100%;display:block;">${g}</svg>`;
+}
+function _listaDes(an, o){
+  const filas=[...an.bends.map((b,i)=>({s:b.s, t: b.punta ? `<b style="color:${b.dir==="adentro"?_DES_ADENTRO:_DES_AFUERA};">${i+1}</b> · <b>punta</b> de <b>${(b.s/10).toFixed(1)} a ${(b.s2/10).toFixed(1)} cm</b> · ${Math.round(b.ang)}° en total hacia ${b.dir} (${b.n} dobleces chicos)` : `<b style="color:${b.dir==="adentro"?_DES_ADENTRO:_DES_AFUERA};">${i+1}</b> · a <b>${(b.s/10).toFixed(1)} cm</b> · ${Math.round(b.ang)}° hacia ${b.dir}`})),
+    ...an.curvas.map(cv=>({s:cv.s0, t:`<b style="color:${_DES_CURVA};">Curva</b> · de ${(cv.s0/10).toFixed(1)} a ${(cv.s1/10).toFixed(1)} cm · ${Math.round(cv.ang)}° hacia ${cv.dir} · radio ≈ ${cv.radio.toFixed(1)} cm · marcas cada ${o.curvaCadaCm} cm`}))].sort((a,b)=>a.s-b.s);
+  return `<div style="font-size:12px;line-height:1.7;">${filas.map(f=>`<div>${f.t}</div>`).join("")||'<div style="color:var(--muted);">Sin dobleces (todo recto).</div>'}
+    <div style="color:var(--muted);">Tira de ${(an.n/10).toFixed(1)} cm + ${o.traslapeCm} cm de traslape = <b>${(an.n/10+o.traslapeCm).toFixed(1)} cm</b></div></div>`;
+}
+// Plantilla para imprimir a escala 1:1 en hojas carta horizontales (tramos de 25 cm)
+function _plantillaDes(letras, o, titulo){
+  const tramo=250, alto=o.tiraCm*10;
+  let filas="";
+  letras.forEach(L=>L.contornos.forEach((ct,ci)=>{ const an=ct.an, Lmm=an.n+o.traslapeCm*10, nombre=`${L.label}${L.contornos.length>1?(ct.tipo==="hueco"?" · hueco "+ci:" · exterior"):""}`;
+    for(let s0=0;s0<Lmm;s0+=tramo){ const s1=Math.min(Lmm,s0+tramo);
+      let g=`<rect x="${s0}" y="10" width="${s1-s0}" height="${alto}" fill="none" stroke="#000" stroke-width=".3"/>`;
+      if(s1>an.n) g+=`<rect x="${Math.max(s0,an.n)}" y="10" width="${s1-Math.max(s0,an.n)}" height="${alto}" fill="#ddd"/><text x="${Math.max(s0,an.n)+2}" y="${14+alto/2}" font-size="4">TRASLAPE</text>`;
+      an.curvas.forEach(cv=>cv.ticks.filter(s=>s>=s0&&s<=s1).forEach(s=>{ g+=`<line x1="${s}" x2="${s}" y1="10" y2="${10+alto}" stroke="#c98a0b" stroke-width=".4"/>`; }));
+      an.curvas.filter(cv=>cv.s1>=s0&&cv.s0<=s1).forEach(cv=>{ g+=`<text x="${Math.max(cv.s0,s0)+1}" y="${10+alto-2}" font-size="3.2" fill="#a16207">curva ${Math.round(cv.ang)}° ${cv.dir} (r≈${cv.radio.toFixed(1)} cm)</text>`; });
+      an.bends.filter(b=>b.punta&&b.s2>=s0&&b.s<=s1).forEach(b=>{ g+=`<rect x="${Math.max(b.s,s0)}" y="10" width="${Math.min(b.s2,s1)-Math.max(b.s,s0)}" height="${alto}" fill="#fde68a" fill-opacity=".6"/>`; });
+      an.bends.forEach((b,i)=>{ if(b.s<s0||b.s>s1) return; const col=b.dir==="adentro"?"#047857":"#c2410c";
+        g+=`<line x1="${b.s}" x2="${b.s}" y1="6" y2="${14+alto}" stroke="${col}" stroke-width=".6" ${b.dir==="afuera"?'stroke-dasharray="2 1.5"':""}/><text x="${b.s}" y="5" font-size="3.6" text-anchor="middle" fill="${col}" font-weight="bold">${i+1} · ${Math.round(b.ang)}° ${b.dir==="adentro"?"ADENTRO":"AFUERA"}${b.punta?" (punta "+((b.s2-b.s)/10).toFixed(1)+" cm)":""}</text>`; });
+      for(let t=Math.ceil(s0/10)*10;t<=s1;t+=10){ const cinco=(t/10)%5===0; g+=`<line x1="${t}" x2="${t}" y1="${10+alto}" y2="${10+alto+(cinco?5:2.5)}" stroke="#000" stroke-width=".25"/>`+(cinco?`<text x="${t}" y="${10+alto+9}" font-size="3.2" text-anchor="middle">${t/10}</text>`:""); }
+      if(s0===0) g+=`<text x="1" y="${14+alto/2}" font-size="4" font-weight="bold">INICIO ▶</text>`;
+      filas+=`<div class="fila"><div class="tit">${escapeHTML(nombre)} · de ${(s0/10).toFixed(0)} a ${(s1/10).toFixed(1)} cm</div>
+        <svg width="${(s1-s0)}mm" height="${alto+18}mm" viewBox="${s0} 0 ${s1-s0} ${alto+18}">${g}</svg></div>`; }
+  }));
+  return `<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Plantilla de dobleces · ${escapeHTML(titulo)}</title>
+  <style>@page{size:letter landscape;margin:10mm} body{font-family:Arial,sans-serif;margin:0} .fila{break-inside:avoid;margin-bottom:6mm} .tit{font-size:9pt;font-weight:bold;margin-bottom:1mm}
+  .reg{font-size:8pt;margin-bottom:4mm}</style></head><body>
+  <div class="reg"><b>${escapeHTML(titulo)}</b> · Escala 1:1 · offset hacia adentro ${o.offsetMm} mm · tira de ${o.tiraCm} cm · imprime al 100% (sin "ajustar a la página").
+    Comprueba la escala: <svg width="100mm" height="4mm" viewBox="0 0 100 4"><rect x="0" y="1" width="100" height="2" fill="#000"/></svg> debe medir 10 cm.
+    Verde continua = doblar hacia adentro · Naranja punteada = doblar hacia afuera · Amarillo = marcas de curva.</div>${filas}</body></html>`;
+}
+function _svgDes1a1(letras, o){
+  let y=0, g=""; const alto=o.tiraCm*10;
+  letras.forEach(L=>L.contornos.forEach(ct=>{ const an=ct.an, Lmm=an.n+o.traslapeCm*10;
+    g+=`<text x="0" y="${y+6}" font-size="5">${escapeHTML(L.label)} ${ct.tipo}</text><rect x="0" y="${y+8}" width="${Lmm}" height="${alto}" fill="none" stroke="#000" stroke-width=".3"/>`;
+    an.bends.forEach((b,i)=>{ g+=`<line x1="${b.s}" x2="${b.s}" y1="${y+8}" y2="${y+8+alto}" stroke="${b.dir==="adentro"?"#00a000":"#ff6000"}" stroke-width=".4"/><text x="${b.s+1}" y="${y+13}" font-size="3.5">${i+1} ${Math.round(b.ang)}° ${b.dir}</text>`; });
+    an.curvas.forEach(cv=>cv.ticks.forEach(s=>{ g+=`<line x1="${s}" x2="${s}" y1="${y+8}" y2="${y+8+alto}" stroke="#c98a0b" stroke-width=".25"/>`; }));
+    y+=alto+16; }));
+  const W=Math.max(10,...letras.flatMap(L=>L.contornos.map(ct=>ct.an.n+o.traslapeCm*10)));
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" width="${W}mm" height="${y}mm" viewBox="0 0 ${W} ${y}">${g}</svg>`;
+}
+
+function openDesdoblado(inicial){
+  const old=document.getElementById("_desModal"); if(old) old.remove();
+  const o={...DESD}; const st={modo:"texto", texto:inicial&&inicial.texto||"", fuente:inicial&&inicial.fuente||"Cinzel", ancho:Number(inicial&&inicial.ancho)||60, svgTxt:"", svgNombre:""};
+  let letras=[], turno=0;
+  const ov=document.createElement("div"); ov.id="_desModal";
+  ov.style.cssText="position:fixed;inset:0;background:rgba(2,6,23,.6);display:flex;align-items:center;justify-content:center;z-index:10000;padding:12px;";
+  document.body.appendChild(ov);
+  const selS="background:transparent;border:none;color:var(--text);font-family:inherit;font-size:13px;width:100%;padding:8px 0;";
+  const num=(id,label,v,step)=>`<div><div class="field-label">${label}</div><div class="field"><input id="${id}" type="number" step="${step||1}" value="${v}"></div></div>`;
+  ov.innerHTML=`<div style="background:var(--card);border-radius:16px;width:1100px;max-width:100%;max-height:95vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.3);">
+    <div style="display:flex;align-items:center;gap:10px;padding:12px 18px;border-bottom:1px solid var(--border);">
+      <div style="font-size:16px;font-weight:900;flex:1;">📐 Desdoblado de letras (canto)</div><button class="btn small" id="_desClose">✕</button></div>
+    <div style="padding:12px 18px;overflow:auto;">
+      <div style="display:grid;grid-template-columns:110px minmax(0,2fr) minmax(0,1.3fr) 110px;gap:8px;align-items:end;">
+        <div><div class="field-label">Pieza</div><div class="field" style="padding:0 8px;"><select id="_desModo" style="${selS}"><option value="texto">Texto</option><option value="svg">Logo (SVG)</option></select></div></div>
+        <div id="_desEntrada"></div>
+        <div id="_desFuenteBox"><div class="field-label">Tipo de letra</div><div class="field" style="padding:0 8px;"><select id="_desFuente" style="${selS}">${ALU_FUENTES.map(f=>`<option value="${f[0]}">${f[1]}</option>`).join("")}</select></div></div>
+        ${num("_desAncho","Ancho total (cm)",st.ancho)}
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin-top:8px;">
+        ${num("_desOff","Offset hacia adentro (mm)",o.offsetMm,0.5)}${num("_desEsq","Esquina desde (°)",o.esquinaGrados)}${num("_desCurva","Marcas de curva cada (cm)",o.curvaCadaCm,0.5)}${num("_desTras","Traslape (cm)",o.traslapeCm,0.5)}${num("_desTira","Ancho de tira (cm)",o.tiraCm,0.5)}
+      </div>
+      <div style="display:flex;gap:14px;font-size:11.5px;color:var(--muted);margin:10px 0 4px;flex-wrap:wrap;">
+        <span><b style="color:${_DES_ADENTRO};">●</b> Doblar hacia adentro (hacia la letra)</span><span><b style="color:${_DES_AFUERA};">●</b> Doblar hacia afuera</span><span><b style="color:${_DES_CURVA};">●</b> Curva (doblar poco a poco en las marcas)</span><span>⚫ Inicio de la tira</span></div>
+      <div id="_desRes"></div>
+    </div>
+    <div style="display:flex;justify-content:flex-end;gap:8px;padding:12px 18px;border-top:1px solid var(--border);flex-wrap:wrap;">
+      <button class="btn" id="_desSvg">⬇ SVG 1:1</button><button class="btn primary" id="_desPrint">🖨 Plantilla para imprimir (1:1)</button><button class="btn" id="_desCancel">Cerrar</button></div></div>`;
+  const $d=id=>document.getElementById(id);
+  const entrada=()=>{ $d("_desEntrada").innerHTML= st.modo==="texto"
+      ? `<div class="field-label">Texto (cada letra sale aparte)</div><div class="field"><input id="_desTexto" value="${escapeAttr(st.texto)}" placeholder="Ej: TRÍA"></div>`
+      : `<div class="field-label">Logo en SVG</div><input type="file" id="_desFile" accept=".svg,image/svg+xml" style="font-size:12px;"> <span style="font-size:11.5px;color:var(--muted);">${escapeHTML(st.svgNombre||"")}</span>`;
+    $d("_desFuenteBox").style.visibility = st.modo==="texto"?"visible":"hidden";
+    if(st.modo==="texto") $d("_desTexto").onchange=e=>{ st.texto=e.target.value; calcular(); };
+    else $d("_desFile").onchange=async e=>{ const f=e.target.files[0]; if(!f) return; st.svgTxt=await f.text(); st.svgNombre=f.name; entrada(); calcular(); }; };
+  const calcular=async()=>{ const yo=++turno, res=$d("_desRes");
+    if(st.modo==="texto"&&!st.texto.trim() || st.modo==="svg"&&!st.svgTxt){ res.innerHTML=`<div style="color:var(--muted);padding:24px;text-align:center;">Escribe el texto o sube el logo.</div>`; letras=[]; return; }
+    res.innerHTML=`<div style="color:var(--muted);padding:24px;text-align:center;">Desdoblando…</div>`;
+    try{ const L = st.modo==="texto" ? await _desdoblarTexto(st.texto.trim(), st.fuente, st.ancho, o) : await _desdoblarSVG(st.svgTxt, st.ancho, st.svgNombre.replace(/\.svg$/i,""), o);
+      if(yo!==turno) return; letras=L;
+      const total=L.reduce((a,l)=>a+l.contornos.reduce((b,ct)=>b+ct.an.n/10+o.traslapeCm,0),0);
+      res.innerHTML=`<div style="font-size:12.5px;margin-bottom:8px;"><b>${L.length}</b> pieza(s) · <b>${L.reduce((a,l)=>a+l.contornos.length,0)}</b> tira(s) · <b>${(total/100).toFixed(2)} m</b> de canto con traslapes</div>`+
+        L.map(l=>`<div class="card" style="padding:10px;margin-bottom:10px;display:grid;grid-template-columns:200px minmax(0,1fr);gap:12px;align-items:start;">
+          <div><div style="font-size:15px;font-weight:900;margin-bottom:4px;">${escapeHTML(l.label)}</div>${_svgLetraDes(l)}</div>
+          <div>${l.contornos.map((ct,ci)=>`<div style="margin-bottom:8px;"><div style="font-size:12px;font-weight:800;">${l.contornos.length>1?`Tira ${ci+1} · ${ct.tipo==="hueco"?"hueco":"exterior"}`:"Tira"}</div>${_svgTiraDes(ct.an,o)}${_listaDes(ct.an,o)}</div>`).join("")}</div></div>`).join("");
+    }catch(e){ if(yo===turno) res.innerHTML=`<div style="color:var(--red);padding:20px;">${escapeHTML(e.message)}</div>`; } };
+  $d("_desModo").value=st.modo; $d("_desFuente").value=st.fuente;
+  $d("_desModo").onchange=e=>{ st.modo=e.target.value; entrada(); calcular(); };
+  $d("_desFuente").onchange=e=>{ st.fuente=e.target.value; calcular(); };
+  $d("_desAncho").onchange=e=>{ st.ancho=Number(e.target.value)||0; calcular(); };
+  [["_desOff","offsetMm"],["_desEsq","esquinaGrados"],["_desCurva","curvaCadaCm"],["_desTras","traslapeCm"],["_desTira","tiraCm"]].forEach(([id,k])=>$d(id).onchange=e=>{ o[k]=Number(e.target.value)||0; calcular(); });
+  $d("_desClose").onclick=$d("_desCancel").onclick=()=>ov.remove();
+  const nombreArch=()=>(st.modo==="texto"?st.texto:st.svgNombre||"logo").replace(/[^\wáéíóúñ]+/gi,"-").slice(0,30);
+  $d("_desPrint").onclick=()=>{ if(!letras.length) return; _printHTML(_plantillaDes(letras,o,`Desdoblado ${st.modo==="texto"?st.texto:st.svgNombre} · ${st.ancho} cm`)); };
+  $d("_desSvg").onclick=()=>{ if(!letras.length) return; const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([_svgDes1a1(letras,o)],{type:"image/svg+xml"})); a.download=`desdoblado-${nombreArch()}.svg`; document.body.appendChild(a); a.click(); a.remove(); };
+  entrada(); calcular();
 }
 
 function _diasDesde(iso){ if(!iso) return null; return Math.round((new Date(todayISO()+"T00:00:00")-new Date(String(iso).slice(0,10)+"T00:00:00"))/86400000); }
