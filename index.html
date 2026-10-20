@@ -9959,7 +9959,7 @@ const WIZ_TIPOS = [
 ];
 // [descripción en catálogo, nombre para el cliente, ancho hoja cm, alto hoja cm, se pinta por defecto]
 const WIZ_PLANAS = [
-  ["MDF 6mm","MDF de 6 mm pintado",122,244,true],
+  ["MDF 6mm","MDF de 6 mm",122,244,true],
   ["Trovicel blanco 6mm 1.20x2.40","trovicel de 6 mm",120,240,true],
   ["Acrílico sólido blanco/rojo/negro 3mm 1.22x2.44","acrílico sólido de 3 mm",122,244,false],
   ["Acrílico de color 3mm 1.20x1.80","acrílico de color de 3 mm",120,180,false],
@@ -10090,7 +10090,7 @@ function openCotizadorLetrero(q, p){
   };
   const pasoResultado=()=>{ res=calcular(); const t=res.tot;
     let vistas="";
-    if(res.extra&&res.extra.nest){ const h=res.extra.hoja||{w:res.extra.mat[2],h:res.extra.mat[3]}; vistas+=`<div><div class="field-label">Acomodo en la hoja (${res.extra.frac} hoja)</div>${res.extra.nest.hojas.map((s,i)=>_svgHoja(s,h.w,h.h,i)).join("")}</div>`; }
+    if(res.extra&&res.extra.nest){ const h=res.extra.hoja||{w:res.extra.mat[2],h:res.extra.mat[3]}; vistas+=`<div><div class="field-label">Acomodo en la hoja (${res.extra.frac} hoja)</div><div style="display:flex;flex-wrap:wrap;gap:8px;">${res.extra.nest.hojas.map((s,i)=>`<div style="width:170px;">${_svgHoja(s,h.w,h.h,i)}</div>`).join("")}</div></div>`; }
     if(st.tipo==="3d"&&res.extra.tiras.length) vistas+=`<div><div class="field-label">Tiras de ${st.tira} cm × 2.44 m: ${res.extra.tiras.length}</div>${_svgTiras(res.extra.tiras,2.44)}<button class="btn small" id="_wzDes" style="margin-top:6px;">📐 Ver desdoblado (dónde doblar)</button></div>`;
     return `<div style="display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:14px;">
       <div><div class="kpi-box" style="padding:12px 14px;margin-bottom:10px;"><div class="kl">Precio de venta</div><div class="kv" style="font-size:26px;color:var(--accent);">$${money(t.venta)}</div>
