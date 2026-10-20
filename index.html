@@ -6439,7 +6439,8 @@ function openQuoteEditorPage(q){
           <option value="lost" ${q.pipelineStatus==='lost'?'selected':''}>Perdida</option>
         </select></label>`:''}
       <label class="qe-tool">Cantidad <input id="qQtyInput" type="number" min="1" value="${Number(q.qty||1)}" style="width:44px;text-align:center;"> u.</label>
-      <button class="btn small primary" id="btnAsistente" title="Arma la cotización con unos cuantos datos">⚡ Asistente de letrero</button>
+      <button class="btn small primary" id="btnWizLetrero" title="Te guía: tipo de letrero → diseño (DXF, PDF, imagen o texto) → acabados → costos → aplicar">🪧 Cotizar letrero paso a paso</button>
+      <button class="btn small" id="btnAsistente" title="Arma la cotización con unos cuantos datos">⚡ Asistente rápido</button>
       <button class="btn small" id="btnAlu3D" title="Mide el contorno de las letras y calcula tiras, lámina, LED y herrajes">📏 Letras 3D aluminio</button>
       <button class="btn small" id="btnDesdoblado" title="Desdobla el canto de cada letra: dónde, cuánto y hacia qué lado doblar">📐 Desdoblado</button>
       <button class="btn small" id="btnLoadTemplate"><i class="ti ti-folder-open"></i> Usar plantilla</button>
@@ -6639,6 +6640,7 @@ function openQuoteEditorPage(q){
   }
 
   document.getElementById("addProd").addEventListener("click",()=>{ q.products=q.products||[]; q.products.push({id:uid(),matPick:"",desc:"",qty:1,unitPrice:0}); saveQuote(q); renderLines(); });
+  const _bw=document.getElementById("btnWizLetrero"); if(_lineaDe(p)!=="letrero"){ if(_bw) _bw.style.display="none"; } else if(_bw){ _bw.addEventListener("click",()=>openCotizadorLetrero(q,p)); if(!(q.products||[]).length && !(q.routes||[]).length){ const av=document.createElement("div"); av.style.cssText="margin:8px 0;padding:10px 14px;border-radius:10px;background:rgba(37,99,235,.08);border:1px dashed var(--accent);font-size:13px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;"; av.innerHTML=`<span style="flex:1;min-width:200px;">🪧 Esta cotización de letrero está vacía. Te guío paso a paso: tipo, diseño (DXF, PDF, imagen o texto), acabados y costos.</span><button class="btn small primary">Empezar</button>`; av.querySelector("button").onclick=()=>openCotizadorLetrero(q,p); const tb=_bw.parentElement; if(tb&&tb.parentElement) tb.parentElement.insertBefore(av, tb.nextSibling); } }
   if(_lineaDe(p)!=="letrero"){ const _ba=document.getElementById("btnAsistente"); if(_ba) _ba.style.display="none"; const _b3=document.getElementById("btnAlu3D"); if(_b3) _b3.style.display="none"; const _bd=document.getElementById("btnDesdoblado"); if(_bd) _bd.style.display="none"; const _bn=document.getElementById("btnNest"); if(_bn) _bn.classList.add("primary"); }
   document.getElementById("btnAsistente").addEventListener("click",()=>openAsistenteLetrero(q, r=>{
     q.products=r.products; q.routes=r.routes; q.extras=r.extras; q.marginPct=r.marginPct; q.asis=r.asis||null;
@@ -9890,7 +9892,7 @@ function _svgDes1a1(letras, o){
 
 function openDesdoblado(inicial){
   const old=document.getElementById("_desModal"); if(old) old.remove();
-  const o={...DESD}; const st={modo:"texto", texto:inicial&&inicial.texto||"", fuente:inicial&&inicial.fuente||"Cinzel", ancho:Number(inicial&&inicial.ancho)||60, svgTxt:"", svgNombre:""};
+  const o={...DESD}; const st={modo:inicial&&inicial.file?"svg":"texto", file:inicial&&inicial.file||null, texto:inicial&&inicial.texto||"", fuente:inicial&&inicial.fuente||"Cinzel", ancho:inicial&&inicial.ancho!=null?Number(inicial.ancho):60, svgTxt:"", svgNombre:inicial&&inicial.file?inicial.file.name:""};
   let letras=[], turno=0;
   const ov=document.createElement("div"); ov.id="_desModal";
   ov.style.cssText="position:fixed;inset:0;background:rgba(2,6,23,.6);display:flex;align-items:center;justify-content:center;z-index:10000;padding:12px;";
@@ -9944,6 +9946,230 @@ function openDesdoblado(inicial){
   $d("_desPrint").onclick=()=>{ if(!letras.length) return; _printHTML(_plantillaDes(letras,o,`Desdoblado ${st.modo==="texto"?st.texto:st.svgNombre} · ${st.ancho} cm`)); };
   $d("_desSvg").onclick=()=>{ if(!letras.length) return; const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([_svgDes1a1(letras,o)],{type:"image/svg+xml"})); a.download=`desdoblado-${nombreArch()}.svg`; document.body.appendChild(a); a.click(); a.remove(); };
   entrada(); calcular();
+}
+
+// ── COTIZADOR DE LETREROS PASO A PASO ──
+// Pedido del dueño (20/10/2026): al cotizar un letrero, que la app guíe paso a paso:
+// 1 tipo · 2 diseño (archivo, texto o neón) y foto · 3 acabados · 4 resultado con costos y vistas · 5 aplicar.
+const WIZ_TIPOS = [
+  ["neon","💡","Neón LED","Letras de neón sobre acrílico"],
+  ["caja","🔆","Caja de luz","Letrero luminoso de bandera o de pared"],
+  ["3d","🔠","Letras 3D de aluminio","Con volumen, con o sin luz por detrás"],
+  ["planas","✂️","Letras o figuras planas","MDF, acrílico o trovicel cortado en router"],
+];
+// [descripción en catálogo, nombre para el cliente, ancho hoja cm, alto hoja cm, se pinta por defecto]
+const WIZ_PLANAS = [
+  ["MDF 6mm","MDF de 6 mm pintado",122,244,true],
+  ["Trovicel blanco 6mm 1.20x2.40","trovicel de 6 mm",120,240,true],
+  ["Acrílico sólido blanco/rojo/negro 3mm 1.22x2.44","acrílico sólido de 3 mm",122,244,false],
+  ["Acrílico de color 3mm 1.20x1.80","acrílico de color de 3 mm",120,180,false],
+  ["Acrílico espejo plata/dorado 3mm 1.20x2.40","acrílico espejo de 3 mm",120,240,false],
+];
+const WIZ_REGLAS = { routerBaseH:0.5, routerHporM:0.12, habBaseH:1, habHporPieza:0.25, pinturaM2PorL:3, pinturaHporM2:2 };
+
+function _wizFila(desc, qty, faltan){ return _asisProd(desc, qty, faltan); }
+function _wizCalc3D(piezas, o){
+  const faltan=[], hoja=_aluHoja(o.alu), tpH=Math.floor(hoja.w/o.tira), precioTira=hoja.costo/tpH;
+  const tiras=_cortarTiras(piezas, hoja.h/100);
+  const nest=_acomodarPiezas(piezas.map(p=>({w:p.w,h:p.h,qty:1,label:p.label})), hoja.w, hoja.h, ALU_REGLAS.sepFrenteCm, true);
+  const frac=nest.hojas.length ? Math.ceil(((nest.hojas.length-1)+nest.hojas[nest.hojas.length-1].usedY/hoja.h)*100)/100 : 0;
+  const per=piezas.reduce((a,p)=>a+p.perM,0), ledM=o.luz?per*ALU_REGLAS.ledPorM:0, rollos=ledM>0?Math.max(1,Math.ceil(ledM*1.1/5)):0;
+  const lista=ASIS_FUENTES[o.uso], fuente=ledM>0?(lista.find(f=>f[1]>=ledM*ASIS_REGLAS.wattsPorMetro*ASIS_REGLAS.margenFuente)||lista[lista.length-1]):null;
+  const nEsc=piezas.reduce((a,p)=>a+ALU_REGLAS.escuadrasPorPieza+(p.h>ALU_REGLAS.escuadrasExtraSiAltoCm?1:0),0);
+  const rows=[{id:uid(), desc:hoja.desc, matPick:hoja.enCatalogo?hoja.desc:"", qty:frac, unitPrice:hoja.costo}];
+  if(tiras.length) rows.push({id:uid(), desc:`Tira de aluminio ${o.alu==="dorado"?"dorado":"natural"} ${o.tira} cm × 2.44 m (${tpH} por hoja)`, matPick:"", qty:tiras.length, unitPrice:Math.round(precioTira*100)/100});
+  if(o.pintar) rows.push(_wizFila("pintura",1,faltan));
+  if(ledM>0){ rows.push(_wizFila(o.uso==="exterior"?"led para exterior":"Tira COB 12V interior (rollo 5 m)",rollos,faltan)); rows.push(_wizFila(fuente[0],1,faltan)); rows.push(_wizFila("Cable cal 22 cobre (para letrero)",Math.ceil(5+piezas.length),faltan)); }
+  rows.push(_wizFila("silicon",Math.max(1,Math.ceil(piezas.length/10)),faltan), _wizFila("kola Loca",1,faltan), _wizFila("Papel para plantilla",1,faltan));
+  rows.push(_wizFila("Escuadra natural",nEsc,faltan), _wizFila("tornillos para letreros",nEsc,faltan), _wizFila("tornillo para taquete",nEsc,faltan), _wizFila("Taquete de madera",nEsc,faltan));
+  if(ledM>0 && Number(o.instalacion)>0) rows.push(_wizFila("Cable THW cal 14 (instalación)",10,faltan), _wizFila("Apagador sencillo con placa",1,faltan), _wizFila("Grapas para cable",1,faltan));
+  const hSug={router:Math.round((ALU_REGLAS.routerBaseH+per*ALU_REGLAS.routerHporM)*10)/10, hab:Math.round((ALU_REGLAS.habBaseH+per*ALU_REGLAS.habHporM3D+piezas.length*ALU_REGLAS.habHporPieza+ledM*ALU_REGLAS.habHporMLed)*2)/2};
+  return {rows, faltan, hSug, extra:{tiras, nest, hoja, frac, ledM, rollos, nEsc, tpH}};
+}
+function _wizCalcPlanas(piezas, o){
+  const faltan=[], mat=WIZ_PLANAS.find(x=>x[0]===o.material)||WIZ_PLANAS[0];
+  const nest=_acomodarPiezas(piezas.map(p=>({w:p.w,h:p.h,qty:1,label:p.label})), mat[2], mat[3], 1, true);
+  const frac=nest.hojas.length ? Math.ceil(((nest.hojas.length-1)+nest.hojas[nest.hojas.length-1].usedY/mat[3])*100)/100 : 0;
+  const areaM2=piezas.reduce((a,p)=>a+p.areaCm2,0)/10000, per=piezas.reduce((a,p)=>a+p.perM,0);
+  const rows=[{..._wizFila(mat[0],frac,faltan), nest:{uso:"piezas planas"}}];
+  if(o.pintar) rows.push(_wizFila("pintura",Math.max(1,Math.ceil(areaM2*2/WIZ_REGLAS.pinturaM2PorL)),faltan));
+  if(o.montaje==="cinta") rows.push(_wizFila("Cinta doble cara",Math.max(1,Math.ceil(piezas.length/6)),faltan), _wizFila("silicon",1,faltan));
+  if(o.montaje==="separadores") rows.push(_wizFila("Chapetón acero inoxidable 19x30",piezas.length*2,faltan));
+  rows.push(_wizFila("Papel para plantilla",1,faltan));
+  const hSug={router:Math.round((WIZ_REGLAS.routerBaseH+per*WIZ_REGLAS.routerHporM)*10)/10, hab:Math.round((WIZ_REGLAS.habBaseH+piezas.length*WIZ_REGLAS.habHporPieza+(o.pintar?areaM2*WIZ_REGLAS.pinturaHporM2:0))*2)/2};
+  return {rows, faltan, hSug, extra:{nest, mat, frac, areaM2}};
+}
+
+function openCotizadorLetrero(q, p){
+  const old=document.getElementById("_wizModal"); if(old) old.remove();
+  const st={ paso:1, tipo:null, fuente:"archivo", file:null, texto:"", fam:"Cinzel", ancho:0, piezas:null, anchoTotal:0, altoTotal:0, leyendo:false,
+    foto:null, fotoNombre:"", neon:null, color:"blanco", base:"transparente", uso:"interior", montaje:"pared", caja:ASIS_CAJAS[1][0], colores:2, kit:true, bandera:true, negocio:(p&&p.name||"").split("·")[0].trim(),
+    alu:"natural", tira:5, luz:true, pintar:false, material:WIZ_PLANAS[0][0], pintarPlanas:true, montajePlanas:"cinta", instalacion:800, utilidad:Number(q.marginPct)||60, horas:{}, modo:(q.products||[]).length?"sumar":"reemplazar" };
+  const ov=document.createElement("div"); ov.id="_wizModal";
+  ov.style.cssText="position:fixed;inset:0;background:rgba(2,6,23,.6);display:flex;align-items:center;justify-content:center;z-index:9998;padding:12px;";
+  document.body.appendChild(ov);
+  const selS="background:transparent;border:none;color:var(--text);font-family:inherit;font-size:13px;width:100%;padding:8px 0;";
+  const fld=(label,html)=>`<div><div class="field-label">${label}</div>${html}</div>`;
+  const inp=(id,v,type,extra)=>`<div class="field"><input id="${id}" type="${type||"text"}" value="${escapeAttr(v)}" ${extra||""}></div>`;
+  const sel=(id,v,opts)=>`<div class="field" style="padding:0 10px;"><select id="${id}" style="${selS}">${opts.map(([k,l])=>`<option value="${escapeAttr(k)}" ${String(v)===String(k)?"selected":""}>${escapeHTML(l)}</option>`).join("")}</select></div>`;
+  const chk=(id,v,label)=>`<label style="display:flex;gap:6px;align-items:center;font-size:12.5px;"><input type="checkbox" id="${id}" ${v?"checked":""}> ${label}</label>`;
+  const PASOS=["Tipo","Diseño","Acabados","Resultado","Aplicar"];
+  let res=null;
+
+  // ── Cálculo según el tipo ──
+  const calcular=()=>{
+    const ins=Number(st.instalacion)||0, ut=Number(st.utilidad)||60; let r;
+    if(st.tipo==="neon"){ const u=st.neon;
+      const a=_asisCalcular("neon",{texto:u.texto.replace(/\n+/g," "), lineas:u.texto.split("\n").length, ancho:u.anchoBase, alto:u.altoBase, estilo:u.estilo, color:st.color, base:st.base, uso:st.uso, montaje:st.montaje, instalacion:ins, utilidad:ut, metrosLinea:Math.round(u.metros*100)/100, tramosLinea:u.tramos});
+      r={rows:a.products, routes:a.routes, extras:a.extras, faltan:a.faltan, nombre:a.nombre, asis:a.asis, notas:a.notas};
+    } else if(st.tipo==="caja"){
+      const a=_asisCalcular("caja",{caja:st.caja, colores:st.colores, kit:st.kit, bandera:st.bandera, instalacion:ins, negocio:st.negocio, utilidad:ut});
+      r={rows:a.products, routes:a.routes, extras:a.extras, faltan:a.faltan, nombre:a.nombre, notas:a.notas};
+    } else {
+      const piezas=st.piezas.map(x=>({...x}));
+      const c = st.tipo==="3d" ? _wizCalc3D(piezas,{alu:st.alu, tira:st.tira, luz:st.luz, uso:st.uso, pintar:st.pintar, instalacion:ins}) : _wizCalcPlanas(piezas,{material:st.material, pintar:st.pintarPlanas, montaje:st.montajePlanas});
+      const routes=[_asisRuta("Router de Cama",c.hSug.router), _asisRuta("Habilitado de letreros",c.hSug.hab)];
+      const mat=(WIZ_PLANAS.find(x=>x[0]===st.material)||WIZ_PLANAS[0])[1], txt=st.fuente==="texto"&&st.texto?` "${st.texto}"`:"";
+      const nombre = st.tipo==="3d" ? `Letras 3D de aluminio ${st.alu==="dorado"?"dorado":"natural"}${txt}${st.luz?" con luz":""} · ${st.anchoTotal} x ${st.altoTotal} cm` : `Letras planas de ${mat}${txt} · ${st.anchoTotal} x ${st.altoTotal} cm`;
+      r={rows:c.rows, routes, extras: ins>0?[{id:uid(),label:"Instalación",amount:ins}]:[], faltan:c.faltan, nombre, extra:c.extra, hSug:c.hSug};
+    }
+    r.routes.forEach(x=>{ if(st.horas[x.routeName]!=null) x.hours=st.horas[x.routeName]; });
+    r.tot=quoteSellTotals({products:r.rows, routes:r.routes, extras:r.extras, marginPct:Number(st.utilidad)||60, qty:1});
+    return r;
+  };
+  const descCliente=(r)=>{
+    if(st.tipo==="neon"||st.tipo==="caja") return null; // la arma _qDescAuto con los datos del asistente
+    const mat=(WIZ_PLANAS.find(x=>x[0]===st.material)||WIZ_PLANAS[0])[1], n=st.piezas.length, med=`${st.anchoTotal} x ${st.altoTotal} cm`;
+    const vis = st.tipo==="3d"
+      ? `Letras con volumen (3D) en aluminio ${st.alu==="dorado"?"dorado":"natural"}, de ${med} aproximadamente, cortadas a la medida en router CNC.${st.luz?" Por detrás llevan luz LED cálida que ilumina la pared alrededor de las letras (efecto halo): de día se ven elegantes y de noche hacen que tu negocio se distinga.":" Dan presencia y profundidad a tu fachada o recepción."}`
+      : `Letras y figuras planas de ${mat}, de ${med} aproximadamente, cortadas a la medida en router CNC${st.pintarPlanas?" y pintadas en los colores de tu marca":""}. Un acabado limpio y profesional, ideal para muros y recepciones.`;
+    const inc = st.tipo==="3d"
+      ? [`${n} pieza(s) 3D de aluminio ${st.alu==="dorado"?"dorado":"natural"}, cortadas en router CNC`, st.luz?"Iluminación LED cálida por detrás (efecto halo)":"", st.luz?"Fuente de poder, cableado y apagador":"", "Montaje con escuadras y taquetes", Number(st.instalacion)>0?"Instalación":""]
+      : [`${n} pieza(s) de ${mat}, cortadas en router CNC`, st.pintarPlanas?"Pintura en tus colores":"", st.montajePlanas==="separadores"?"Separadores de acero inoxidable":"Pegado firme a la pared", Number(st.instalacion)>0?"Instalación":""];
+    return [r.nombre,"","Cómo se verá:",vis,"","Incluye:",...inc.filter(Boolean).map(x=>"• "+x),"","Diseño previo para tu aprobación antes de fabricar."].join("\n");
+  };
+
+  // ── Pasos ──
+  const pasoTipo=()=>`<div style="font-size:13px;color:var(--muted);margin-bottom:10px;">¿Qué tipo de letrero vas a cotizar?</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px;">${WIZ_TIPOS.map(([k,ic,t,d])=>`<button type="button" data-tipo="${k}" class="card" style="text-align:left;padding:14px;cursor:pointer;border:2px solid ${st.tipo===k?"var(--accent)":"var(--border)"};background:var(--card);">
+      <div style="font-size:26px;">${ic}</div><div style="font-size:14.5px;font-weight:900;margin-top:4px;">${t}</div><div style="font-size:12px;color:var(--muted);">${d}</div></button>`).join("")}</div>`;
+  const resumenPiezas=()=>{ if(st.leyendo) return `<div style="color:var(--muted);padding:12px;">Leyendo el diseño…</div>`; if(!st.piezas) return ""; if(!st.piezas.length) return `<div style="color:var(--red);padding:8px;">No encontré piezas en el diseño.</div>`;
+    const per=st.piezas.reduce((a,x)=>a+x.perM,0), area=st.piezas.reduce((a,x)=>a+x.areaCm2,0);
+    const dib = st.piezas.some(x=>x.contornos) ? (()=>{ let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity; st.piezas.forEach(pz=>(pz.contornos||[]).forEach(c=>c.pts.forEach(([x,y])=>{x0=Math.min(x0,x);x1=Math.max(x1,x);y0=Math.min(y0,y);y1=Math.max(y1,y);})));
+        const pad=(x1-x0)*0.03; return `<svg viewBox="${x0-pad} ${y0-pad} ${x1-x0+2*pad} ${y1-y0+2*pad}" style="width:100%;max-height:200px;background:#f8fafc;border-radius:8px;display:block;">${st.piezas.map(pz=>(pz.contornos||[]).map(c=>`<path d="M${c.pts.map(q=>q[0].toFixed(1)+","+q[1].toFixed(1)).join(" L")}Z" fill="${c.tipo==="hueco"?"#fff":"#cbd5e1"}" stroke="#334155" stroke-width="${(x1-x0)/400}"/>`).join("")).join("")}</svg>`; })()
+      : `<div style="font-family:'${_fAlu(st.fam)[0]}';font-weight:${_fAlu(st.fam)[2]};font-size:44px;text-align:center;padding:10px;background:#f8fafc;border-radius:8px;">${escapeHTML(st.texto)}</div>`;
+    return `<div class="card" style="padding:10px;margin-top:10px;"><div style="font-size:12.5px;margin-bottom:6px;">✅ <b>${st.piezas.length}</b> pieza(s) · <b>${st.anchoTotal} × ${st.altoTotal} cm</b> · contorno ${per.toFixed(2)} m · área ${(area/10000).toFixed(2)} m²</div>${dib}</div>`; };
+  const pasoDiseno=()=>{
+    let h="";
+    if(st.tipo==="neon") h=`<div style="font-size:13px;color:var(--muted);margin-bottom:8px;">Escribe el texto y traza la línea del neón: así salen los metros exactos y el tamaño del acrílico.</div>
+      ${fld("Texto del letrero (Enter = otro renglón)",`<div class="field"><textarea id="_wzTexto" rows="2">${escapeHTML(st.texto)}</textarea></div>`)}
+      <button class="btn primary" id="_wzTrazar" style="margin-top:8px;">✏️ Trazar línea de neón</button>
+      ${st.neon?`<div class="card" style="padding:10px;margin-top:10px;font-size:12.5px;">✅ <b>${st.neon.metros.toFixed(2)} m</b> de neón · ${st.neon.tramos} tramos · acrílico de <b>${st.neon.anchoBase} × ${st.neon.altoBase} cm</b> · letra ${escapeHTML(st.neon.fuente)}</div>`:""}`;
+    else if(st.tipo==="caja") h=`<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;">
+      ${fld("Caja de luz",sel("_wzCaja",st.caja,ASIS_CAJAS))}${fld("Nombre del negocio",inp("_wzNeg",st.negocio))}${fld("Colores del logo (1 m de vinil c/u)",inp("_wzCol",st.colores,"number"))}</div>`;
+    else h=`<div style="display:flex;gap:8px;margin-bottom:10px;"><button class="btn small ${st.fuente==="archivo"?"primary":""}" data-fuente="archivo">📄 Subir diseño (DXF, PDF, SVG, imagen)</button><button class="btn small ${st.fuente==="texto"?"primary":""}" data-fuente="texto">🔤 Escribir el texto</button></div>
+      ${st.fuente==="archivo"
+        ? `<div style="display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);gap:8px;">${fld("Archivo",`<input type="file" id="_wzFile" accept="${DISENO_TIPOS}" style="font-size:12px;"> <span style="font-size:11.5px;color:var(--muted);">${escapeHTML(st.file?st.file.name:"")}</span>`)}${fld("Ancho total (cm) · 0 = tamaño real (DXF/PDF)",inp("_wzAncho",st.ancho,"number"))}</div>`
+        : `<div style="display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1.2fr) minmax(0,1fr);gap:8px;">${fld("Texto",inp("_wzTexto2",st.texto))}${fld("Tipo de letra",sel("_wzFam",st.fam,ALU_FUENTES.map(f=>[f[0],f[1]])))}${fld("Ancho total (cm)",inp("_wzAncho",st.ancho||100,"number"))}</div>`}
+      <button class="btn primary" id="_wzLeer" style="margin-top:8px;">🔍 Leer diseño</button>${resumenPiezas()}`;
+    return h+`<div style="margin-top:14px;border-top:1px dashed var(--border);padding-top:10px;">${fld("📸 Foto o render de referencia (opcional, la ve el cliente en el PDF)",`<input type="file" id="_wzFoto" accept="image/*" style="font-size:12px;"> ${st.foto?`<img src="${st.foto}" style="height:60px;border-radius:6px;vertical-align:middle;margin-left:8px;">`:""}`)}</div>`;
+  };
+  const pasoAcabados=()=>{
+    const comunes=`${fld("Instalación ($, 0 = no)",inp("_wzIns",st.instalacion,"number"))}${fld("Utilidad (%)",inp("_wzUt",st.utilidad,"number"))}`;
+    if(st.tipo==="neon") return `<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;">
+      ${fld("Color del neón",sel("_wzColor",st.color,[["blanco","Blanco frío"],["blanco cálido","Blanco cálido"],["rosa","Rosa"],["rojo","Rojo"],["azul","Azul"],["verde","Verde"],["amarillo","Amarillo"],["morado","Morado"]]))}
+      ${fld("Base de acrílico",sel("_wzBase",st.base,[["transparente","Transparente"],["negro","Negro"]]))}${fld("Uso",sel("_wzUso",st.uso,[["interior","Interior"],["exterior","Exterior"]]))}
+      ${fld("Montaje",sel("_wzMont",st.montaje,[["pared","Pared (chapetones)"],["colgar","Colgante (cadena)"],["ninguno","Sin montaje"]]))}${comunes}</div>`;
+    if(st.tipo==="caja") return `<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;align-items:end;">${comunes}<div style="display:flex;flex-direction:column;gap:6px;">${chk("_wzBand",st.bandera,"Tipo bandera (doble vista)")}${chk("_wzKit",st.kit,"Kit eléctrico (cable, apagador, grapas)")}</div></div>`;
+    if(st.tipo==="3d") return `<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;align-items:end;">
+      ${fld("Aluminio",sel("_wzAlu",st.alu,[["natural","Natural (hoja 0.90×2.44)"],["dorado","Dorado (hoja 1.22×2.44)"]]))}${fld("Fondo de la letra (tira)",sel("_wzTira",st.tira,[[5,"5 cm"],[10,"10 cm"]]))}${fld("Uso",sel("_wzUso",st.uso,[["interior","Interior"],["exterior","Exterior"]]))}
+      ${comunes}<div style="display:flex;flex-direction:column;gap:6px;">${chk("_wzLuz",st.luz,"Luz LED por detrás (halo)")}${chk("_wzPint",st.pintar,"Pintar")}</div></div>`;
+    return `<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;align-items:end;">
+      ${fld("Material",sel("_wzMat",st.material,WIZ_PLANAS.map(m=>[m[0],m[1]])))}${fld("Montaje",sel("_wzMontP",st.montajePlanas,[["cinta","Pegado (cinta doble cara)"],["separadores","Con separadores"],["ninguno","Sin montaje"]]))}
+      <div>${chk("_wzPintP",st.pintarPlanas,"Pintar")}</div>${comunes}</div>`;
+  };
+  const pasoResultado=()=>{ res=calcular(); const t=res.tot;
+    let vistas="";
+    if(res.extra&&res.extra.nest){ const h=res.extra.hoja||{w:res.extra.mat[2],h:res.extra.mat[3]}; vistas+=`<div><div class="field-label">Acomodo en la hoja (${res.extra.frac} hoja)</div>${res.extra.nest.hojas.map((s,i)=>_svgHoja(s,h.w,h.h,i)).join("")}</div>`; }
+    if(st.tipo==="3d"&&res.extra.tiras.length) vistas+=`<div><div class="field-label">Tiras de ${st.tira} cm × 2.44 m: ${res.extra.tiras.length}</div>${_svgTiras(res.extra.tiras,2.44)}<button class="btn small" id="_wzDes" style="margin-top:6px;">📐 Ver desdoblado (dónde doblar)</button></div>`;
+    return `<div style="display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:14px;">
+      <div><div class="kpi-box" style="padding:12px 14px;margin-bottom:10px;"><div class="kl">Precio de venta</div><div class="kv" style="font-size:26px;color:var(--accent);">$${money(t.venta)}</div>
+        <div style="font-size:11.5px;color:var(--muted);">Materiales $${money(t.mp)} · Mano de obra $${money(t.ruta)} · Extras $${money(t.extra)} · Utilidad ${st.utilidad}%${t.mp+t.ruta>0?` · Material ${Math.round(t.mp/(t.mp+t.ruta)*100)}% / Ruta ${Math.round(t.ruta/(t.mp+t.ruta)*100)}%`:""}</div></div>
+        ${res.faltan&&res.faltan.length?`<div style="font-size:12px;color:var(--red);font-weight:700;margin-bottom:8px;">⚠️ Faltan en el catálogo (precio $0): ${escapeHTML(res.faltan.join(", "))}</div>`:""}
+        ${res.notas&&res.notas.length?`<div style="font-size:11.5px;color:var(--muted);margin-bottom:8px;">🧮 ${escapeHTML(res.notas.join(" · "))}</div>`:""}
+        <table style="width:100%;font-size:12px;border-collapse:collapse;">
+          ${res.rows.map(x=>`<tr style="border-bottom:1px solid var(--border);"><td style="padding:4px 0;">${escapeHTML(x.desc)}</td><td style="text-align:right;">${x.qty}</td><td style="text-align:right;">$${money(x.qty*x.unitPrice)}</td></tr>`).join("")}
+          ${res.routes.map(x=>`<tr style="border-bottom:1px solid var(--border);"><td style="padding:4px 0;color:var(--muted);">${escapeHTML(x.routeName)}</td><td style="text-align:right;"><input data-hora="${escapeAttr(x.routeName)}" type="number" step="0.5" value="${x.hours}" style="width:56px;text-align:right;border:1px solid var(--border);border-radius:6px;padding:2px 4px;"> h</td><td style="text-align:right;">$${money(x.hours*x.rate)}</td></tr>`).join("")}
+          ${res.extras.map(x=>`<tr><td style="padding:4px 0;color:var(--muted);">${escapeHTML(x.label)}</td><td></td><td style="text-align:right;">$${money(x.amount)}</td></tr>`).join("")}
+        </table><div style="font-size:11px;color:var(--muted);margin-top:6px;">Las horas son sugeridas: cámbialas aquí si hace falta. Todo queda editable en la cotización.</div></div>
+      <div style="display:flex;flex-direction:column;gap:10px;">${vistas||`<div style="font-size:12px;color:var(--muted);">${escapeHTML(res.nombre)}</div>`}</div></div>`; };
+  const pasoAplicar=()=>`<div style="font-size:13px;">Se va a guardar en la cotización <b>${escapeHTML(q.code||"")} · ${escapeHTML(q.name||"")}</b>:</div>
+    <ul style="font-size:12.5px;line-height:1.8;margin:8px 0 12px 18px;"><li>Nombre: <b>${escapeHTML(res.nombre)}</b> ${/^Cotizaci[oó]n( \d+)?$/.test(q.name||"")||!q.name?"":"<span style='color:var(--muted)'>(solo si la cotización no tiene nombre)</span>"}</li>
+      <li>${res.rows.length} materiales, ${res.routes.length} rutas y ${res.extras.length} extra(s) · <b>$${money(res.tot.venta)}</b></li><li>Descripción para el cliente ("Cómo se verá" e "Incluye")</li>${st.foto?"<li>Foto de referencia para el PDF</li>":""}</ul>
+    ${(q.products||[]).length?`<div style="display:flex;gap:14px;font-size:12.5px;"><label><input type="radio" name="_wzModo" value="reemplazar" ${st.modo==="reemplazar"?"checked":""}> Reemplazar lo que ya tiene</label><label><input type="radio" name="_wzModo" value="sumar" ${st.modo==="sumar"?"checked":""}> Sumar a lo que ya tiene</label></div>`:""}`;
+
+  const valido=()=> st.paso===1 ? !!st.tipo : st.paso===2 ? (st.tipo==="neon"?!!st.neon : st.tipo==="caja"?true : !!(st.piezas&&st.piezas.length)) : true;
+  const pintar=()=>{
+    const cuerpo=[null,pasoTipo,pasoDiseno,pasoAcabados,pasoResultado,pasoAplicar][st.paso]();
+    ov.innerHTML=`<div style="background:var(--card);border-radius:16px;width:1060px;max-width:100%;max-height:95vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.3);">
+      <div style="display:flex;align-items:center;gap:10px;padding:12px 18px;border-bottom:1px solid var(--border);">
+        <div style="font-size:16px;font-weight:900;flex:1;">🪧 Cotizar letrero paso a paso${st.tipo?` · ${WIZ_TIPOS.find(t=>t[0]===st.tipo)[2]}`:""}</div><button class="btn small" id="_wzClose">✕</button></div>
+      <div style="display:flex;gap:6px;padding:10px 18px;border-bottom:1px solid var(--border);flex-wrap:wrap;">${PASOS.map((n,i)=>`<span style="font-size:11.5px;font-weight:800;padding:4px 10px;border-radius:999px;${i+1===st.paso?"background:var(--accent);color:#fff;":i+1<st.paso?"background:rgba(22,163,74,.15);color:#15803d;":"background:var(--bg3);color:var(--muted);"}">${i+1<st.paso?"✓ ":(i+1)+". "}${n}</span>`).join("")}</div>
+      <div style="padding:14px 18px;overflow:auto;flex:1;">${cuerpo}</div>
+      <div style="display:flex;justify-content:space-between;gap:8px;padding:12px 18px;border-top:1px solid var(--border);">
+        <button class="btn" id="_wzAtras" ${st.paso===1?"disabled":""}>← Atrás</button>
+        ${st.paso<5?`<button class="btn primary" id="_wzSig" ${valido()?"":"disabled"}>Siguiente →</button>`:`<button class="btn primary" id="_wzOk">✅ Aplicar a la cotización · $${money(res.tot.venta)}</button>`}</div></div>`;
+    enlazar();
+  };
+  const $w=id=>document.getElementById(id);
+  const val=(id,k,num)=>{ const e=$w(id); if(e) e.onchange=()=>{ st[k]= e.type==="checkbox"?e.checked : num?Number(e.value||0):e.value; if(st.paso===4) pintar(); else if(st.paso===2&&["_wzAncho","_wzTexto2","_wzFam"].includes(id)){ st.piezas=null; pintar(); } }; };
+  const leer=async()=>{
+    st.leyendo=true; pintar();
+    try{
+      if(st.fuente==="archivo"){ if(!st.file) throw new Error("Primero elige el archivo");
+        const m=await _mascaraDeArchivo(st.file, Number(st.ancho)||0, DESD); st.piezas=_piezasDeMascara(m,0,false,DESD);
+        st.anchoTotal=Math.round((m.W-24)/m.ppm/10); st.altoTotal=Math.round((m.H-24)/m.ppm/10); }
+      else { if(!st.texto.trim()) throw new Error("Escribe el texto"); const r=await _medirRenglon(st.texto.trim(), st.fam, Number(st.ancho)||100);
+        st.piezas=r?r.letras:[]; st.anchoTotal=Number(st.ancho)||100; st.altoTotal=r?r.alto:0; }
+    }catch(e){ st.piezas=null; _showSaveToast(e.message,"warning"); }
+    st.leyendo=false; pintar(); };
+  const enlazar=()=>{
+    $w("_wzClose").onclick=()=>ov.remove();
+    $w("_wzAtras").onclick=()=>{ if(st.paso>1){ st.paso--; pintar(); } };
+    if($w("_wzSig")) $w("_wzSig").onclick=()=>{ if(!valido()) return; st.paso++; pintar(); };
+    ov.querySelectorAll("[data-tipo]").forEach(b=>b.onclick=()=>{ if(st.tipo!==b.dataset.tipo){ st.tipo=b.dataset.tipo; st.horas={}; } st.paso=2; pintar(); });
+    ov.querySelectorAll("[data-fuente]").forEach(b=>b.onclick=()=>{ st.fuente=b.dataset.fuente; st.piezas=null; pintar(); });
+    if($w("_wzTexto")) $w("_wzTexto").oninput=e=>{ st.texto=e.target.value; };
+    if($w("_wzTrazar")) $w("_wzTrazar").onclick=()=>{ st.texto=$w("_wzTexto").value; openGeneradorLinea({texto:st.texto, anchoTexto:st.neon?st.neon.anchoTexto:60, fuente:st.neon?st.neon.fuente:"Sacramento"}, u=>{ st.neon=u; st.texto=u.texto; pintar(); }); };
+    if($w("_wzTexto2")) $w("_wzTexto2").onchange=e=>{ st.texto=e.target.value; st.piezas=null; };
+    if($w("_wzFile")) $w("_wzFile").onchange=e=>{ const f=e.target.files[0]; if(!f) return; st.file=f; st.piezas=null; if(/\.(dxf|pdf)$/i.test(f.name)) st.ancho=0; else if(!(Number(st.ancho)>0)) st.ancho=100; pintar(); };
+    if($w("_wzLeer")) $w("_wzLeer").onclick=()=>{ const a=$w("_wzAncho"); if(a) st.ancho=Number(a.value)||0; const t=$w("_wzTexto2"); if(t) st.texto=t.value; const fm=$w("_wzFam"); if(fm) st.fam=fm.value; leer(); };
+    if($w("_wzFoto")) $w("_wzFoto").onchange=e=>{ const f=e.target.files[0]; if(!f) return; const rd=new FileReader(); rd.onload=()=>{ st.foto=rd.result; st.fotoNombre=f.name; pintar(); }; rd.readAsDataURL(f); };
+    [["_wzCaja","caja"],["_wzNeg","negocio"],["_wzColor","color"],["_wzBase","base"],["_wzUso","uso"],["_wzMont","montaje"],["_wzAlu","alu"],["_wzMat","material"],["_wzMontP","montajePlanas"],["_wzBand","bandera"],["_wzKit","kit"],["_wzLuz","luz"],["_wzPint","pintar"],["_wzPintP","pintarPlanas"]].forEach(([id,k])=>val(id,k,false));
+    [["_wzCol","colores"],["_wzIns","instalacion"],["_wzUt","utilidad"],["_wzTira","tira"],["_wzAncho","ancho"]].forEach(([id,k])=>val(id,k,true));
+    if($w("_wzMat")) $w("_wzMat").addEventListener("change",()=>{ st.pintarPlanas=!!(WIZ_PLANAS.find(m=>m[0]===st.material)||[])[4]; });
+    ov.querySelectorAll("[data-hora]").forEach(e=>e.onchange=()=>{ st.horas[e.dataset.hora]=Number(e.value)||0; pintar(); });
+    if($w("_wzDes")) $w("_wzDes").onclick=()=>openDesdoblado(st.fuente==="archivo"?{file:st.file, ancho:Number(st.ancho)||0}:{texto:st.texto, ancho:Number(st.ancho)||100, fuente:st.fam});
+    ov.querySelectorAll('input[name="_wzModo"]').forEach(e=>e.onchange=()=>{ st.modo=e.value; });
+    if($w("_wzOk")) $w("_wzOk").onclick=async()=>{
+      const b=$w("_wzOk"); b.disabled=true; b.textContent="Guardando…";
+      try{
+        if(st.foto && /^data:/.test(st.foto)){ try{ q.refPhoto=await uploadToImgbb(st.foto); }catch(e){ _showSaveToast("No se pudo subir la foto: "+e.message,"warning"); } }
+        if(st.modo==="sumar"&&(q.products||[]).length){
+          q.products=(q.products||[]).concat(res.rows);
+          q.routes=q.routes||[]; res.routes.forEach(r=>{ const ex=q.routes.find(x=>x.routeName===r.routeName); if(ex) ex.hours=Math.round((Number(ex.hours||0)+r.hours)*10)/10; else q.routes.push(r); });
+          q.extras=q.extras||[]; res.extras.forEach(e=>{ if(!q.extras.some(x=>/instal/i.test(x.label||""))) q.extras.push(e); });
+        } else { q.products=res.rows; q.routes=res.routes; q.extras=res.extras; }
+        q.marginPct=Number(st.utilidad)||60; if(res.asis) q.asis=res.asis;
+        if(!q.name || /^Cotizaci[oó]n( \d+)?$/.test(q.name)) q.name=res.nombre;
+        q.clientDesc = descCliente(res) || _qDescAuto(q,p);
+        q.letrero={tipo:st.tipo, fecha:todayISO(), archivo:st.file?st.file.name:"", texto:st.texto||""};
+        saveQuote(q); save(); ov.remove(); openQuoteEditorPage(q);
+        _showSaveToast("🪧 Letrero cotizado paso a paso. Revisa y ajusta lo que necesites.","success");
+      }catch(e){ b.disabled=false; b.textContent="Reintentar"; _showSaveToast("Error: "+e.message,"error"); }
+    };
+  };
+  pintar();
 }
 
 function _diasDesde(iso){ if(!iso) return null; return Math.round((new Date(todayISO()+"T00:00:00")-new Date(String(iso).slice(0,10)+"T00:00:00"))/86400000); }
