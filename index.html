@@ -9461,10 +9461,10 @@ function openLetras3D(q, onApply){
   let calc=null, turno=0;
   const selS="background:transparent;border:none;color:var(--text);font-family:inherit;font-size:13px;width:100%;padding:8px 0;";
   const filaPieza=(p,i)=>`<div style="display:grid;grid-template-columns:110px minmax(0,2fr) minmax(0,1.3fr) 90px auto auto 30px;gap:6px;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);">
-      <select data-p="${i}" data-k="modo" class="field" style="padding:6px;">${[["texto","Texto"],["svg","Logo (SVG)"],["manual","Pieza a mano"]].map(([v,l])=>`<option value="${v}" ${p.modo===v?"selected":""}>${l}</option>`).join("")}</select>
+      <select data-p="${i}" data-k="modo" class="field" style="padding:6px;">${[["texto","Texto"],["svg","Archivo (DXF, PDF, SVG, imagen)"],["manual","Pieza a mano"]].map(([v,l])=>`<option value="${v}" ${p.modo===v?"selected":""}>${l}</option>`).join("")}</select>
       ${p.modo==="texto"?`<input data-p="${i}" data-k="texto" class="field" style="padding:7px;" placeholder="Ej: TRÍA" value="${escapeAttr(p.texto)}">
         <select data-p="${i}" data-k="fuente" class="field" style="padding:6px;">${ALU_FUENTES.map(f=>`<option value="${f[0]}" ${p.fuente===f[0]?"selected":""}>${f[1]}</option>`).join("")}</select>`
-      : p.modo==="svg"?`<input type="file" accept=".svg,image/svg+xml" data-p="${i}" data-k="svg" style="font-size:11.5px;"><span style="font-size:11.5px;color:var(--muted);">${p.svgNombre?escapeHTML(p.svgNombre):"Sube el logo en SVG"}</span>`
+      : p.modo==="svg"?`<input type="file" accept="${DISENO_TIPOS}" data-p="${i}" data-k="svg" style="font-size:11.5px;"><span style="font-size:11.5px;color:var(--muted);">${p.svgNombre?escapeHTML(p.svgNombre)+(p.nPiezas?` · ${p.nPiezas} piezas`:""):"DXF o PDF: tamaño real (ancho 0)"}</span>`
       : `<input data-p="${i}" data-k="nombre" class="field" style="padding:7px;" placeholder="Nombre (ej: Flor)" value="${escapeAttr(p.nombre||"")}"><span style="display:flex;gap:4px;align-items:center;font-size:11px;">Contorno <input data-p="${i}" data-k="perM" type="number" step="0.1" class="field" style="padding:6px;width:64px;" value="${p.perM||""}"> m · alto <input data-p="${i}" data-k="alto" type="number" class="field" style="padding:6px;width:54px;" value="${p.alto||""}"></span>`}
       <span style="display:flex;align-items:center;gap:3px;font-size:11px;"><input data-p="${i}" data-k="ancho" type="number" class="field" style="padding:6px;width:60px;" value="${p.ancho}"> cm</span>
       <label style="font-size:11.5px;display:flex;gap:3px;align-items:center;" title="Con canto de tiras (volumen)"><input type="checkbox" data-p="${i}" data-k="d3" ${p.d3?"checked":""}>3D</label>
@@ -9476,7 +9476,7 @@ function openLetras3D(q, onApply){
       const piezas=[]; // {label, perM, areaCm2, w, h, d3, luz}
       for(const p of st.piezas){
         if(p.modo==="texto" && p.texto.trim()){ const r=await _medirRenglon(p.texto.trim(), p.fuente, Number(p.ancho)||0); if(r) r.letras.forEach(l=>piezas.push({...l, d3:p.d3, luz:p.luz})); }
-        else if(p.modo==="svg" && p.svgTxt){ const r=await _medirSVG(p.svgTxt, Number(p.ancho)||0); piezas.push({label:p.svgNombre?p.svgNombre.replace(/\.svg$/i,"").slice(0,12):"Logo", ...r, d3:p.d3, luz:p.luz}); }
+        else if(p.modo==="svg" && p.file){ const ps=_piezasDeMascara(await _mascaraDeArchivo(p.file, Number(p.ancho)||0, DESD), 0, false, DESD); p.nPiezas=ps.length; ps.forEach((x,k)=>piezas.push({label:"P"+(k+1), perM:x.perM, areaCm2:x.areaCm2, w:x.w, h:x.h, d3:p.d3, luz:p.luz})); }
         else if(p.modo==="manual" && Number(p.perM)>0){ const w=Number(p.ancho)||0, h=Number(p.alto)||w; piezas.push({label:p.nombre||"Pieza", perM:Number(p.perM), areaCm2:w*h*0.6, w, h, d3:p.d3, luz:p.luz}); }
       }
       if(yo!==turno) return;
@@ -9562,12 +9562,164 @@ function openLetras3D(q, onApply){
     $a("_aluAdd").onclick=()=>{ st.piezas.push({modo:"texto",texto:"",fuente:"Cinzel",ancho:60,d3:true,luz:true}); st.horas=null; pintar(); };
     ov.querySelectorAll("[data-del]").forEach(b=>b.onclick=()=>{ st.piezas.splice(Number(b.dataset.del),1); st.horas=null; pintar(); });
     ov.querySelectorAll("[data-p]").forEach(el=>{ const i=Number(el.dataset.p), k=el.dataset.k, p=st.piezas[i];
-      if(k==="svg"){ el.onchange=async()=>{ const f=el.files[0]; if(!f) return; p.svgTxt=await f.text(); p.svgNombre=f.name; st.horas=null; pintar(); }; return; }
+      if(k==="svg"){ el.onchange=()=>{ const f=el.files[0]; if(!f) return; p.file=f; p.svgNombre=f.name; if(/\.(dxf|pdf)$/i.test(f.name)) p.ancho=0; st.horas=null; pintar(); }; return; }
       el.onchange=()=>{ p[k]= el.type==="checkbox"?el.checked : el.type==="number"?Number(el.value||0) : el.value; st.horas=null; if(k==="modo") pintar(); else calcular(); }; });
     $a("_aluOk").onclick=()=>{ if(!calc){ _showSaveToast("Agrega las piezas primero","warning"); return; } onApply(calc); ov.remove(); };
     calcular();
   };
   pintar();
+}
+
+// ── DISEÑOS: leer DXF, PDF, SVG o imagen y sacar las piezas (con sus huecos) a tamaño real ──
+// Lo usan 📏 Letras 3D aluminio y 📐 Desdoblado. DXF y PDF traen su tamaño real; SVG e imagen necesitan el ancho.
+const DISENO_TIPOS = ".dxf,.pdf,.svg,.png,.jpg,.jpeg,.webp";
+const _DISENO_MAXPX = 9e6;
+
+// DXF → lazos cerrados en mm (y hacia arriba como en CAD)
+function _parseDXF(txt){
+  const L=txt.split(/\r?\n/), P=[]; for(let i=0;i+1<L.length;i+=2) P.push([L[i].trim(), L[i+1].trim()]);
+  let ins=0; for(let i=0;i<P.length-1;i++) if(P[i][0]==="9"&&P[i][1]==="$INSUNITS"&&P[i+1][0]==="70"){ ins=Number(P[i+1][1]); break; }
+  const fac={1:25.4,2:304.8,4:1,5:10,6:1000}[ins]||1;
+  let k=P.findIndex(p=>p[0]==="2"&&p[1]==="ENTITIES"); if(k<0) k=0;
+  const ents=[]; let cur=null;
+  for(let i=k+1;i<P.length;i++){ const [c,v]=P[i]; if(c==="0"){ if(v==="ENDSEC") break; cur={type:v,g:[]}; ents.push(cur); } else if(cur) cur.g.push([Number(c),v]); }
+  const num=(e,c,d)=>{ const x=e.g.find(p=>p[0]===c); return x?Number(x[1]):d; };
+  const arco=(cx,cy,r,a0,a1)=>{ if(a1<=a0) a1+=360; const n=Math.max(8,Math.ceil((a1-a0)/5)), o=[]; for(let i=0;i<=n;i++){ const a=(a0+(a1-a0)*i/n)*Math.PI/180; o.push([cx+r*Math.cos(a), cy+r*Math.sin(a)]); } return o; };
+  const bulge=(p,q,b)=>{ if(!b) return [q]; const ang=4*Math.atan(b), d=Math.hypot(q[0]-p[0],q[1]-p[1]); if(!d) return [q]; const r=d/(2*Math.sin(Math.abs(ang)/2));
+    const mx=(p[0]+q[0])/2, my=(p[1]+q[1])/2, h=Math.sqrt(Math.max(0,r*r-d*d/4))*Math.sign(b)*(Math.abs(ang)>Math.PI?-1:1);
+    const ux=-(q[1]-p[1])/d, uy=(q[0]-p[0])/d, cx=mx+ux*h, cy=my+uy*h; let a0=Math.atan2(p[1]-cy,p[0]-cx), a1=Math.atan2(q[1]-cy,q[0]-cx);
+    if(b>0){ while(a1<=a0) a1+=2*Math.PI; } else { while(a1>=a0) a1-=2*Math.PI; }
+    const n=Math.max(4,Math.ceil(Math.abs(a1-a0)/(5*Math.PI/180))), o=[]; for(let i=1;i<=n;i++){ const a=a0+(a1-a0)*i/n; o.push([cx+Math.abs(r)*Math.cos(a), cy+Math.abs(r)*Math.sin(a)]); } return o; };
+  const vertices=(lista, cerrado)=>{ if(!lista.length) return null; const o=[[lista[0].x,lista[0].y]];
+    for(let i=1;i<lista.length;i++) o.push(...bulge([lista[i-1].x,lista[i-1].y],[lista[i].x,lista[i].y],lista[i-1].b));
+    if(cerrado){ const a=lista[lista.length-1]; o.push(...bulge([a.x,a.y],[lista[0].x,lista[0].y],a.b)); } return {pts:o, cerrado}; };
+  const deBoor=(ctrl,knots,deg,n)=>{ const o=[], t0=knots[deg], t1=knots[knots.length-deg-1];
+    for(let s=0;s<=n;s++){ const t=Math.min(t1-1e-9,t0+(t1-t0)*s/n); let k=deg; while(k<knots.length-deg-2 && t>=knots[k+1]) k++;
+      const d=[]; for(let j=0;j<=deg;j++) d.push([...ctrl[Math.min(ctrl.length-1,Math.max(0,j+k-deg))]]);
+      for(let r=1;r<=deg;r++) for(let j=deg;j>=r;j--){ const i=j+k-deg, den=knots[i+deg-r+1]-knots[i]; const a=den?(t-knots[i])/den:0; d[j]=[(1-a)*d[j-1][0]+a*d[j][0],(1-a)*d[j-1][1]+a*d[j][1]]; }
+      o.push(d[deg]); } return o; };
+  const trazos=[];
+  for(let i=0;i<ents.length;i++){ const e=ents[i];
+    if(e.type==="LINE") trazos.push({pts:[[num(e,10,0),num(e,20,0)],[num(e,11,0),num(e,21,0)]],cerrado:false});
+    else if(e.type==="CIRCLE"){ const pts=arco(num(e,10,0),num(e,20,0),num(e,40,0),0,360); trazos.push({pts,cerrado:true}); }
+    else if(e.type==="ARC") trazos.push({pts:arco(num(e,10,0),num(e,20,0),num(e,40,0),num(e,50,0),num(e,51,360)),cerrado:false});
+    else if(e.type==="LWPOLYLINE"){ const lista=[]; let v=null; e.g.forEach(([c,val])=>{ if(c===10){ v={x:Number(val),y:0,b:0}; lista.push(v); } else if(c===20&&v) v.y=Number(val); else if(c===42&&v) v.b=Number(val); });
+      const t=vertices(lista, (num(e,70,0)&1)===1); if(t) trazos.push(t); }
+    else if(e.type==="POLYLINE"){ const cerr=(num(e,70,0)&1)===1, lista=[]; let j=i+1; while(j<ents.length && ents[j].type==="VERTEX"){ const vx=ents[j]; if(!(num(vx,70,0)&16)) lista.push({x:num(vx,10,0),y:num(vx,20,0),b:num(vx,42,0)}); j++; }
+      const t=vertices(lista,cerr); if(t) trazos.push(t); i=j; }
+    else if(e.type==="ELLIPSE"){ const cx=num(e,10,0), cy=num(e,20,0), mx=num(e,11,0), my=num(e,21,0), ra=num(e,40,1); let a0=num(e,41,0), a1=num(e,42,2*Math.PI); if(a1<=a0) a1+=2*Math.PI;
+      const A=Math.hypot(mx,my), rot=Math.atan2(my,mx), n=Math.max(16,Math.ceil((a1-a0)/(5*Math.PI/180))), o=[];
+      for(let s=0;s<=n;s++){ const t=a0+(a1-a0)*s/n, x=A*Math.cos(t), y=A*ra*Math.sin(t); o.push([cx+x*Math.cos(rot)-y*Math.sin(rot), cy+x*Math.sin(rot)+y*Math.cos(rot)]); }
+      trazos.push({pts:o, cerrado: Math.abs(a1-a0-2*Math.PI)<1e-6}); }
+    else if(e.type==="SPLINE"){ const deg=num(e,71,3), knots=e.g.filter(p=>p[0]===40).map(p=>Number(p[1])), ctrl=[], fit=[]; let c=null, f=null;
+      e.g.forEach(([cd,val])=>{ if(cd===10){ c=[Number(val),0]; ctrl.push(c); } else if(cd===20&&c) c[1]=Number(val); else if(cd===11){ f=[Number(val),0]; fit.push(f); } else if(cd===21&&f) f[1]=Number(val); });
+      const pts = ctrl.length>deg && knots.length===ctrl.length+deg+1 ? deBoor(ctrl,knots,deg,Math.max(24,ctrl.length*8)) : (fit.length?fit:ctrl);
+      trazos.push({pts, cerrado:(num(e,70,0)&1)===1}); }
+  }
+  // Une trazos abiertos que se tocan para formar lazos cerrados
+  const tol=0.05/ (fac||1) + 0.05, d2=(a,b)=>Math.hypot(a[0]-b[0],a[1]-b[1]);
+  const lazos=trazos.filter(t=>t.cerrado||t.pts.length>2&&d2(t.pts[0],t.pts[t.pts.length-1])<tol).map(t=>t.pts);
+  let abiertos=trazos.filter(t=>!(t.cerrado||t.pts.length>2&&d2(t.pts[0],t.pts[t.pts.length-1])<tol)).map(t=>t.pts.slice());
+  while(abiertos.length){ let cad=abiertos.shift(), cambio=true;
+    while(cambio){ cambio=false; for(let i=0;i<abiertos.length;i++){ const s=abiertos[i], a=cad[0], b=cad[cad.length-1];
+        if(d2(b,s[0])<tol){ cad=cad.concat(s.slice(1)); } else if(d2(b,s[s.length-1])<tol){ cad=cad.concat(s.slice(0,-1).reverse()); }
+        else if(d2(a,s[s.length-1])<tol){ cad=s.slice(0,-1).concat(cad); } else if(d2(a,s[0])<tol){ cad=s.slice(1).reverse().concat(cad); } else continue;
+        abiertos.splice(i,1); cambio=true; break; } }
+    if(cad.length>2 && d2(cad[0],cad[cad.length-1])<Math.max(tol,1/fac)) lazos.push(cad); }
+  return lazos.map(l=>l.map(([x,y])=>[x*fac,y*fac]));
+}
+
+let _pdfjsP=null;
+function _cargarPdfjs(){
+  return _pdfjsP||(_pdfjsP=new Promise((ok,ko)=>{ if(window.pdfjsLib) return ok(window.pdfjsLib);
+    const s=document.createElement("script"); s.src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
+    s.onload=()=>{ window.pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js"; ok(window.pdfjsLib); };
+    s.onerror=()=>{ _pdfjsP=null; s.remove(); ko(new Error("No se pudo cargar el lector de PDF (revisa internet)")); }; document.head.appendChild(s); }));
+}
+// Canvas con tinta (oscura) → máscara recortada; devuelve {data,W,H,ppm}
+function _recortarTinta(ctx, W, H, ppm, umbral, invertir){
+  const src=ctx.getImageData(0,0,W,H).data; let minX=W,minY=H,maxX=-1,maxY=-1; const ink=new Uint8Array(W*H);
+  for(let i=0;i<W*H;i++){ const a=src[i*4+3]/255, lum=(0.299*src[i*4]+0.587*src[i*4+1]+0.114*src[i*4+2])*a+255*(1-a); let t=lum<umbral; if(invertir) t=!t&&a>0.5;
+    if(t){ ink[i]=1; const x=i%W, y=(i/W)|0; if(x<minX)minX=x; if(x>maxX)maxX=x; if(y<minY)minY=y; if(y>maxY)maxY=y; } }
+  if(maxX<0) throw new Error("No encontré dibujo en el archivo");
+  const pad=12, w=maxX-minX+1+2*pad, h=maxY-minY+1+2*pad, out=new Uint8ClampedArray(w*h*4);
+  for(let y=minY;y<=maxY;y++) for(let x=minX;x<=maxX;x++) if(ink[y*W+x]) out[((y-minY+pad)*w+(x-minX+pad))*4+3]=255;
+  return {data:out, W:w, H:h, ppm};
+}
+// Si el dibujo viene en líneas (contornos sin relleno), rellena por capas: afuera vacío, dentro de la letra lleno,
+// dentro del hueco vacío… (par/impar), igual que el "evenodd" de los programas de diseño.
+function _rellenarTrazos(m){
+  const {W,H}=m, N=W*H, ink=new Uint8Array(N); let area=0, borde=0;
+  for(let i=0;i<N;i++) if(m.data[i*4+3]>=128){ ink[i]=1; area++; }
+  for(let i=0;i<N;i++) if(ink[i]){ const x=i%W; if((x>0&&!ink[i-1])||(x<W-1&&!ink[i+1])||(i>=W&&!ink[i-W])||(i<N-W&&!ink[i+W])) borde++; }
+  const grosorPx=2*area/Math.max(1,borde), grosorMm=grosorPx/m.ppm;
+  // Es dibujo de líneas si el trazo es delgado: menos de 1.5 mm reales o menos de 7 px (imágenes y PDF a baja resolución)
+  if(grosorMm>=1.5 && grosorPx>=7) return {...m, lineas:false};
+  // Cierra huequitos de la línea (antialias, trazos que casi se tocan) engrosándola 1–2 px
+  const rad=Math.max(1,Math.round(0.4*m.ppm));
+  for(let k=0;k<rad;k++){ const prev=ink.slice(); for(let i=0;i<N;i++) if(!prev[i]){ const x=i%W;
+      if((x>0&&prev[i-1])||(x<W-1&&prev[i+1])||(i>=W&&prev[i-W])||(i<N-W&&prev[i+W])||(x>0&&i>=W&&prev[i-W-1])||(x<W-1&&i>=W&&prev[i-W+1])||(x>0&&i<N-W&&prev[i+W-1])||(x<W-1&&i<N-W&&prev[i+W+1])) ink[i]=1; } }
+  const lab=new Int32Array(N); let id=0; const tipo=[0], vec=k=>{ const x=k%W, o=[]; if(x>0) o.push(k-1); if(x<W-1) o.push(k+1); if(k>=W) o.push(k-W); if(k<N-W) o.push(k+W); return o; };
+  for(let i=0;i<N;i++) if(!lab[i]){ id++; tipo[id]=ink[i]; const st=[i]; lab[i]=id; while(st.length){ const k=st.pop(); for(const j of vec(k)) if(!lab[j]&&ink[j]===ink[i]){ lab[j]=id; st.push(j); } } }
+  const ady=Array.from({length:id+1},()=>new Set());
+  for(let i=0;i<N;i++) for(const j of vec(i)) if(lab[j]!==lab[i]){ ady[lab[i]].add(lab[j]); }
+  const prof=new Int32Array(id+1).fill(-1), cola=[];
+  [0,W-1,N-W,N-1].forEach(i=>{ if(!ink[i]&&prof[lab[i]]<0){ prof[lab[i]]=0; cola.push(lab[i]); } });
+  while(cola.length){ const a=cola.shift(); for(const s of ady[a]){ if(!tipo[s]) continue; for(const b of ady[s]) if(!tipo[b]&&prof[b]<0){ prof[b]=prof[a]+1; cola.push(b); } } }
+  const out=new Uint8ClampedArray(N*4);
+  for(let i=0;i<N;i++){ const c=lab[i]; if(ink[i] || (prof[c]>0 && prof[c]%2===1)) out[i*4+3]=255; }
+  return {...m, data:out, lineas:true};
+}
+// Archivo → máscara a tamaño real. anchoCm>0 escala al ancho indicado (obligatorio en SVG e imagen).
+async function _mascaraDeArchivo(file, anchoCm, o){
+  const ext=(file.name.split(".").pop()||"").toLowerCase(), base=o.pxPorMm||2.5;
+  const canvas=(W,H)=>{ const c=document.createElement("canvas"); c.width=W; c.height=H; return [c, c.getContext("2d",{willReadFrequently:true})]; };
+  if(ext==="dxf"){
+    const lazos=_parseDXF(await file.text()); if(!lazos.length) throw new Error("El DXF no trae figuras cerradas (polilíneas o círculos)");
+    let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity; lazos.forEach(l=>l.forEach(([x,y])=>{ minX=Math.min(minX,x); maxX=Math.max(maxX,x); minY=Math.min(minY,y); maxY=Math.max(maxY,y); }));
+    const esc=anchoCm>0?anchoCm*10/(maxX-minX):1, Wmm=(maxX-minX)*esc, Hmm=(maxY-minY)*esc;
+    const ppm=Math.min(base, Math.sqrt(_DISENO_MAXPX/Math.max(1,Wmm*Hmm))), pad=12, W=Math.ceil(Wmm*ppm)+2*pad, H=Math.ceil(Hmm*ppm)+2*pad;
+    const [,ctx]=canvas(W,H); ctx.fillStyle="#000"; ctx.beginPath();
+    lazos.forEach(l=>l.forEach(([x,y],i)=>{ const X=pad+(x-minX)*esc*ppm, Y=pad+(maxY-y)*esc*ppm; i?ctx.lineTo(X,Y):ctx.moveTo(X,Y); })); ctx.closePath(); ctx.fill("evenodd");
+    const r=_recortarTinta(ctx,W,H,ppm,128,false); return {...r, nombre:file.name, real:!(anchoCm>0), mm:[Wmm,Hmm]};
+  }
+  if(ext==="pdf"){
+    const pdfjs=await _cargarPdfjs(); const doc=await pdfjs.getDocument({data:await file.arrayBuffer()}).promise; const pg=await doc.getPage(1);
+    const v1=pg.getViewport({scale:1}), Wmm=v1.width*25.4/72, Hmm=v1.height*25.4/72;
+    const ppm0=Math.min(base, Math.sqrt(_DISENO_MAXPX/Math.max(1,Wmm*Hmm))), vp=pg.getViewport({scale:ppm0*25.4/72});
+    const [c,ctx]=canvas(Math.ceil(vp.width),Math.ceil(vp.height)); ctx.fillStyle="#fff"; ctx.fillRect(0,0,c.width,c.height);
+    await pg.render({canvasContext:ctx, viewport:vp}).promise;
+    let r=_recortarTinta(ctx,c.width,c.height,ppm0,o.umbral||200,false);
+    if(anchoCm>0) r.ppm=(r.W-24)/(anchoCm*10);
+    return _rellenarTrazos({...r, nombre:file.name, real:!(anchoCm>0)});
+  }
+  // SVG o imagen: hace falta el ancho real
+  if(!(anchoCm>0)) throw new Error("Para SVG o imagen escribe el ancho real (cm)");
+  const url=URL.createObjectURL(file); const img=await new Promise((ok,ko)=>{ const im=new Image(); im.onload=()=>ok(im); im.onerror=()=>ko(new Error("No pude abrir la imagen")); im.src=url; });
+  const nw=img.naturalWidth||img.width||1000, nh=img.naturalHeight||img.height||1000;
+  // SVG: se dibuja directo a la resolución de trabajo; imagen: a su tamaño, sin pasar del límite de pixeles
+  let W = ext==="svg" ? anchoCm*10*base : nw; W=Math.min(W, Math.sqrt(_DISENO_MAXPX*nw/nh)); W=Math.max(50,Math.ceil(W));
+  const H=Math.ceil(nh*W/nw); const [c,ctx]=canvas(W,H);
+  if(ext!=="svg"){ ctx.fillStyle="#fff"; ctx.fillRect(0,0,W,H); } ctx.drawImage(img,0,0,W,H); URL.revokeObjectURL(url);
+  // Fondo oscuro → invertir automáticamente
+  const d=ctx.getImageData(0,0,W,H).data; let s=0,n=0; for(let x=0;x<W;x+=Math.max(1,W>>6)){ for(const y of [0,H-1]){ const i=(y*W+x)*4; s+=0.299*d[i]+0.587*d[i+1]+0.114*d[i+2]; n++; } }
+  const invertir = ext!=="svg" && s/n<110;
+  let r=ext==="svg" ? _recortarTinta(ctx,W,H,1,250,false) : _recortarTinta(ctx,W,H,1,o.umbral||150,invertir);
+  r.ppm=(r.W-24)/(anchoCm*10);
+  return _rellenarTrazos({...r, nombre:file.name, real:false});
+}
+// Máscara → piezas (exterior + sus huecos), con perímetro, área y medidas
+function _piezasDeMascara(m, offMm, conDoblez, o){
+  const r=_contornosMascara(m.data, m.W, m.H, m.ppm, offMm);
+  const largo=p=>{ let s=0; for(let i=1;i<p.length;i++) s+=Math.hypot(p[i][0]-p[i-1][0],p[i][1]-p[i-1][1]); return s; };
+  const area=p=>{ let s=0; for(let i=1;i<p.length;i++) s+=p[i-1][0]*p[i][1]-p[i][0]*p[i-1][1]; return Math.abs(s)/2; };
+  const ext=r.contornos.filter(c=>c.tipo==="exterior").map(c=>({...c, bb:c.pts.reduce((b,[x,y])=>[Math.min(b[0],x),Math.min(b[1],y),Math.max(b[2],x),Math.max(b[3],y)],[Infinity,Infinity,-Infinity,-Infinity]), huecos:[]}));
+  r.contornos.filter(c=>c.tipo==="hueco").forEach(h=>{ const dueño=ext.find(e=>_dentro(h.pts[0],e.pts)); if(dueño) dueño.huecos.push(h); });
+  // Fuera basura: piezas de menos de 1 cm² o líneas sueltas (cotas, marcos) de menos de 1.5 mm de grueso
+  return ext.filter(e=>{ const a=area(e.pts)-e.huecos.reduce((s,h)=>s+area(h.pts),0), p=[e,...e.huecos].reduce((s,c)=>s+largo(c.pts),0); return a>=100 && 2*a/Math.max(1,p)>=1.5; }).sort((a,b)=>a.bb[0]-b.bb[0]||a.bb[1]-b.bb[1]).map((e,i)=>{ const cont=[e,...e.huecos];
+    return { label:"Pieza "+(i+1), perM:cont.reduce((s,c)=>s+largo(c.pts),0)/1000, areaCm2:(area(e.pts)-e.huecos.reduce((s,h)=>s+area(h.pts),0))/100,
+      w:Math.ceil((e.bb[2]-e.bb[0])/10), h:Math.ceil((e.bb[3]-e.bb[1])/10),
+      contornos: conDoblez ? cont.map(c=>({tipo:c.tipo, pts:c.pts, an:_analizarDoblez(c.pts, r.esTinta, o)})).filter(c=>c.an) : cont.map(c=>({tipo:c.tipo, pts:c.pts})) }; });
 }
 
 // ── DESDOBLADO DE LETRAS: el canto de cada letra como tira recta con sus dobleces ──
@@ -9674,7 +9826,8 @@ async function _desdoblarSVG(svgTxt, anchoCm, nombre, o){
 
 const _DES_ADENTRO="#0f9d6b", _DES_AFUERA="#d9532b", _DES_CURVA="#c98a0b";
 function _svgLetraDes(L){
-  const pad=8, vb=`${-pad} ${-pad} ${L.W+2*pad} ${L.H+2*pad}`, r=Math.max(L.W,L.H)/45;
+  let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity; L.contornos.forEach(ct=>ct.pts.forEach(([x,y])=>{ x0=Math.min(x0,x); x1=Math.max(x1,x); y0=Math.min(y0,y); y1=Math.max(y1,y); }));
+  const bw=x1-x0, bh=y1-y0, pad=Math.max(bw,bh)*0.06, vb=`${x0-pad} ${y0-pad} ${bw+2*pad} ${bh+2*pad}`, r=Math.max(bw,bh)/45;
   const path=p=>"M"+p.map(q=>q[0].toFixed(1)+","+q[1].toFixed(1)).join(" L")+"Z";
   let marcas=""; L.contornos.forEach((ct,ci)=>{ const Q=ct.an.Q;
     marcas+=`<circle cx="${Q[0][0]}" cy="${Q[0][1]}" r="${r*0.8}" fill="#334155"/>`;
@@ -9749,10 +9902,10 @@ function openDesdoblado(inicial){
       <div style="font-size:16px;font-weight:900;flex:1;">📐 Desdoblado de letras (canto)</div><button class="btn small" id="_desClose">✕</button></div>
     <div style="padding:12px 18px;overflow:auto;">
       <div style="display:grid;grid-template-columns:110px minmax(0,2fr) minmax(0,1.3fr) 110px;gap:8px;align-items:end;">
-        <div><div class="field-label">Pieza</div><div class="field" style="padding:0 8px;"><select id="_desModo" style="${selS}"><option value="texto">Texto</option><option value="svg">Logo (SVG)</option></select></div></div>
+        <div><div class="field-label">Pieza</div><div class="field" style="padding:0 8px;"><select id="_desModo" style="${selS}"><option value="texto">Texto</option><option value="svg">Archivo (DXF, PDF, SVG, imagen)</option></select></div></div>
         <div id="_desEntrada"></div>
         <div id="_desFuenteBox"><div class="field-label">Tipo de letra</div><div class="field" style="padding:0 8px;"><select id="_desFuente" style="${selS}">${ALU_FUENTES.map(f=>`<option value="${f[0]}">${f[1]}</option>`).join("")}</select></div></div>
-        ${num("_desAncho","Ancho total (cm)",st.ancho)}
+        ${num("_desAncho","Ancho total (cm) · 0 = tamaño real",st.ancho)}
       </div>
       <div style="display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin-top:8px;">
         ${num("_desOff","Offset hacia adentro (mm)",o.offsetMm,0.5)}${num("_desEsq","Esquina desde (°)",o.esquinaGrados)}${num("_desCurva","Marcas de curva cada (cm)",o.curvaCadaCm,0.5)}${num("_desTras","Traslape (cm)",o.traslapeCm,0.5)}${num("_desTira","Ancho de tira (cm)",o.tiraCm,0.5)}
@@ -9766,17 +9919,17 @@ function openDesdoblado(inicial){
   const $d=id=>document.getElementById(id);
   const entrada=()=>{ $d("_desEntrada").innerHTML= st.modo==="texto"
       ? `<div class="field-label">Texto (cada letra sale aparte)</div><div class="field"><input id="_desTexto" value="${escapeAttr(st.texto)}" placeholder="Ej: TRÍA"></div>`
-      : `<div class="field-label">Logo en SVG</div><input type="file" id="_desFile" accept=".svg,image/svg+xml" style="font-size:12px;"> <span style="font-size:11.5px;color:var(--muted);">${escapeHTML(st.svgNombre||"")}</span>`;
+      : `<div class="field-label">Diseño: DXF o PDF (tamaño real), SVG o imagen (pon el ancho)</div><input type="file" id="_desFile" accept="${DISENO_TIPOS}" style="font-size:12px;"> <span style="font-size:11.5px;color:var(--muted);">${escapeHTML(st.svgNombre||"")}</span>`;
     $d("_desFuenteBox").style.visibility = st.modo==="texto"?"visible":"hidden";
     if(st.modo==="texto") $d("_desTexto").onchange=e=>{ st.texto=e.target.value; calcular(); };
-    else $d("_desFile").onchange=async e=>{ const f=e.target.files[0]; if(!f) return; st.svgTxt=await f.text(); st.svgNombre=f.name; entrada(); calcular(); }; };
+    else $d("_desFile").onchange=e=>{ const f=e.target.files[0]; if(!f) return; st.file=f; st.svgNombre=f.name; if(/.(dxf|pdf)$/i.test(f.name)){ st.ancho=0; $d("_desAncho").value=0; } entrada(); calcular(); }; };
   const calcular=async()=>{ const yo=++turno, res=$d("_desRes");
-    if(st.modo==="texto"&&!st.texto.trim() || st.modo==="svg"&&!st.svgTxt){ res.innerHTML=`<div style="color:var(--muted);padding:24px;text-align:center;">Escribe el texto o sube el logo.</div>`; letras=[]; return; }
+    if(st.modo==="texto"&&!st.texto.trim() || st.modo==="svg"&&!st.file){ res.innerHTML=`<div style="color:var(--muted);padding:24px;text-align:center;">Escribe el texto o sube el logo.</div>`; letras=[]; return; }
     res.innerHTML=`<div style="color:var(--muted);padding:24px;text-align:center;">Desdoblando…</div>`;
-    try{ const L = st.modo==="texto" ? await _desdoblarTexto(st.texto.trim(), st.fuente, st.ancho, o) : await _desdoblarSVG(st.svgTxt, st.ancho, st.svgNombre.replace(/\.svg$/i,""), o);
+    try{ const L = st.modo==="texto" ? await _desdoblarTexto(st.texto.trim(), st.fuente, st.ancho, o) : _piezasDeMascara(await _mascaraDeArchivo(st.file, st.ancho, o), o.offsetMm, true, o);
       if(yo!==turno) return; letras=L;
       const total=L.reduce((a,l)=>a+l.contornos.reduce((b,ct)=>b+ct.an.n/10+o.traslapeCm,0),0);
-      res.innerHTML=`<div style="font-size:12.5px;margin-bottom:8px;"><b>${L.length}</b> pieza(s) · <b>${L.reduce((a,l)=>a+l.contornos.length,0)}</b> tira(s) · <b>${(total/100).toFixed(2)} m</b> de canto con traslapes</div>`+
+      res.innerHTML=`<div style="font-size:12.5px;margin-bottom:8px;">${st.modo==="svg"?`📄 ${escapeHTML(st.svgNombre)} · `:""}<b>${L.length}</b> pieza(s) · <b>${L.reduce((a,l)=>a+l.contornos.length,0)}</b> tira(s) · <b>${(total/100).toFixed(2)} m</b> de canto con traslapes</div>`+
         L.map(l=>`<div class="card" style="padding:10px;margin-bottom:10px;display:grid;grid-template-columns:200px minmax(0,1fr);gap:12px;align-items:start;">
           <div><div style="font-size:15px;font-weight:900;margin-bottom:4px;">${escapeHTML(l.label)}</div>${_svgLetraDes(l)}</div>
           <div>${l.contornos.map((ct,ci)=>`<div style="margin-bottom:8px;"><div style="font-size:12px;font-weight:800;">${l.contornos.length>1?`Tira ${ci+1} · ${ct.tipo==="hueco"?"hueco":"exterior"}`:"Tira"}</div>${_svgTiraDes(ct.an,o)}${_listaDes(ct.an,o)}</div>`).join("")}</div></div>`).join("");
