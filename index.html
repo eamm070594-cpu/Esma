@@ -10030,12 +10030,12 @@ function _wizPlano(res){
 function _wizSvgPlano(hj, W, H, idx, grande){
   const d=p=>"M"+p.map(([x,y])=>x.toFixed(2)+","+y.toFixed(2)).join(" L")+"Z", usado=Math.max(0,...hj.map(p=>p.y+p.h));
   return `<div style="font-size:11px;font-weight:700;color:#64748b;margin-bottom:3px;">Hoja ${idx+1} · ${hj.length} pieza(s) · se usan ${Math.ceil(usado)} de ${H} cm</div>
-    <svg viewBox="-2 -2 ${W+4} ${H+4}" style="width:100%;${grande?"max-height:175mm;":""}background:#fff;display:block;">
+    <svg viewBox="-2 -2 ${W+4} ${(grande?Math.min(H,Math.ceil(usado)+12):H)+4}" style="width:100%;${grande?"max-height:150mm;":""}background:#fff;display:block;">
     <rect x="0" y="0" width="${W}" height="${H}" fill="#f8fafc" stroke="#334155" stroke-width="${W/300}"/>
     <rect x="0" y="${usado}" width="${W}" height="${Math.max(0,H-usado)}" fill="#e2e8f0" opacity=".5"/>
     ${hj.map(p=>{ const col=_NEST_COLORES[(p.n-1)%_NEST_COLORES.length], fs=Math.max(2.5,Math.min(p.w,p.h)/3.2);
       return `<path d="${p.paths.map(d).join(" ")}" fill="${col}" fill-opacity=".28" fill-rule="evenodd" stroke="${col}" stroke-width="${W/500}"/>
-      <text x="${p.x+p.w/2}" y="${p.y+p.h/2}" font-size="${fs}" text-anchor="middle" dominant-baseline="middle" fill="#0f172a" font-weight="800">${p.n}</text>`; }).join("")}</svg>`;
+      <text x="${p.x+p.w/2}" y="${p.y+p.h/2}" font-size="${fs}" text-anchor="middle" dominant-baseline="middle" fill="#0f172a" font-weight="800">${p.n}</text>`; }).join("")}${grande&&usado+12<H?`<text x="${W/2}" y="${Math.ceil(usado)+9}" font-size="${W/45}" text-anchor="middle" fill="#64748b">… resto de la lámina libre: ${Math.floor(H-usado)} cm</text>`:""}</svg>`;
 }
 function _wizBajarDxf(res, nombre){
   const pl=_wizPlano(res), capas=[];
@@ -10050,7 +10050,7 @@ function _wizHtmlPlano(res, titulo, tiraCm){
   const hojas=pl.hojas.map((hj,i)=>`<section class="hoja"><h2>${escapeHTML(titulo)}</h2><div class="sub">${escapeHTML(mat)} · lámina ${pl.W} × ${pl.H} cm · ${pl.hojas.length>1?`hoja ${i+1} de ${pl.hojas.length}`:"1 hoja"} · se usa ${ex.frac} hoja en total</div>
     <div class="fila"><div class="dib">${_wizSvgPlano(hj,pl.W,pl.H,i,true)}</div><table><tr><th>#</th><th>Pieza</th><th>Medida (cm)</th></tr>${hj.slice().sort((a,b)=>a.n-b.n).map(p=>`<tr><td><b>${p.n}</b></td><td>${escapeHTML(p.label)}${p.rot?" ↻":""}</td><td>${p.wr} × ${p.hr}</td></tr>`).join("")}</table></div></section>`).join("");
   const tiras=ex.tiras&&ex.tiras.length?`<section class="hoja"><h2>Tiras de ${tiraCm} cm × 2.44 m: ${ex.tiras.length}</h2><div class="sub">Corte de cada tira: letra y largo en cm (incluye 5 cm de traslape por tramo)</div>${_svgTiras(ex.tiras,2.44)}</section>`:"";
-  return `<html><head><title>Plano de corte</title><style>@page{size:letter landscape;margin:10mm}body{font-family:Arial,sans-serif;color:#0f172a}.hoja{page-break-after:always}.hoja:last-child{page-break-after:auto}h2{font-size:16px;margin:0 0 2px}.sub{font-size:11px;color:#475569;margin-bottom:8px}.fila{display:flex;gap:14px;align-items:flex-start}.dib{flex:1;min-width:0}table{font-size:11px;border-collapse:collapse;min-width:180px}td,th{border:1px solid #cbd5e1;padding:3px 6px;text-align:left}.nota{font-size:10px;color:#64748b;margin-top:6px}</style></head><body>${hojas}${tiras}<div class="nota">↻ = pieza girada 90°. El DXF va en milímetros, tamaño real (capas HOJA y CORTE).</div></body></html>`;
+  return `<html><head><title>Plano de corte</title><style>@page{size:letter landscape;margin:10mm}body{font-family:Arial,sans-serif;color:#0f172a}.hoja{page-break-after:always}.hoja:last-child{page-break-after:auto}h2{font-size:16px;margin:0 0 2px}.sub{font-size:11px;color:#475569;margin-bottom:8px}.dib{width:100%;margin-bottom:8px}table{font-size:11px;border-collapse:collapse;width:auto}td,th{border:1px solid #cbd5e1;padding:3px 6px;text-align:left}.nota{font-size:10px;color:#64748b;margin-top:6px}</style></head><body>${hojas}${tiras}<div class="nota">↻ = pieza girada 90°. El DXF va en milímetros, tamaño real (capas HOJA y CORTE).</div></body></html>`;
 }
 
 function openCotizadorLetrero(q, p){
