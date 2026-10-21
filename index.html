@@ -10033,9 +10033,9 @@ function _wizSvgPlano(hj, W, H, idx, grande){
     <svg viewBox="-2 -2 ${W+4} ${(grande?Math.min(H,Math.ceil(usado)+12):H)+4}" style="width:100%;${grande?"max-height:150mm;":""}background:#fff;display:block;">
     <rect x="0" y="0" width="${W}" height="${H}" fill="#f8fafc" stroke="#334155" stroke-width="${W/300}"/>
     <rect x="0" y="${usado}" width="${W}" height="${Math.max(0,H-usado)}" fill="#e2e8f0" opacity=".5"/>
-    ${hj.map(p=>{ const col=_NEST_COLORES[(p.n-1)%_NEST_COLORES.length], fs=Math.max(2.5,Math.min(p.w,p.h)/3.2);
+    ${hj.map(p=>{ const col=_NEST_COLORES[(p.n-1)%_NEST_COLORES.length], fs=Math.max(2.2,Math.min(W,H)/32), cx=p.x+fs*0.7, cy=p.y+fs*0.7;
       return `<path d="${p.paths.map(d).join(" ")}" fill="${col}" fill-opacity=".28" fill-rule="evenodd" stroke="${col}" stroke-width="${W/500}"/>
-      <text x="${p.x+p.w/2}" y="${p.y+p.h/2}" font-size="${fs}" text-anchor="middle" dominant-baseline="middle" fill="#0f172a" font-weight="800">${p.n}</text>`; }).join("")}${grande&&usado+12<H?`<text x="${W/2}" y="${Math.ceil(usado)+9}" font-size="${W/45}" text-anchor="middle" fill="#64748b">… resto de la lámina libre: ${Math.floor(H-usado)} cm</text>`:""}</svg>`;
+      <circle cx="${cx}" cy="${cy}" r="${fs*0.7}" fill="#fff" stroke="${col}" stroke-width="${W/400}"/><text x="${cx}" y="${cy}" font-size="${fs}" text-anchor="middle" dominant-baseline="central" fill="#0f172a" font-weight="800">${p.n}</text>`; }).join("")}${grande&&usado+12<H?`<text x="${W/2}" y="${Math.ceil(usado)+9}" font-size="${W/45}" text-anchor="middle" fill="#64748b">… resto de la lámina libre: ${Math.floor(H-usado)} cm</text>`:""}</svg>`;
 }
 function _wizBajarDxf(res, nombre){
   const pl=_wizPlano(res), capas=[];
