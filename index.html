@@ -1015,7 +1015,7 @@ tbody tr:hover td{background:rgba(13,148,136,.03);}
     <div class="page" id="page-tablero">
       <div class="page-header">
         <div><h1>Tablero</h1><div class="sub">Tus proyectos por etapa, de cotizar a entregar. Lo urgente arriba.</div></div>
-        <button class="btn primary" onclick="document.getElementById('btnNewProject').click()">＋ Nuevo proyecto</button>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;"><button class="btn primary" onclick="openCotizadorLetrero()">🪧 Nuevo letrero</button><button class="btn" onclick="document.getElementById('btnNewProject').click()">＋ Nuevo proyecto</button></div>
       </div>
       <div id="tableroContent"></div>
     </div>
@@ -1045,7 +1045,7 @@ tbody tr:hover td{background:rgba(13,148,136,.03);}
           <h1>Proyectos</h1>
           <div class="sub" id="projCount">—</div>
         </div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;"><button class="btn primary" onclick="openProyectoRapido()">🎤 Proyecto rápido (voz o captura)</button><button class="btn" id="btnNewProject"><i class="ti ti-plus"></i> Nuevo proyecto</button></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;"><button class="btn primary" onclick="openCotizadorLetrero()">🪧 Nuevo letrero</button><button class="btn" onclick="openProyectoRapido()">🎤 Proyecto rápido (voz o captura)</button><button class="btn" id="btnNewProject"><i class="ti ti-plus"></i> Nuevo proyecto</button></div>
       </div>
 
       <div id="projV2"></div>
@@ -2733,6 +2733,7 @@ function createQuote(projectId){
   const folio = String(db.settings.folioCounter).padStart(4,"0");
   const q={id:uid(), projectId, code: folio, name:"Cotización "+folio, qty:1, status:"draft", saleType:"manufactured", marginPct:60, createdAt:todayISO(), products:[], routes:[], extras:[]};
   db.quotes.unshift(q);
+  { const pr=db.projects.find(x=>x.id===projectId); if(pr && _lineaDe(pr)==="letrero") window._wizAuto=q.id; }
   _onQuoteCreated(projectId);
   saveQuote(q);
   const proj = db.projects.find(x=>x.id===projectId);
@@ -4922,6 +4923,7 @@ function renderHoyPage(){
         <h1>${nombre?`${escapeHTML(nombre)}, esto toca hoy`:"Esto toca hoy"}</h1>
         <div class="sub" style="text-transform:capitalize;">${fecha}</div>
       </div>
+      <button class="btn primary" onclick="openCotizadorLetrero()" style="align-self:center;">🪧 Nuevo letrero</button>
       <div style="text-align:right;">
         <div style="font-size:22px;font-weight:900;color:${accColor};">${D.accionesHoy}/${HOY_ACCIONES_META}</div>
         <div style="font-size:11px;color:var(--muted);">acciones de venta hoy</div>
@@ -6640,7 +6642,7 @@ function openQuoteEditorPage(q){
   }
 
   document.getElementById("addProd").addEventListener("click",()=>{ q.products=q.products||[]; q.products.push({id:uid(),matPick:"",desc:"",qty:1,unitPrice:0}); saveQuote(q); renderLines(); });
-  const _bw=document.getElementById("btnWizLetrero"); if(_lineaDe(p)!=="letrero"){ if(_bw) _bw.style.display="none"; } else if(_bw){ _bw.addEventListener("click",()=>openCotizadorLetrero(q,p)); if(!(q.products||[]).length && !(q.routes||[]).length){ const av=document.createElement("div"); av.style.cssText="margin:8px 0;padding:10px 14px;border-radius:10px;background:rgba(37,99,235,.08);border:1px dashed var(--accent);font-size:13px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;"; av.innerHTML=`<span style="flex:1;min-width:200px;">🪧 Esta cotización de letrero está vacía. Te guío paso a paso: tipo, diseño (DXF, PDF, imagen o texto), acabados y costos.</span><button class="btn small primary">Empezar</button>`; av.querySelector("button").onclick=()=>openCotizadorLetrero(q,p); const tb=_bw.parentElement; if(tb&&tb.parentElement) tb.parentElement.insertBefore(av, tb.nextSibling); } }
+  const _bw=document.getElementById("btnWizLetrero"); if(_lineaDe(p)!=="letrero"){ if(_bw) _bw.style.display="none"; } else if(_bw){ _bw.addEventListener("click",()=>openCotizadorLetrero(q,p)); if(window._wizAuto===q.id){ window._wizAuto=null; setTimeout(()=>openCotizadorLetrero(q,p),60); } if(!(q.products||[]).length && !(q.routes||[]).length){ const av=document.createElement("div"); av.style.cssText="margin:8px 0;padding:10px 14px;border-radius:10px;background:rgba(37,99,235,.08);border:1px dashed var(--accent);font-size:13px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;"; av.innerHTML=`<span style="flex:1;min-width:200px;">🪧 Esta cotización de letrero está vacía. Te guío paso a paso: tipo, diseño (DXF, PDF, imagen o texto), acabados y costos.</span><button class="btn small primary">Empezar</button>`; av.querySelector("button").onclick=()=>openCotizadorLetrero(q,p); const tb=_bw.parentElement; if(tb&&tb.parentElement) tb.parentElement.insertBefore(av, tb.nextSibling); } }
   if(_lineaDe(p)!=="letrero"){ const _ba=document.getElementById("btnAsistente"); if(_ba) _ba.style.display="none"; const _b3=document.getElementById("btnAlu3D"); if(_b3) _b3.style.display="none"; const _bd=document.getElementById("btnDesdoblado"); if(_bd) _bd.style.display="none"; const _bn=document.getElementById("btnNest"); if(_bn) _bn.classList.add("primary"); }
   document.getElementById("btnAsistente").addEventListener("click",()=>openAsistenteLetrero(q, r=>{
     q.products=r.products; q.routes=r.routes; q.extras=r.extras; q.marginPct=r.marginPct; q.asis=r.asis||null;
@@ -8998,7 +9000,8 @@ function openProyectoRapido(){
     db.projects.unshift(p); saveProject(p); save(); cerrar();
     try{ renderProjectsPage(); }catch(e){}
     openProjectDetail(p.id);
-    _showSaveToast("✅ Proyecto creado. Revisa la ficha y haz la cotización.","success");
+    if(p.linea==="letrero"){ openQuoteEditorPage(createQuote(p.id)); _showSaveToast("✅ Proyecto creado. Vamos a cotizar el letrero paso a paso.","success"); }
+    else _showSaveToast("✅ Proyecto creado. Revisa la ficha y haz la cotización.","success");
   };
 }
 
@@ -10054,8 +10057,10 @@ function _wizHtmlPlano(res, titulo, tiraCm){
 }
 
 function openCotizadorLetrero(q, p){
+  const nuevo=!q; if(!q) q={products:[],routes:[],extras:[],marginPct:60};
+  const pasoMin=()=>nuevo&&!p?0:1;
   const old=document.getElementById("_wizModal"); if(old) old.remove();
-  const st={ paso:1, tipo:null, fuente:"archivo", file:null, texto:"", fam:"Cinzel", ancho:0, piezas:null, anchoTotal:0, altoTotal:0, leyendo:false,
+  const st={ paso:nuevo?0:1, cliente:"", tel:"", proyecto:"", entrega:"", notasP:"", proyectoId:"", hecho:null, tipo:null, fuente:"archivo", file:null, texto:"", fam:"Cinzel", ancho:0, piezas:null, anchoTotal:0, altoTotal:0, leyendo:false,
     foto:null, fotoNombre:"", neon:null, color:"blanco", base:"transparente", uso:"interior", montaje:"pared", caja:ASIS_CAJAS[1][0], colores:2, kit:true, bandera:true, negocio:(p&&p.name||"").split("·")[0].trim(),
     alu:"natural", tira:5, luz:true, pintar:false, material:WIZ_PLANAS[0][0], pintarPlanas:true, montajePlanas:"cinta", instalacion:800, utilidad:Number(q.marginPct)||60, horas:{}, modo:(q.products||[]).length?"sumar":"reemplazar" };
   const ov=document.createElement("div"); ov.id="_wizModal";
@@ -10066,7 +10071,7 @@ function openCotizadorLetrero(q, p){
   const inp=(id,v,type,extra)=>`<div class="field"><input id="${id}" type="${type||"text"}" value="${escapeAttr(v)}" ${extra||""}></div>`;
   const sel=(id,v,opts)=>`<div class="field" style="padding:0 10px;"><select id="${id}" style="${selS}">${opts.map(([k,l])=>`<option value="${escapeAttr(k)}" ${String(v)===String(k)?"selected":""}>${escapeHTML(l)}</option>`).join("")}</select></div>`;
   const chk=(id,v,label)=>`<label style="display:flex;gap:6px;align-items:center;font-size:12.5px;"><input type="checkbox" id="${id}" ${v?"checked":""}> ${label}</label>`;
-  const PASOS=["Tipo","Diseño","Acabados","Resultado","Aplicar"];
+  const PASOS=["Cliente","Tipo","Diseño","Acabados","Resultado","Guardar"];
   let res=null;
 
   // ── Cálculo según el tipo ──
@@ -10156,22 +10161,32 @@ function openCotizadorLetrero(q, p){
           ${res.extras.map(x=>`<tr><td style="padding:4px 0;color:var(--muted);">${escapeHTML(x.label)}</td><td></td><td style="text-align:right;">$${money(x.amount)}</td></tr>`).join("")}
         </table><div style="font-size:11px;color:var(--muted);margin-top:6px;">Las horas son sugeridas: cámbialas aquí si hace falta. Todo queda editable en la cotización.</div></div>
       <div style="display:flex;flex-direction:column;gap:10px;">${vistas||`<div style="font-size:12px;color:var(--muted);">${escapeHTML(res.nombre)}</div>`}</div></div>`; };
-  const pasoAplicar=()=>`<div style="font-size:13px;">Se va a guardar en la cotización <b>${escapeHTML(q.code||"")} · ${escapeHTML(q.name||"")}</b>:</div>
+  const pasoCliente=()=>{ const ps=(db.projects||[]).filter(x=>_lineaDe(x)==="letrero").slice(0,40);
+    return `<div style="font-size:13px;color:var(--muted);margin-bottom:10px;">¿Para quién es el letrero?</div>
+    <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;" class="detail-fields-grid">${fld("Cliente",inp("_wzCli",st.cliente))}${fld("WhatsApp",inp("_wzTel",st.tel,"tel"))}
+      ${fld("Nombre del proyecto (opcional)",inp("_wzProy",st.proyecto,"text",`placeholder="Letrero · ${escapeAttr(st.cliente||"cliente")}"`))}${fld("Fecha de entrega (si ya la sabes)",inp("_wzEnt",st.entrega,"date"))}</div>
+    <div style="margin-top:8px;">${fld("¿Qué pidió? (opcional)",`<div class="field"><textarea id="_wzNotas" rows="2">${escapeHTML(st.notasP)}</textarea></div>`)}</div>
+    ${ps.length?`<div style="margin-top:12px;border-top:1px dashed var(--border);padding-top:10px;">${fld("…o agrégalo a un proyecto de letrero que ya existe",sel("_wzPid",st.proyectoId,[["","— Proyecto nuevo —"],...ps.map(x=>[x.id,`${x.name}${x.client?" · "+x.client:""}`])]))}</div>`:""}`; };
+  const pasoListo=()=>`<div style="text-align:center;padding:10px 0 4px;"><div style="font-size:40px;">✅</div><div style="font-size:17px;font-weight:900;">Cotización ${escapeHTML(st.hecho.code)} lista · $${money(st.hecho.venta)}</div>
+    <div style="font-size:12.5px;color:var(--muted);margin-top:2px;">${escapeHTML(st.hecho.nombre)} · ${escapeHTML(p.client||p.name)}</div></div>
+    <div style="font-size:13px;font-weight:800;margin:14px 0 8px;">¿Qué sigue?</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px;">${[["_wzFinPdf","📄","Ver y enviar PDF","Elige qué opciones mandar al cliente"],["_wzFinOtra","➕","Agregar otra opción","Otra cotización para el mismo cliente: otro material, tamaño o tipo"],["_wzFinEdit","✏️","Revisar la cotización","Ajustar materiales, horas o descripción"],["_wzFinProy","📁","Ver el proyecto","Seguimiento, fechas y estado"]].map(([id,ic,t,d])=>`<button type="button" id="${id}" class="card" style="text-align:left;padding:14px;cursor:pointer;border:2px solid ${id==="_wzFinPdf"?"var(--accent)":"var(--border)"};background:var(--card);"><div style="font-size:24px;">${ic}</div><div style="font-size:14px;font-weight:900;margin-top:4px;">${t}</div><div style="font-size:12px;color:var(--muted);">${d}</div></button>`).join("")}</div>`;
+  const pasoAplicar=()=>`<div style="font-size:13px;">Se va a guardar en ${q.id?`la cotización <b>${escapeHTML(q.code||"")} · ${escapeHTML(q.name||"")}</b>`:`una cotización nueva ${p?`del proyecto <b>${escapeHTML(p.name)}</b>`:`para <b>${escapeHTML(st.cliente||"el cliente")}</b> (se crea el proyecto)`}`}:</div>
     <ul style="font-size:12.5px;line-height:1.8;margin:8px 0 12px 18px;"><li>Nombre: <b>${escapeHTML(res.nombre)}</b> ${/^Cotizaci[oó]n( \d+)?$/.test(q.name||"")||!q.name?"":"<span style='color:var(--muted)'>(solo si la cotización no tiene nombre)</span>"}</li>
       <li>${res.rows.length} materiales, ${res.routes.length} rutas y ${res.extras.length} extra(s) · <b>$${money(res.tot.venta)}</b></li><li>Descripción para el cliente ("Cómo se verá" e "Incluye")</li>${st.foto?"<li>Foto de referencia para el PDF</li>":""}</ul>
     ${(q.products||[]).length?`<div style="display:flex;gap:14px;font-size:12.5px;"><label><input type="radio" name="_wzModo" value="reemplazar" ${st.modo==="reemplazar"?"checked":""}> Reemplazar lo que ya tiene</label><label><input type="radio" name="_wzModo" value="sumar" ${st.modo==="sumar"?"checked":""}> Sumar a lo que ya tiene</label></div>`:""}`;
 
-  const valido=()=> st.paso===1 ? !!st.tipo : st.paso===2 ? (st.tipo==="neon"?!!st.neon : st.tipo==="caja"?true : !!(st.piezas&&st.piezas.length)) : true;
+  const valido=()=> st.paso===0 ? !!(st.cliente.trim()||st.proyectoId) : st.paso===1 ? !!st.tipo : st.paso===2 ? (st.tipo==="neon"?!!st.neon : st.tipo==="caja"?true : !!(st.piezas&&st.piezas.length)) : true;
   const pintar=()=>{
-    const cuerpo=[null,pasoTipo,pasoDiseno,pasoAcabados,pasoResultado,pasoAplicar][st.paso]();
+    const cuerpo=[pasoCliente,pasoTipo,pasoDiseno,pasoAcabados,pasoResultado,pasoAplicar,pasoListo][st.paso]();
     ov.innerHTML=`<div style="background:var(--card);border-radius:16px;width:1060px;max-width:100%;max-height:95vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.3);">
       <div style="display:flex;align-items:center;gap:10px;padding:12px 18px;border-bottom:1px solid var(--border);">
         <div style="font-size:16px;font-weight:900;flex:1;">🪧 Cotizar letrero paso a paso${st.tipo?` · ${WIZ_TIPOS.find(t=>t[0]===st.tipo)[2]}`:""}</div><button class="btn small" id="_wzClose">✕</button></div>
-      <div style="display:flex;gap:6px;padding:10px 18px;border-bottom:1px solid var(--border);flex-wrap:wrap;">${PASOS.map((n,i)=>`<span style="font-size:11.5px;font-weight:800;padding:4px 10px;border-radius:999px;${i+1===st.paso?"background:var(--accent);color:#fff;":i+1<st.paso?"background:rgba(22,163,74,.15);color:#15803d;":"background:var(--bg3);color:var(--muted);"}">${i+1<st.paso?"✓ ":(i+1)+". "}${n}</span>`).join("")}</div>
+      <div style="display:flex;gap:6px;padding:10px 18px;border-bottom:1px solid var(--border);flex-wrap:wrap;">${PASOS.map((n,i)=>[n,i]).filter(([n,i])=>i>=pasoMin()).map(([n,i],k)=>`<span style="font-size:11.5px;font-weight:800;padding:4px 10px;border-radius:999px;${i===st.paso?"background:var(--accent);color:#fff;":i<st.paso?"background:rgba(22,163,74,.15);color:#15803d;":"background:var(--bg3);color:var(--muted);"}">${i<st.paso?"✓ ":(k+1)+". "}${n}</span>`).join("")}</div>
       <div style="padding:14px 18px;overflow:auto;flex:1;">${cuerpo}</div>
       <div style="display:flex;justify-content:space-between;gap:8px;padding:12px 18px;border-top:1px solid var(--border);">
-        <button class="btn" id="_wzAtras" ${st.paso===1?"disabled":""}>← Atrás</button>
-        ${st.paso<5?`<button class="btn primary" id="_wzSig" ${valido()?"":"disabled"}>Siguiente →</button>`:`<button class="btn primary" id="_wzOk">✅ Aplicar a la cotización · $${money(res.tot.venta)}</button>`}</div></div>`;
+        <button class="btn" id="_wzAtras" ${st.paso<=pasoMin()||st.paso===6?"disabled":""}>← Atrás</button>
+        ${st.paso<5?`<button class="btn primary" id="_wzSig" ${valido()?"":"disabled"}>Siguiente →</button>`:st.paso===5?`<button class="btn primary" id="_wzOk">✅ Guardar cotización · $${money(res.tot.venta)}</button>`:`<button class="btn" id="_wzFin">Cerrar</button>`}</div></div>`;
     enlazar();
   };
   const $w=id=>document.getElementById(id);
@@ -10187,8 +10202,16 @@ function openCotizadorLetrero(q, p){
     st.leyendo=false; pintar(); };
   const enlazar=()=>{
     $w("_wzClose").onclick=()=>ov.remove();
-    $w("_wzAtras").onclick=()=>{ if(st.paso>1){ st.paso--; pintar(); } };
-    if($w("_wzSig")) $w("_wzSig").onclick=()=>{ if(!valido()) return; st.paso++; pintar(); };
+    $w("_wzAtras").onclick=()=>{ if(st.paso>pasoMin()&&st.paso<6){ st.paso--; pintar(); } };
+    if($w("_wzSig")) $w("_wzSig").onclick=()=>{ if(!valido()) return;
+      if(st.paso===0){ const px=st.proyectoId&&db.projects.find(x=>x.id===st.proyectoId); st.negocio=px?(px.client||px.name):st.cliente.trim(); }
+      st.paso++; pintar(); };
+    [["_wzCli","cliente"],["_wzTel","tel"],["_wzProy","proyecto"],["_wzEnt","entrega"],["_wzNotas","notasP"],["_wzPid","proyectoId"]].forEach(([id,k])=>{ const e=$w(id); if(e) e.oninput=e.onchange=()=>{ st[k]=e.value; if($w("_wzSig")) $w("_wzSig").disabled=!valido(); }; });
+    if($w("_wzFin")) $w("_wzFin").onclick=()=>ov.remove();
+    if($w("_wzFinEdit")) $w("_wzFinEdit").onclick=()=>ov.remove();
+    if($w("_wzFinPdf")) $w("_wzFinPdf").onclick=()=>{ ov.remove(); openPDFSelector(p.id); };
+    if($w("_wzFinProy")) $w("_wzFinProy").onclick=()=>{ ov.remove(); openProjectDetail(p.id); };
+    if($w("_wzFinOtra")) $w("_wzFinOtra").onclick=()=>{ q={products:[],routes:[],extras:[],marginPct:Number(st.utilidad)||60}; st.modo="reemplazar"; st.hecho=null; st.horas={}; st.foto=null; st.paso=1; pintar(); };
     ov.querySelectorAll("[data-tipo]").forEach(b=>b.onclick=()=>{ if(st.tipo!==b.dataset.tipo){ st.tipo=b.dataset.tipo; st.horas={}; } st.paso=2; pintar(); });
     ov.querySelectorAll("[data-fuente]").forEach(b=>b.onclick=()=>{ st.fuente=b.dataset.fuente; st.piezas=null; pintar(); });
     if($w("_wzTexto")) $w("_wzTexto").oninput=e=>{ st.texto=e.target.value; };
@@ -10209,6 +10232,9 @@ function openCotizadorLetrero(q, p){
     if($w("_wzOk")) $w("_wzOk").onclick=async()=>{
       const b=$w("_wzOk"); b.disabled=true; b.textContent="Guardando…";
       try{
+        if(!p){ p=st.proyectoId?db.projects.find(x=>x.id===st.proyectoId):null;
+          if(!p){ const hoy=todayISO(); p={id:uid(), name:st.proyecto.trim()||`Letrero · ${st.cliente.trim()}`, client:st.cliente.trim(), phone:st.tel.trim(), linea:"letrero", createdAt:hoy, deliveryDate:st.entrega||"", notes:st.notasP.trim(), stage:"cotizacion", stageUpdatedAt:hoy, tipoTrabajo:"Letreros"}; db.projects.unshift(p); saveProject(p); } }
+        if(!q.id){ const nq=createQuote(p.id); window._wizAuto=null; nq.marginPct=q.marginPct; q=nq; }
         if(st.foto && /^data:/.test(st.foto)){ try{ q.refPhoto=await uploadToImgbb(st.foto); }catch(e){ _showSaveToast("No se pudo subir la foto: "+e.message,"warning"); } }
         if(st.modo==="sumar"&&(q.products||[]).length){
           q.products=(q.products||[]).concat(res.rows);
@@ -10219,8 +10245,9 @@ function openCotizadorLetrero(q, p){
         if(!q.name || /^Cotizaci[oó]n( \d+)?$/.test(q.name)) q.name=res.nombre;
         q.clientDesc = descCliente(res) || _qDescAuto(q,p);
         q.letrero={tipo:st.tipo, fecha:todayISO(), archivo:st.file?st.file.name:"", texto:st.texto||""};
-        saveQuote(q); save(); ov.remove(); openQuoteEditorPage(q);
-        _showSaveToast("🪧 Letrero cotizado paso a paso. Revisa y ajusta lo que necesites.","success");
+        saveQuote(q); save(); try{ openQuoteEditorPage(q); }catch(e){}
+        if(!document.body.contains(ov)) document.body.appendChild(ov);
+        st.hecho={code:q.code, venta:res.tot.venta, nombre:q.name}; st.paso=6; pintar();
       }catch(e){ b.disabled=false; b.textContent="Reintentar"; _showSaveToast("Error: "+e.message,"error"); }
     };
   };
