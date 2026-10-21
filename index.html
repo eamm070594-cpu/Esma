@@ -6401,6 +6401,16 @@ function openQuoteEditorPage(q){
       .qe table th{font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);}
       .qe .qe-tool{display:flex;align-items:center;gap:6px;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:4px 10px;font-size:12px;color:var(--muted);}
       .qe .qe-tool select,.qe .qe-tool input{background:transparent;border:none;color:var(--text);font-family:inherit;font-size:12.5px;font-weight:700;outline:none;}
+      .qe .qe-st{background:var(--bg3);border:1px solid var(--border);border-radius:999px;padding:2px 8px;font-size:11.5px;font-weight:700;color:var(--text);font-family:inherit;outline:none;cursor:pointer;}
+      .qe .qe-qty{width:40px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:1px 4px;font-size:11.5px;font-weight:700;color:var(--text);font-family:inherit;text-align:center;outline:none;}
+      .qe details.qe-menu > summary{list-style:none;}
+      .qe details.qe-menu > summary::-webkit-details-marker{display:none;}
+      .qe .qe-menu-list{position:absolute;left:0;top:38px;z-index:20;width:300px;padding:6px;box-shadow:0 12px 32px rgba(0,0,0,.18);}
+      .qe .qe-mgrp{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);padding:8px 10px 3px;}
+      .qe .qe-mi{display:flex;flex-direction:column;align-items:flex-start;gap:1px;width:100%;background:transparent;border:none;border-radius:8px;padding:7px 10px;cursor:pointer;font-family:inherit;text-align:left;color:var(--text);}
+      .qe .qe-mi:hover{background:var(--bg3);}
+      .qe .qe-mi b{font-size:13px;font-weight:700;}
+      .qe .qe-mi span{font-size:11.5px;color:var(--muted);}
       .qe details.qe-guide > summary{list-style:none;}
       .qe details.qe-guide > summary::-webkit-details-marker{display:none;}
       @media(max-width:900px){ .qe .qe-top{flex-wrap:wrap;} .qe .qe-actions{width:100%;justify-content:flex-end;} }
@@ -6415,6 +6425,14 @@ function openQuoteEditorPage(q){
           <span class="badge ${_qeAuth?'green':'amber'}" style="font-size:10.5px;">${_qeAuth?'✓ Autorizada':'Borrador'}</span>
           <span>Folio <b style="color:var(--text);">${_qeCode}</b></span><span>·</span>
           <span>${escapeHTML(p.name||"Proyecto")}</span>${p.client?`<span>·</span><span>${escapeHTML(p.client)}</span>`:""}<span>·</span><span>${escapeHTML(q.createdAt||"")}</span>
+          ${!_qeAuth?`<span>·</span><select id="qPipelineStatus" class="qe-st" title="Estado de la cotización">
+            <option value="">Sin enviar</option>
+            <option value="sent" ${q.pipelineStatus==='sent'?'selected':''}>Enviada</option>
+            <option value="negotiating" ${q.pipelineStatus==='negotiating'?'selected':''}>En negociación</option>
+            <option value="no_response" ${q.pipelineStatus==='no_response'?'selected':''}>Sin respuesta</option>
+            <option value="lost" ${q.pipelineStatus==='lost'?'selected':''}>Perdida</option>
+          </select>`:''}
+          <span>·</span><label style="display:inline-flex;align-items:center;gap:4px;" title="Cuántas piezas iguales cotizas">Cantidad <input id="qQtyInput" class="qe-qty" type="number" min="1" value="${Number(q.qty||1)}"></label>
         </div>
       </div>
       <div style="text-align:right;padding:0 4px;">
@@ -6432,24 +6450,24 @@ function openQuoteEditorPage(q){
 
     <!-- ── HERRAMIENTAS ── -->
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px;">
-      ${!_qeAuth?`<label class="qe-tool">Estado
-        <select id="qPipelineStatus">
-          <option value="">Sin enviar</option>
-          <option value="sent" ${q.pipelineStatus==='sent'?'selected':''}>Enviada</option>
-          <option value="negotiating" ${q.pipelineStatus==='negotiating'?'selected':''}>En negociación</option>
-          <option value="no_response" ${q.pipelineStatus==='no_response'?'selected':''}>Sin respuesta</option>
-          <option value="lost" ${q.pipelineStatus==='lost'?'selected':''}>Perdida</option>
-        </select></label>`:''}
-      <label class="qe-tool">Cantidad <input id="qQtyInput" type="number" min="1" value="${Number(q.qty||1)}" style="width:44px;text-align:center;"> u.</label>
-      <button class="btn small primary" id="btnWizLetrero" title="Te guía: tipo de letrero → diseño (DXF, PDF, imagen o texto) → acabados → costos → aplicar">🪧 Cotizar letrero paso a paso</button>
-      <button class="btn small" id="btnAsistente" title="Arma la cotización con unos cuantos datos">⚡ Asistente rápido</button>
-      <button class="btn small" id="btnAlu3D" title="Mide el contorno de las letras y calcula tiras, lámina, LED y herrajes">📏 Letras 3D aluminio</button>
-      <button class="btn small" id="btnDesdoblado" title="Desdobla el canto de cada letra: dónde, cuánto y hacia qué lado doblar">📐 Desdoblado</button>
-      <button class="btn small" id="btnLoadTemplate"><i class="ti ti-folder-open"></i> Usar plantilla</button>
-      <button class="btn small" id="btnSaveTemplate"><i class="ti ti-star"></i> Guardar como plantilla</button>
-      <details class="qe-guide" style="margin-left:auto;position:relative;">
-        <summary class="btn small" style="cursor:pointer;">📘 Cómo cotizar</summary>
-        <div class="card" style="position:absolute;right:0;top:38px;width:min(580px,92vw);z-index:20;padding:12px 16px;box-shadow:0 12px 32px rgba(0,0,0,.18);">${GUIA_COTIZAR_HTML}</div>
+      <button class="btn small primary" id="btnWizLetrero" title="Te guía: tipo de letrero → diseño (DXF, PDF, imagen o texto) → acabados → costos → guardar">🪧 Cotizar paso a paso</button>
+      <details class="qe-menu" style="position:relative;">
+        <summary class="btn small" style="cursor:pointer;">🧰 Herramientas ▾</summary>
+        <div class="card qe-menu-list">
+          <div id="qeGrpLetreros">
+            <div class="qe-mgrp">Letreros</div>
+            <button type="button" class="qe-mi" id="btnAsistente"><b>⚡ Asistente rápido</b><span>Neón o caja de luz con pocos datos</span></button>
+            <button type="button" class="qe-mi" id="btnAlu3D"><b>📏 Letras 3D de aluminio</b><span>Tiras, lámina, LED y herrajes</span></button>
+            <button type="button" class="qe-mi" id="btnDesdoblado"><b>📐 Desdoblado</b><span>Dónde y hacia qué lado doblar el canto</span></button>
+          </div>
+          <div class="qe-mgrp">Materiales</div>
+          <button type="button" class="qe-mi" id="btnNest"><b>📐 Calcular hoja</b><span>Cuánta hoja usan tus piezas</span></button>
+          <div class="qe-mgrp">Plantillas</div>
+          <button type="button" class="qe-mi" id="btnLoadTemplate"><b>📂 Usar plantilla</b><span>Cargar una cotización guardada como base</span></button>
+          <button type="button" class="qe-mi" id="btnSaveTemplate"><b>⭐ Guardar como plantilla</b><span>Para reusar esta cotización después</span></button>
+          <div class="qe-mgrp">Ayuda</div>
+          <button type="button" class="qe-mi" id="btnGuiaCotizar"><b>📘 Cómo cotizar</b><span>Guía rápida de materiales, horas y utilidad</span></button>
+        </div>
       </details>
     </div>
 
@@ -6459,7 +6477,7 @@ function openQuoteEditorPage(q){
       <div>
         <div class="card" style="margin-bottom:10px;padding:0;overflow:hidden;">
           <div class="qe-head"><span><span class="qe-sec">1 · Materiales</span><span class="qe-sub" id="stProd"></span></span>
-            <span style="display:flex;gap:6px;"><button class="btn small" id="btnNest" title="Calcula cuánta hoja usan tus piezas">📐 Calcular hoja</button><button class="btn small primary" id="addProd"><i class="ti ti-plus"></i> Material</button></span></div>
+            <span style="display:flex;gap:6px;"><button class="btn small primary" id="addProd"><i class="ti ti-plus"></i> Material</button></span></div>
           <div class="table-wrap" style="border:none;border-radius:0;">
             <table><thead><tr><th>Material del catálogo</th><th>Descripción</th><th>Cant.</th><th>Costo unit.</th><th>Total</th><th></th></tr></thead>
             <tbody id="tbProd"></tbody></table>
@@ -6642,7 +6660,10 @@ function openQuoteEditorPage(q){
   }
 
   document.getElementById("addProd").addEventListener("click",()=>{ q.products=q.products||[]; q.products.push({id:uid(),matPick:"",desc:"",qty:1,unitPrice:0}); saveQuote(q); renderLines(); });
-  const _bw=document.getElementById("btnWizLetrero"); if(_lineaDe(p)!=="letrero"){ if(_bw) _bw.style.display="none"; } else if(_bw){ _bw.addEventListener("click",()=>openCotizadorLetrero(q,p)); if(window._wizAuto===q.id){ window._wizAuto=null; setTimeout(()=>openCotizadorLetrero(q,p),60); } if(!(q.products||[]).length && !(q.routes||[]).length){ const av=document.createElement("div"); av.style.cssText="margin:8px 0;padding:10px 14px;border-radius:10px;background:rgba(37,99,235,.08);border:1px dashed var(--accent);font-size:13px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;"; av.innerHTML=`<span style="flex:1;min-width:200px;">🪧 Esta cotización de letrero está vacía. Te guío paso a paso: tipo, diseño (DXF, PDF, imagen o texto), acabados y costos.</span><button class="btn small primary">Empezar</button>`; av.querySelector("button").onclick=()=>openCotizadorLetrero(q,p); const tb=_bw.parentElement; if(tb&&tb.parentElement) tb.parentElement.insertBefore(av, tb.nextSibling); } }
+  const _bw=document.getElementById("btnWizLetrero"); if(_lineaDe(p)!=="letrero"){ if(_bw) _bw.style.display="none"; const _gl=document.getElementById("qeGrpLetreros"); if(_gl) _gl.style.display="none"; }
+  document.querySelectorAll(".qe-menu .qe-mi").forEach(b=>b.addEventListener("click",()=>{ const d=b.closest("details"); if(d) d.open=false; }));
+  if(!window._qeMenuCierre){ window._qeMenuCierre=true; document.addEventListener("click",e=>{ document.querySelectorAll(".qe-menu[open]").forEach(m=>{ if(!m.contains(e.target)) m.open=false; }); }); }
+  { const _bg=document.getElementById("btnGuiaCotizar"); if(_bg) _bg.addEventListener("click",()=>openSheet("📘 Cómo cotizar", GUIA_COTIZAR_HTML, [{label:"Cerrar",cls:"btn primary",action:closeSheet}])); } else if(_bw){ _bw.addEventListener("click",()=>openCotizadorLetrero(q,p)); if(window._wizAuto===q.id){ window._wizAuto=null; setTimeout(()=>openCotizadorLetrero(q,p),60); } if(!(q.products||[]).length && !(q.routes||[]).length){ const av=document.createElement("div"); av.style.cssText="margin:8px 0;padding:10px 14px;border-radius:10px;background:rgba(37,99,235,.08);border:1px dashed var(--accent);font-size:13px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;"; av.innerHTML=`<span style="flex:1;min-width:200px;">🪧 Esta cotización de letrero está vacía. Te guío paso a paso: tipo, diseño (DXF, PDF, imagen o texto), acabados y costos.</span><button class="btn small primary">Empezar</button>`; av.querySelector("button").onclick=()=>openCotizadorLetrero(q,p); const tb=_bw.parentElement; if(tb&&tb.parentElement) tb.parentElement.insertBefore(av, tb.nextSibling); } }
   if(_lineaDe(p)!=="letrero"){ const _ba=document.getElementById("btnAsistente"); if(_ba) _ba.style.display="none"; const _b3=document.getElementById("btnAlu3D"); if(_b3) _b3.style.display="none"; const _bd=document.getElementById("btnDesdoblado"); if(_bd) _bd.style.display="none"; const _bn=document.getElementById("btnNest"); if(_bn) _bn.classList.add("primary"); }
   document.getElementById("btnAsistente").addEventListener("click",()=>openAsistenteLetrero(q, r=>{
     q.products=r.products; q.routes=r.routes; q.extras=r.extras; q.marginPct=r.marginPct; q.asis=r.asis||null;
