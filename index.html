@@ -10001,17 +10001,20 @@ function _wizCalcPlanas(piezas, o){
 }
 
 // ── PLANO DE CORTE: las piezas con su forma real acomodadas en cada lámina (pedido del dueño 20/10/2026) ──
-// El texto también se vuelve máscara para tener la forma real de cada letra.
-async function _wizMascaraTexto(texto, fam, anchoCm){
+// El texto se mide letra por letra (así no se juntan las que se tocan) y cada letra da sus piezas con forma real.
+async function _wizPiezasTexto(texto, fam, anchoCm){
   const f=_fAlu(fam); await _cargarFuenteNeon([f[0],f[1],f[2]], texto);
   const c=document.createElement("canvas"), ctx=c.getContext("2d",{willReadFrequently:true});
   ctx.font=`${f[2]} 300px "${f[0]}"`; const m=ctx.measureText(texto), anchoPx=m.actualBoundingBoxLeft+m.actualBoundingBoxRight;
   if(!(anchoPx>0)) throw new Error("No pude medir el texto");
-  const ppm=Math.min(DESD.pxPorMm, 4000/(anchoCm*10)), fp=300*anchoCm*10*ppm/anchoPx, font=`${f[2]} ${fp}px "${f[0]}"`;
-  ctx.font=font; const mc=ctx.measureText(texto);
-  const W=Math.ceil(mc.actualBoundingBoxLeft+mc.actualBoundingBoxRight)+40, H=Math.ceil(mc.actualBoundingBoxAscent+mc.actualBoundingBoxDescent)+40;
-  c.width=W; c.height=H; ctx.font=font; ctx.fillStyle="#000"; ctx.fillText(texto, 20+mc.actualBoundingBoxLeft, 20+mc.actualBoundingBoxAscent);
-  return _recortarTinta(ctx, W, H, ppm, 128, false);
+  const ppm=Math.min(DESD.pxPorMm, 1500/(anchoCm*10/Math.max(1,texto.length/2))), fp=300*anchoCm*10*ppm/anchoPx, font=`${f[2]} ${fp}px "${f[0]}"`;
+  ctx.font=font; const mt=ctx.measureText(texto), piezas=[];
+  for(const ch of texto){ if(!ch.trim()) continue; ctx.font=font; const mc=ctx.measureText(ch);
+    const W=Math.ceil(mc.actualBoundingBoxLeft+mc.actualBoundingBoxRight)+40, H=Math.ceil(mc.actualBoundingBoxAscent+mc.actualBoundingBoxDescent)+40;
+    c.width=W; c.height=H; ctx.font=font; ctx.fillStyle="#000"; ctx.fillText(ch, 20+mc.actualBoundingBoxLeft, 20+mc.actualBoundingBoxAscent);
+    const ps=_piezasDeMascara(_recortarTinta(ctx,W,H,ppm,128,false),0,false,DESD);
+    ps.sort((a,b)=>b.areaCm2-a.areaCm2).forEach((x,k)=>piezas.push({...x, label:ch+(k?` (${k+1})`:"")})); }
+  return {piezas, ancho:Math.round(anchoCm), alto:Math.round((mt.actualBoundingBoxAscent+mt.actualBoundingBoxDescent)/ppm/10)};
 }
 // Lleva cada pieza (contornos en mm) a su lugar en la hoja (cm), girada si el acomodo la giró
 function _wizPlano(res){
@@ -10179,9 +10182,7 @@ function openCotizadorLetrero(q, p){
       if(st.fuente==="archivo"){ if(!st.file) throw new Error("Primero elige el archivo");
         const m=await _mascaraDeArchivo(st.file, Number(st.ancho)||0, DESD); st.piezas=_piezasDeMascara(m,0,false,DESD);
         st.anchoTotal=Math.round((m.W-24)/m.ppm/10); st.altoTotal=Math.round((m.H-24)/m.ppm/10); }
-      else { if(!st.texto.trim()) throw new Error("Escribe el texto"); const m=await _wizMascaraTexto(st.texto.trim(), st.fam, Number(st.ancho)||100); st.piezas=_piezasDeMascara(m,0,false,DESD);
-        const chs=[...st.texto].filter(ch=>ch.trim()); if(chs.length===st.piezas.length) st.piezas.forEach((x,i)=>x.label=chs[i]);
-        st.anchoTotal=Math.round((m.W-24)/m.ppm/10); st.altoTotal=Math.round((m.H-24)/m.ppm/10); }
+      else { if(!st.texto.trim()) throw new Error("Escribe el texto"); const t=await _wizPiezasTexto(st.texto.trim(), st.fam, Number(st.ancho)||100); st.piezas=t.piezas; st.anchoTotal=t.ancho; st.altoTotal=t.alto; }
     }catch(e){ st.piezas=null; _showSaveToast(e.message,"warning"); }
     st.leyendo=false; pintar(); };
   const enlazar=()=>{
