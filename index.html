@@ -9464,16 +9464,24 @@ function _medirSVG(svgTxt, anchoCm){
 }
 // Acomoda los tramos de canto en tiras de 2.44 m (primero los más largos)
 function _cortarTiras(piezas, largoTira){
-  const tramos=[]; piezas.forEach((p,i)=>{ let resto=p.perM; while(resto>1e-6){ const t=Math.min(resto,largoTira-ALU_REGLAS.traslapeM); tramos.push({label:p.label, m:t+ALU_REGLAS.traslapeM, color:i}); resto-=t; } });
+  const tr=ALU_REGLAS.traslapeM, util=largoTira-tr, tramos=[], lazos=[];
+  const largo=p=>{ let s=0; for(let i=1;i<p.length;i++) s+=Math.hypot(p[i][0]-p[i-1][0],p[i][1]-p[i-1][1]); return s/1000; };
+  piezas.forEach((p,i)=>{
+    const nh=(p.contornos||[]).filter(c=>c.tipo==="hueco").length; let kh=0;
+    const ls = p.contornos&&p.contornos.length ? p.contornos.map(c=>({nombre:c.tipo==="hueco"?`${p.label} · hueco${nh>1?" "+(++kh):""}`:p.label, m:largo(c.pts)})) : [{nombre:p.label, m:p.perM}];
+    ls.forEach(l=>{ const n=Math.max(1,Math.ceil(l.m/util-1e-9)); lazos.push({...l, tramos:n}); let resto=l.m, k=0;
+      while(resto>1e-6){ const t=Math.min(resto,util); k++; tramos.push({label:l.nombre.replace(" · hueco"," h")+(n>1?` ${k}/${n}`:""), m:t+tr, tras:tr, color:i}); resto-=t; } });
+  });
   tramos.sort((a,b)=>b.m-a.m); const tiras=[];
   tramos.forEach(t=>{ let tira=tiras.find(x=>x.libre>=t.m-1e-9); if(!tira){ tira={libre:largoTira, cortes:[]}; tiras.push(tira); } tira.cortes.push(t); tira.libre-=t.m; });
-  return tiras;
+  tiras.lazos=lazos; return tiras;
 }
 function _svgTiras(tiras, largo){
-  const hBar=14, gap=5, W=600, esc=W/largo;
-  return `<svg viewBox="0 0 ${W+60} ${tiras.length*(hBar+gap)+4}" style="width:100%;display:block;">${tiras.map((t,i)=>{ let x=0; const y=i*(hBar+gap)+2;
-    return `<text x="0" y="${y+hBar-3}" font-size="10" fill="#64748b">#${i+1}</text>`+t.cortes.map(c=>{ const w=c.m*esc, col=_NEST_COLORES[c.color%_NEST_COLORES.length]; const s=`<rect x="${30+x}" y="${y}" width="${w-1}" height="${hBar}" rx="2" fill="${col}" fill-opacity=".75"/><text x="${30+x+w/2}" y="${y+hBar-3.5}" font-size="9.5" text-anchor="middle" fill="#fff" font-weight="700">${escapeHTML(c.label)} ${(c.m*100).toFixed(0)}</text>`; x+=w; return s; }).join("")
-      +`<rect x="${30+x}" y="${y}" width="${Math.max(0,t.libre*esc-1)}" height="${hBar}" rx="2" fill="#e2e8f0"/><text x="${30+largo*esc+4}" y="${y+hBar-3}" font-size="9.5" fill="#94a3b8">sobra ${(t.libre*100).toFixed(0)}</text>`; }).join("")}</svg>`;
+  const hBar=16, gap=6, W=600, esc=W/largo;
+  return `<svg viewBox="0 0 ${W+70} ${tiras.length*(hBar+gap)+4}" style="width:100%;display:block;"><defs><pattern id="_trasP" width="4" height="4" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="4" height="4" fill="#fde68a"/><line x1="0" y1="0" x2="0" y2="4" stroke="#b45309" stroke-width="1.6"/></pattern></defs>${tiras.map((t,i)=>{ let x=0; const y=i*(hBar+gap)+2;
+    return `<text x="0" y="${y+hBar-4}" font-size="10" fill="#64748b">#${i+1}</text>`+t.cortes.map(c=>{ const w=c.m*esc, wt=(c.tras||0)*esc, col=_NEST_COLORES[c.color%_NEST_COLORES.length];
+      const s=`<rect x="${30+x}" y="${y}" width="${Math.max(0,w-wt)}" height="${hBar}" rx="2" fill="${col}" fill-opacity=".8"/>${wt?`<rect x="${30+x+w-wt}" y="${y}" width="${Math.max(0,wt-1)}" height="${hBar}" fill="url(#_trasP)" stroke="${col}" stroke-width=".6"/>`:""}<text x="${30+x+(w-wt)/2}" y="${y+hBar-4.5}" font-size="9.5" text-anchor="middle" fill="#fff" font-weight="700">${escapeHTML(c.label)} ${(c.m*100).toFixed(0)}</text>`; x+=w; return s; }).join("")
+      +`<rect x="${30+x}" y="${y}" width="${Math.max(0,t.libre*esc-1)}" height="${hBar}" rx="2" fill="#e2e8f0"/><text x="${30+largo*esc+4}" y="${y+hBar-4}" font-size="9.5" fill="#94a3b8">sobra ${(t.libre*100).toFixed(0)}</text>`; }).join("")}</svg>`;
 }
 function _aluHoja(tipo){ const h=ALU_HOJAS[tipo]; const m=materialByDesc(h.desc); return {...h, costo:m?Number(m.cost||0):h.costoDefault, enCatalogo:!!m}; }
 
@@ -9501,8 +9509,8 @@ function openLetras3D(q, onApply){
     try{
       const piezas=[]; // {label, perM, areaCm2, w, h, d3, luz}
       for(const p of st.piezas){
-        if(p.modo==="texto" && p.texto.trim()){ const r=await _medirRenglon(p.texto.trim(), p.fuente, Number(p.ancho)||0); if(r) r.letras.forEach(l=>piezas.push({...l, d3:p.d3, luz:p.luz})); }
-        else if(p.modo==="svg" && p.file){ const ps=_piezasDeMascara(await _mascaraDeArchivo(p.file, Number(p.ancho)||0, DESD), 0, false, DESD); p.nPiezas=ps.length; ps.forEach((x,k)=>piezas.push({label:"P"+(k+1), perM:x.perM, areaCm2:x.areaCm2, w:x.w, h:x.h, d3:p.d3, luz:p.luz})); }
+        if(p.modo==="texto" && p.texto.trim() && Number(p.ancho)>0){ const r=await _wizPiezasTexto(p.texto.trim(), p.fuente, Number(p.ancho)); r.piezas.forEach(l=>piezas.push({...l, d3:p.d3, luz:p.luz})); }
+        else if(p.modo==="svg" && p.file){ const ps=_piezasDeMascara(await _mascaraDeArchivo(p.file, Number(p.ancho)||0, DESD), 0, false, DESD); p.nPiezas=ps.length; ps.forEach((x,k)=>piezas.push({label:"P"+(k+1), contornos:x.contornos, perM:x.perM, areaCm2:x.areaCm2, w:x.w, h:x.h, d3:p.d3, luz:p.luz})); }
         else if(p.modo==="manual" && Number(p.perM)>0){ const w=Number(p.ancho)||0, h=Number(p.alto)||w; piezas.push({label:p.nombre||"Pieza", perM:Number(p.perM), areaCm2:w*h*0.6, w, h, d3:p.d3, luz:p.luz}); }
       }
       if(yo!==turno) return;
@@ -10087,6 +10095,27 @@ function _neonDeDXF(txt, nombre, texto){
   return {metros:mm/1000, tramos:tr.length, anchoTexto:Math.round(w), altoTexto:Math.round(h), anchoBase:Math.ceil(w+6), altoBase:Math.ceil(h+6), fuente:"DXF "+nombre, estilo:"manuscrita",
     texto:(texto||"").trim()||nombre.replace(/\.dxf$/i,"").replace(/^neon-/i,"").replace(/-\d+x\d+cm$/i,"").replace(/[-_]+/g," ")};
 }
+// Simulación del letrero: cara con brillo metálico, canto (fondo de la tira) y halo de LED si lleva luz
+function _wizMockup(st){
+  const es3d=st.tipo==="3d", luz=es3d&&st.luz, dor=es3d&&st.alu==="dorado", mat=(WIZ_PLANAS.find(m=>m[0]===st.material)||WIZ_PLANAS[0])[0];
+  const cara = es3d ? (dor?["#fff1b8","#c99a1e","#f3d36b"]:["#f6f7f9","#a3aab3","#e6e9ec"])
+    : /espejo/i.test(mat)?["#f6f7f9","#9aa3ad","#e6e9ec"] : /color/i.test(mat)?["#60a5fa","#1d4ed8","#3b82f6"] : /blanco\/rojo/i.test(mat)?["#374151","#111827","#1f2937"] : ["#64748b","#334155","#475569"];
+  const lado = es3d?(dor?"#7a5c0e":"#5f6670"):"#0f172a";
+  const W=Math.max(1,st.anchoTotal), Hh=Math.max(1,st.altoTotal), pad=Math.max(W,Hh)*0.1, dz=(es3d?Number(st.tira)||5:0.6)*0.4;
+  let forma;
+  if(st.fuente==="archivo" && st.piezas.some(p=>p.contornos)){ let a=Infinity,b=Infinity; st.piezas.forEach(p=>(p.contornos||[]).forEach(c=>c.pts.forEach(([x,y])=>{ a=Math.min(a,x); b=Math.min(b,y); })));
+    const d=st.piezas.map(p=>(p.contornos||[]).map(c=>"M"+c.pts.map(([x,y])=>((x-a)/10).toFixed(2)+","+((y-b)/10).toFixed(2)).join("L")+"Z").join("")).join("");
+    forma=(fill,extra)=>`<path d="${d}" fill="${fill}" fill-rule="evenodd" ${extra||""}/>`; }
+  else { const f=_fAlu(st.fam); forma=(fill,extra)=>`<text x="0" y="${Hh*0.86}" font-family="'${f[0]}'" font-weight="${f[2]}" font-size="${Hh*0.95}" textLength="${W}" lengthAdjust="spacingAndGlyphs" fill="${fill}" ${extra||""}>${escapeHTML(st.texto)}</text>`; }
+  const id="mk"+Math.random().toString(36).slice(2,7); let capas="";
+  if(luz) capas+=`<g filter="url(#${id}h)" opacity=".95">${forma("#ffc46b")}</g>`;
+  else capas+=`<g filter="url(#${id}s)" opacity=".28" transform="translate(${dz*1.6},${dz*1.8})">${forma("#000")}</g>`;
+  for(let i=8;i>=1;i--) capas+=`<g transform="translate(${(dz*i/8).toFixed(3)},${(dz*i/8).toFixed(3)})">${forma(lado)}</g>`;
+  capas+=forma(`url(#${id}g)`, `stroke="${lado}" stroke-width="${W/800}"`);
+  return `<svg viewBox="${-pad} ${-pad} ${W+2*pad+dz} ${Hh+2*pad+dz}" style="width:100%;display:block;border-radius:10px;background:${luz?"#23272d":"#ece8e2"};">
+    <defs><linearGradient id="${id}g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${cara[0]}"/><stop offset=".55" stop-color="${cara[1]}"/><stop offset="1" stop-color="${cara[2]}"/></linearGradient>
+    <filter id="${id}h" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="${Hh*0.09}"/></filter><filter id="${id}s" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="${Hh*0.03}"/></filter></defs>${capas}</svg>`;
+}
 function openCotizadorLetrero(q, p){
   const nuevo=!q; if(!q) q={products:[],routes:[],extras:[],marginPct:60};
   const pasoMin=()=>nuevo&&!p?0:1;
@@ -10147,7 +10176,7 @@ function openCotizadorLetrero(q, p){
     const dib = st.piezas.some(x=>x.contornos) ? (()=>{ let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity; st.piezas.forEach(pz=>(pz.contornos||[]).forEach(c=>c.pts.forEach(([x,y])=>{x0=Math.min(x0,x);x1=Math.max(x1,x);y0=Math.min(y0,y);y1=Math.max(y1,y);})));
         const pad=(x1-x0)*0.03; return `<svg viewBox="${x0-pad} ${y0-pad} ${x1-x0+2*pad} ${y1-y0+2*pad}" style="width:100%;max-height:200px;background:#f8fafc;border-radius:8px;display:block;">${st.piezas.map(pz=>(pz.contornos||[]).map(c=>`<path d="M${c.pts.map(q=>q[0].toFixed(1)+","+q[1].toFixed(1)).join(" L")}Z" fill="${c.tipo==="hueco"?"#fff":"#cbd5e1"}" stroke="#334155" stroke-width="${(x1-x0)/400}"/>`).join("")).join("")}</svg>`; })()
       : `<div style="font-family:'${_fAlu(st.fam)[0]}';font-weight:${_fAlu(st.fam)[2]};font-size:44px;text-align:center;padding:10px;background:#f8fafc;border-radius:8px;">${escapeHTML(st.texto)}</div>`;
-    return `<div class="card" style="padding:10px;margin-top:10px;"><div style="font-size:12.5px;margin-bottom:6px;">✅ <b>${st.piezas.length}</b> pieza(s) · <b>${st.anchoTotal} × ${st.altoTotal} cm</b> · contorno ${per.toFixed(2)} m · área ${(area/10000).toFixed(2)} m²</div>${dib}</div>`; };
+    return `<div class="card" style="padding:10px;margin-top:10px;"><div style="font-size:12.5px;margin-bottom:6px;">✅ <b>${st.piezas.length}</b> pieza(s) · <b>${st.anchoTotal} × ${st.altoTotal} cm</b> · contorno ${per.toFixed(2)} m · área ${(area/10000).toFixed(2)} m²</div></div>`; };
   const pasoDiseno=()=>{
     let h="";
     if(st.tipo==="neon") h=`<div style="font-size:13px;color:var(--muted);margin-bottom:8px;">Escribe el texto y traza la línea del neón: así salen los metros exactos y el tamaño del acrílico.</div>
@@ -10180,8 +10209,15 @@ function openCotizadorLetrero(q, p){
   const pasoResultado=()=>{ res=calcular(); const t=res.tot;
     let vistas="";
     if(res.extra&&res.extra.nest){ const h=res.extra.hoja||{w:res.extra.mat[2],h:res.extra.mat[3]}; const pl=_wizPlano(res); vistas+=`<div><div class="field-label">📐 Plano de corte · ${pl.hojas.length} lámina(s) de ${pl.W} × ${pl.H} cm (se usa ${res.extra.frac})</div><div style="display:flex;flex-wrap:wrap;gap:8px;">${pl.hojas.map((hj,i)=>`<div style="width:200px;">${_wizSvgPlano(hj,pl.W,pl.H,i,false)}</div>`).join("")}</div><div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;"><button class="btn small primary" id="_wzDxf">⬇️ DXF para router</button><button class="btn small" id="_wzPrint">🖨️ Imprimir plano</button></div></div>`; }
-    if(st.tipo==="3d"&&res.extra.tiras.length) vistas+=`<div><div class="field-label">Tiras de ${st.tira} cm × 2.44 m: ${res.extra.tiras.length}</div>${_svgTiras(res.extra.tiras,2.44)}<button class="btn small" id="_wzDes" style="margin-top:6px;">📐 Ver desdoblado (dónde doblar)</button></div>`;
-    return `<div style="display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:14px;">
+    if(st.tipo==="3d"&&res.extra.tiras.length){ const ex=res.extra, L=ex.tiras.lazos||[], tc=ALU_REGLAS.traslapeM*100, cm=v=>Math.round(v)+" cm";
+      vistas=`<div class="card" style="padding:12px 14px;"><div style="font-size:14px;font-weight:900;">🧵 Tiras de aluminio: ${ex.tiras.length} de ${st.tira} cm × 2.44 m</div>
+        <div style="font-size:12px;color:var(--muted);margin:3px 0 8px;line-height:1.5;">De cada hoja de ${ex.hoja.w/100} × ${ex.hoja.h/100} m salen <b>${ex.tpH} tiras</b> de ${st.tira} cm. Cada contorno lleva su propia tira: el de afuera de cada letra y <b>cada hueco por separado</b> (el centro de la A, la O, la R…). En cada unión se dejan <b>${tc} cm de traslape</b> para pegar o remachar.</div>
+        <table style="width:100%;font-size:12px;border-collapse:collapse;margin-bottom:10px;"><tr style="color:var(--muted);text-align:left;font-size:11px;"><th>Contorno</th><th style="text-align:right;">Largo</th><th style="text-align:right;">Uniones</th><th style="text-align:right;">Traslape</th><th style="text-align:right;">Tira necesaria</th></tr>
+        ${L.map(l=>`<tr style="border-top:1px solid var(--border);"><td style="padding:4px 0;">${escapeHTML(l.nombre)}</td><td style="text-align:right;">${cm(l.m*100)}</td><td style="text-align:right;">${l.tramos}</td><td style="text-align:right;">+${cm(l.tramos*tc)}</td><td style="text-align:right;font-weight:700;">${cm(l.m*100+l.tramos*tc)}</td></tr>`).join("")}
+        <tr style="border-top:2px solid var(--border);font-weight:800;"><td style="padding:4px 0;">Total</td><td style="text-align:right;">${cm(L.reduce((a,l)=>a+l.m*100,0))}</td><td style="text-align:right;">${L.reduce((a,l)=>a+l.tramos,0)}</td><td style="text-align:right;">+${cm(L.reduce((a,l)=>a+l.tramos*tc,0))}</td><td style="text-align:right;">${cm(L.reduce((a,l)=>a+l.m*100+l.tramos*tc,0))}</td></tr></table>
+        <div style="font-size:11.5px;color:var(--muted);margin-bottom:4px;">Cómo salen de las tiras de 2.44 m (la parte rayada es el traslape):</div>${_svgTiras(ex.tiras,2.44)}
+        <button class="btn small" id="_wzDes" style="margin-top:8px;">📐 Ver desdoblado (dónde doblar cada tira)</button></div>`+vistas; }
+    return `<div style="display:flex;flex-direction:column;gap:14px;">
       <div><div class="kpi-box" style="padding:12px 14px;margin-bottom:10px;"><div class="kl">Precio de venta</div><div class="kv" style="font-size:26px;color:var(--accent);">$${money(t.venta)}</div>
         <div style="font-size:11.5px;color:var(--muted);">Materiales $${money(t.mp)} · Mano de obra $${money(t.ruta)} · Extras $${money(t.extra)} · Utilidad ${st.utilidad}%${t.mp+t.ruta>0?` · Material ${Math.round(t.mp/(t.mp+t.ruta)*100)}% / Ruta ${Math.round(t.ruta/(t.mp+t.ruta)*100)}%`:""}</div></div>
         ${res.faltan&&res.faltan.length?`<div style="font-size:12px;color:var(--red);font-weight:700;margin-bottom:8px;">⚠️ Faltan en el catálogo (precio $0): ${escapeHTML(res.faltan.join(", "))}</div>`:""}
@@ -10192,6 +10228,18 @@ function openCotizadorLetrero(q, p){
           ${res.extras.map(x=>`<tr><td style="padding:4px 0;color:var(--muted);">${escapeHTML(x.label)}</td><td></td><td style="text-align:right;">$${money(x.amount)}</td></tr>`).join("")}
         </table><div style="font-size:11px;color:var(--muted);margin-top:6px;">Las horas son sugeridas: cámbialas aquí si hace falta. Todo queda editable en la cotización.</div></div>
       <div style="display:flex;flex-direction:column;gap:10px;">${vistas||`<div style="font-size:12px;color:var(--muted);">${escapeHTML(res.nombre)}</div>`}</div></div>`; };
+  const panelRef=()=>{
+    const foto=st.foto?`<div style="font-size:11px;color:var(--muted);">Referencia</div><img src="${st.foto}" style="width:100%;border-radius:8px;margin:4px 0 8px;display:block;">`:"";
+    const cab=`<div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:6px;">Lo que estás cotizando</div>`;
+    if(!["3d","planas"].includes(st.tipo)||!st.piezas||!st.piezas.length) return foto?`<div class="card" style="padding:12px;position:sticky;top:0;">${cab}${foto}</div>`:"";
+    let rr=null; try{ rr=st.paso===4&&res?res:calcular(); }catch(e){}
+    const ex=rr&&rr.extra||{}, per=st.piezas.reduce((a,x)=>a+x.perM,0);
+    const fila=(k,v)=>`<div style="display:flex;justify-content:space-between;gap:8px;font-size:12px;padding:4px 0;border-bottom:1px dashed var(--border);"><span style="color:var(--muted);">${k}</span><b style="text-align:right;">${v}</b></div>`;
+    return `<div class="card" style="padding:12px;position:sticky;top:0;">${cab}${foto}
+      <div style="font-size:11px;color:var(--muted);margin-bottom:4px;">Así se verá (simulación)</div>${_wizMockup(st)}
+      <div style="margin-top:8px;">${fila("Medida",`${st.anchoTotal} × ${st.altoTotal} cm`)}${fila("Piezas",st.piezas.length)}${fila("Contorno total",per.toFixed(2)+" m")}
+      ${st.tipo==="3d"?fila("Aluminio",st.alu==="dorado"?"Dorado":"Natural")+fila("Fondo de la letra",st.tira+" cm")+fila("Tiras de 2.44 m",ex.tiras?ex.tiras.length:"—")+fila("Lámina del frente",(ex.frac!=null?ex.frac:"—")+" hoja")+(st.luz?fila("LED (halo)",(ex.ledM||0).toFixed(1)+" m"):""):fila("Material",(ex.frac!=null?ex.frac:"—")+" hoja")}
+      ${rr?fila("Precio de venta",`<span style="color:var(--accent);">$${money(rr.tot.venta)}</span>`):""}</div></div>`; };
   const pasoCliente=()=>{ const ps=(db.projects||[]).filter(x=>_lineaDe(x)==="letrero").slice(0,40);
     return `<div style="font-size:13px;color:var(--muted);margin-bottom:10px;">¿Para quién es el letrero?</div>
     <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;" class="detail-fields-grid">${fld("Cliente",inp("_wzCli",st.cliente))}${fld("WhatsApp",inp("_wzTel",st.tel,"tel"))}
@@ -10210,11 +10258,11 @@ function openCotizadorLetrero(q, p){
   const valido=()=> st.paso===0 ? !!(st.cliente.trim()||st.proyectoId) : st.paso===1 ? !!st.tipo : st.paso===2 ? (st.tipo==="neon"?!!st.neon : st.tipo==="caja"?true : !!(st.piezas&&st.piezas.length)) : true;
   const pintar=()=>{
     const cuerpo=[pasoCliente,pasoTipo,pasoDiseno,pasoAcabados,pasoResultado,pasoAplicar,pasoListo][st.paso]();
-    ov.innerHTML=`<div style="background:var(--card);border-radius:16px;width:1060px;max-width:100%;max-height:95vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.3);">
+    ov.innerHTML=`<div style="background:var(--card);border-radius:16px;width:1180px;max-width:100%;max-height:95vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.3);">
       <div style="display:flex;align-items:center;gap:10px;padding:12px 18px;border-bottom:1px solid var(--border);">
         <div style="font-size:16px;font-weight:900;flex:1;">🪧 Cotizar letrero paso a paso${st.tipo?` · ${WIZ_TIPOS.find(t=>t[0]===st.tipo)[2]}`:""}</div><button class="btn small" id="_wzClose">✕</button></div>
       <div style="display:flex;gap:6px;padding:10px 18px;border-bottom:1px solid var(--border);flex-wrap:wrap;">${PASOS.map((n,i)=>[n,i]).filter(([n,i])=>i>=pasoMin()).map(([n,i],k)=>`<span style="font-size:11.5px;font-weight:800;padding:4px 10px;border-radius:999px;${i===st.paso?"background:var(--accent);color:#fff;":i<st.paso?"background:rgba(22,163,74,.15);color:#15803d;":"background:var(--bg3);color:var(--muted);"}">${i<st.paso?"✓ ":(k+1)+". "}${n}</span>`).join("")}</div>
-      <div style="padding:14px 18px;overflow:auto;flex:1;">${cuerpo}</div>
+      <div style="padding:14px 18px;overflow:auto;flex:1;">${(()=>{ const pn=st.paso>=2&&st.paso<=5?panelRef():""; return pn?`<div style="display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:16px;align-items:start;"><div style="min-width:0;">${cuerpo}</div>${pn}</div>`:cuerpo; })()}</div>
       <div style="display:flex;justify-content:space-between;gap:8px;padding:12px 18px;border-top:1px solid var(--border);">
         <button class="btn" id="_wzAtras" ${st.paso<=pasoMin()||st.paso===6?"disabled":""}>← Atrás</button>
         ${st.paso<5?`<button class="btn primary" id="_wzSig" ${valido()?"":"disabled"}>Siguiente →</button>`:st.paso===5?`<button class="btn primary" id="_wzOk">✅ Guardar cotización · $${money(res.tot.venta)}</button>`:`<button class="btn" id="_wzFin">Cerrar</button>`}</div></div>`;
