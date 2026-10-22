@@ -10033,7 +10033,7 @@ function _wizCalc3D(piezas, o){
   if(ledM>0){ const lista=R.fuentes[o.uso]||R.fuentes.interior, f=lista.find(x=>ledM<=x[0]), g=lista[lista.length-1];
     fuente=f?[f[1],1,f[2]]:[g[1],Math.ceil(ledM/g[0]),g[2]];
     rows.push(fila("Tira LED 12V (metro)", ledM, R.ledPrecioM), fila(fuente[0], fuente[1], fuente[2])); }
-  rows.push(_wizFila("Cable cal 22 cobre (para letrero)", piezas.length*R.cablePorLetraM, faltan), fila("Cinta de aislar",1,R.precioCinta));
+  rows.push(_wizFila("Cable cal 22 cobre (para letrero)", (o.luz?piezas.filter(p=>p.luz!==false&&p.d3!==false).length:0)*R.cablePorLetraM, faltan), fila("Cinta de aislar",1,R.precioCinta));
   rows.push(_wizFila("silicon", eq3/R.siliconLetrasPorCartucho, faltan), _wizFila("kola Loca",1,faltan), _wizFila("Papel para plantilla",1,faltan));
   rows.push(_wizFila("Escuadra natural",nEsc,faltan), fila("Taquete de plástico",nEsc*R.taquetesPorEsc,R.precioTaquete), _wizFila("tornillo para taquete",nEsc*R.tornillosPorEsc,faltan), fila('Remache 1/8"',nEsc*R.remachesPorEsc,R.precioRemache));
   const extras=[];
@@ -10146,6 +10146,7 @@ function _fotoMascara(pix, W, box, color, tol, minSize){
   for(let y=0;y<h;y++) for(let x=0;x<w;x++){ const i=((y0+y)*W+x0+x)*4; if(_fotoDist(pix[i],pix[i+1],pix[i+2],color)<tol) m[y*w+x]=1; }
   _fotoLimpiar(m,w,h,minSize!=null?minSize:Math.max(12,w*h*0.0005)); return {m,w,h};
 }
+const _fotoLargoMm=p=>{ let t=0; for(let i=1;i<p.length;i++) t+=Math.hypot(p[i][0]-p[i-1][0],p[i][1]-p[i-1][1]); return t; };
 function _fotoCaja(m,w,h){ let a=w,b=h,c=-1,d=-1; for(let y=0;y<h;y++) for(let x=0;x<w;x++) if(m[y*w+x]){ if(x<a)a=x; if(x>c)c=x; if(y<b)b=y; if(y>d)d=y; } return c<0?null:[a,b,c,d]; }
 // Todas las partes marcadas → piezas a escala (mm), en un mismo sistema de coordenadas
 function _fotoPiezas(F, elems, anchoCm){
@@ -10165,7 +10166,7 @@ function _fotoPiezas(F, elems, anchoCm){
     const ps=_piezasDeMascara(_recortarTinta(x,W,H,ppm*k,128,false),0,false,DESD);
     const ox=(cx0*k+bb2[0]-12)/(ppm*k)-ux0/ppm, oy=(cy0*k+bb2[1]-12)/(ppm*k)-uy0/ppm;
     ps.forEach((p,i)=>piezas.push({...p, label:ps.length>1?`${e.nombre} ${i+1}`:e.nombre, d3:e.tipo!=="plana", luz:e.tipo==="3d-luz",
-      contornos:p.contornos.map(cc=>({...cc, pts:cc.pts.map(([a,b])=>[a+ox,b+oy])}))}));
+      contornos:p.contornos.filter(cc=>cc.tipo!=="hueco"||_fotoLargoMm(cc.pts)>=40).map(cc=>({...cc, pts:cc.pts.map(([a,b])=>[a+ox,b+oy])}))}));   // huecos de menos de 4 cm de contorno = ruido de la foto
     e.medida=[Math.round((bb[2]-bb[0]+1)/ppm/10), Math.round((bb[3]-bb[1]+1)/ppm/10)]; e.nPiezas=ps.length;
   });
   if(!piezas.length) throw new Error("No salieron piezas: ajusta la sensibilidad");
