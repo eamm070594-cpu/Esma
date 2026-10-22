@@ -10046,7 +10046,7 @@ async function _wizPiezasTexto(texto, fam, anchoCm){
     const W=Math.ceil(mc.actualBoundingBoxLeft+mc.actualBoundingBoxRight)+40, H=Math.ceil(mc.actualBoundingBoxAscent+mc.actualBoundingBoxDescent)+40;
     c.width=W; c.height=H; ctx.font=font; ctx.fillStyle="#000"; ctx.fillText(ch, 20+mc.actualBoundingBoxLeft, 20+mc.actualBoundingBoxAscent);
     const ps=_piezasDeMascara(_recortarTinta(ctx,W,H,ppm,128,false),0,false,DESD);
-    ps.sort((a,b)=>b.areaCm2-a.areaCm2).forEach((x,k)=>piezas.push({...x, label:ch+(k?` (${k+1})`:"")})); }
+    ps.sort((a,b)=>b.areaCm2-a.areaCm2).forEach((x,k)=>piezas.push({...x, label:ch+(k?" · "+(/[̀-ͯ]/.test(ch.normalize("NFD"))?"acento":/[ij]/.test(ch)?"punto":"parte "+(k+1)):"")})); }
   return {piezas, ancho:Math.round(anchoCm), alto:Math.round((mt.actualBoundingBoxAscent+mt.actualBoundingBoxDescent)/ppm/10)};
 }
 // Lleva cada pieza (contornos en mm) a su lugar en la hoja (cm), girada si el acomodo la giró
