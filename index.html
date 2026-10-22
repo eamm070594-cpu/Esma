@@ -10131,7 +10131,8 @@ function _fotoCargar(file){
       ok({img:c, W, H, pix:x.getImageData(0,0,W,H).data, dataUrl:c.toDataURL("image/jpeg",0.85), nombre:file.name}); };
     img.onerror=()=>{ URL.revokeObjectURL(url); ko(new Error("No pude abrir la imagen")); }; img.src=url; });
 }
-const _fotoDist=(r,g,b,c)=>{ const dr=r-c[0], dg=g-c[1], db=b-c[2]; return Math.sqrt(2*dr*dr+4*dg*dg+3*db*db)/3; };
+// Compara sobre todo el tono (no tanto el brillo): así una letra metálica con degradado sale completa
+const _fotoDist=(r,g,b,c)=>{ const Y=0.299*r+0.587*g+0.114*b, Yc=0.299*c[0]+0.587*c[1]+0.114*c[2], dY=Y-Yc, dR=(r-Y)-(c[0]-Yc), dB=(b-Y)-(c[2]-Yc); return Math.sqrt(0.3*dY*dY+2*dR*dR+2*dB*dB); };
 // Quita manchas sueltas más chicas que minSize píxeles
 function _fotoLimpiar(m,w,h,minSize){
   const lab=new Uint8Array(w*h), q=new Int32Array(w*h);
@@ -10286,7 +10287,7 @@ function openCotizadorLetrero(q, p){
     cv.onpointermove=ev=>{ if(!st.fDrag) return; const p=pt(ev); st.fDrag.x1=p[0]; st.fDrag.y1=p[1]; dibujarF(); };
     cv.onpointerup=()=>{ const g=st.fDrag; st.fDrag=null; if(!g) return; const F=st.F;
       if(Math.abs(g.x1-g.x0)>8 && Math.abs(g.y1-g.y0)>8){ const nom=["Logo","Nombre","Frase"][st.elems.length]||"Parte "+(st.elems.length+1);
-        st.elems.push({nombre:nom, box:[Math.min(g.x0,g.x1),Math.min(g.y0,g.y1),Math.max(g.x0,g.x1),Math.max(g.y0,g.y1)].map(v=>Math.round(Math.max(0,v))), color:null, tol:60, tipo:st.tipo==="planas"?"plana":"3d-luz"});
+        st.elems.push({nombre:nom, box:[Math.min(g.x0,g.x1),Math.min(g.y0,g.y1),Math.max(g.x0,g.x1),Math.max(g.y0,g.y1)].map(v=>Math.round(Math.max(0,v))), color:null, tol:80, tipo:st.tipo==="planas"?"plana":"3d-luz"});
         st.fEspera=st.elems.length-1; st.piezas=null; pintar(); return; }
       const i=st.fEspera!=null?st.fEspera:st.elems.findIndex(e=>g.x0>=e.box[0]&&g.x0<=e.box[2]&&g.y0>=e.box[1]&&g.y0<=e.box[3]); if(i==null||i<0) return;
       const c=[0,0,0]; let n=0; for(let yy=-2;yy<=2;yy++) for(let xx=-2;xx<=2;xx++){ const X=Math.round(g.x0)+xx, Y=Math.round(g.y0)+yy; if(X<0||Y<0||X>=F.W||Y>=F.H) continue; const k=(Y*F.W+X)*4; c[0]+=F.pix[k]; c[1]+=F.pix[k+1]; c[2]+=F.pix[k+2]; n++; }
