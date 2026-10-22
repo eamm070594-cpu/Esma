@@ -9408,7 +9408,7 @@ function openGeneradorLinea(inicial, onUse){
 // Cómo trabaja ESMA (dueño, 19/10/2026): las tiras del canto salen de la MISMA hoja de aluminio,
 // cortadas a lo largo (2.44 m). Hoja natural de 0.90×2.44 → 18 tiras de 5 cm o 9 de 10 cm. La dorada igual, pero más cara.
 const ALU_HOJAS = {
-  natural: {desc:"Hoja aluminio natural 0.90x2.44", w:90, h:244, costoDefault:630, vendor:"Dueño ESMA (tira de 5 cm a $35 × 18)"},
+  natural: {desc:"Hoja aluminio natural 0.90x3.00", w:90, h:300, costoDefault:700, vendor:"Dueño ESMA (21/10/2026)"},
   dorado:  {desc:"Lámina aluminio oro cepillado cal 23 4x8", w:122, h:244, costoDefault:4270, vendor:"El Anunciero (catálogo abril 2026)"},
 };
 // Reglas de cálculo (ajustables). Horas: estimado inicial, calibrar con trabajos reales.
@@ -9571,7 +9571,7 @@ function openLetras3D(q, onApply){
         <div style="font-size:16px;font-weight:900;flex:1;">📏 Letras 3D de aluminio</div><button class="btn small" id="_aluClose">✕</button></div>
       <div style="padding:12px 18px;overflow:auto;">
         <div style="display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;">
-          <div><div class="field-label">Aluminio</div><div class="field" style="padding:0 10px;"><select id="_aluTipo" style="${selS}"><option value="natural">Natural (hoja 0.90×2.44)</option><option value="dorado">Dorado (hoja 1.22×2.44)</option></select></div></div>
+          <div><div class="field-label">Aluminio</div><div class="field" style="padding:0 10px;"><select id="_aluTipo" style="${selS}"><option value="natural">Natural (hoja 0.90×3.00)</option><option value="dorado">Dorado (hoja 1.22×2.44)</option></select></div></div>
           <div><div class="field-label">Ancho de tira (fondo)</div><div class="field" style="padding:0 10px;"><select id="_aluTira" style="${selS}"><option value="5">5 cm</option><option value="10">10 cm</option></select></div></div>
           <div><div class="field-label">Uso</div><div class="field" style="padding:0 10px;"><select id="_aluUso" style="${selS}"><option value="interior">Interior</option><option value="exterior">Exterior</option></select></div></div>
           <div><div class="field-label">Instalación ($, 0 = no)</div><div class="field"><input id="_aluInst" type="number" value="${st.instalacion}"></div></div>
@@ -10001,23 +10001,48 @@ const WIZ_PLANAS = [
 const WIZ_REGLAS = { routerBaseH:0.5, routerHporM:0.12, habBaseH:1, habHporPieza:0.25, pinturaM2PorL:3, pinturaHporM2:2 };
 
 function _wizFila(desc, qty, faltan){ return _asisProd(desc, qty, faltan); }
+// Receta estándar (areas/cotizaciones/receta-letras-3d-aluminio.md). "Letra equivalente" = alto de la pieza ÷ 30 cm.
+const ALU_RECETA = {
+  letraRefCm:30, mermaFrente:0.07, corteHoja:250,                       // frente: parte usada + 7 %; tiras: (hoja + $250 de corte) ÷ tiras por hoja
+  siliconLetrasPorCartucho:15, ledPrecioM:26,                            // silicón: 1 cartucho por 15 letras de 30 cm; Tira LED $130 / 5 m
+  cablePorLetraM:0.5, precioCinta:15,
+  escuadrasPorLetra:3, escuadrasPorMenor:1, taquetesPorEsc:2, tornillosPorEsc:2, remachesPorEsc:2, precioTaquete:2, precioRemache:0.5,
+  routerFijoMin:40, routerMinPorLetra:1, habMinPorLetra:45,              // router: 20 min fijar hoja + 20 min programar + 1 min por letra; habilitado 45 min por letra
+  instPersonaDia:400, andamioDia:700, gasolinaKm:3, personasPorAncho:[[200,2],[400,3],[Infinity,4]],
+  fuentes:{ interior:[[10,"Fuente 12V interior slim 60W",199],[20,"Fuente 12V interior slim 120W",272],[40,"Fuente 12V interior slim 250W",340],[50,"Fuente 12V interior slim 360W",420]],
+            exterior:[[10,"Fuente 12V exterior IP67 60W",302],[16,"Fuente 12V exterior IP67 100W",415],[33,"Fuente 12V exterior IP67 200W",655],[50,"Fuente 12V exterior IP67 300W",765]] },
+};
+const _aluPersonas=anchoCm=>ALU_RECETA.personasPorAncho.find(([lim])=>anchoCm<=lim)[1];
 function _wizCalc3D(piezas, o){
-  const faltan=[], hoja=_aluHoja(o.alu), tpH=Math.floor(hoja.w/o.tira), precioTira=hoja.costo/tpH;
-  const tiras=_cortarTiras(piezas, hoja.h/100);
+  const R=ALU_RECETA, faltan=[], hoja=_aluHoja(o.alu), tpH=Math.floor(hoja.w/o.tira), largo=hoja.h/100;
+  const precioTira=Math.round((hoja.costo+R.corteHoja)/tpH*100)/100;
+  const fila=(desc,qty,precio)=>{ const m=materialByDesc(desc); return {id:uid(), desc, matPick:m?desc:"", qty:Math.round(qty*100)/100, unitPrice:m?Number(m.cost||0):precio}; };
+  const maxH=Math.max(1,...piezas.map(p=>p.h)), menor=p=>/acento|punto/.test(p.label||"")||p.h<maxH*0.35;
+  const eq=piezas.reduce((a,p)=>a+p.h/R.letraRefCm,0), nMen=piezas.filter(menor).length, nLetras=piezas.length-nMen;
+  const tiras=_cortarTiras(piezas, largo), mTira=tiras.reduce((a,t)=>a+t.cortes.reduce((b,c)=>b+c.m,0),0);
   const nest=_acomodarPiezas(piezas.map(p=>({w:p.w,h:p.h,qty:1,label:p.label})), hoja.w, hoja.h, ALU_REGLAS.sepFrenteCm, true);
-  const frac=nest.hojas.length ? Math.ceil(((nest.hojas.length-1)+nest.hojas[nest.hojas.length-1].usedY/hoja.h)*100)/100 : 0;
-  const per=piezas.reduce((a,p)=>a+p.perM,0), ledM=o.luz?per*ALU_REGLAS.ledPorM:0, rollos=ledM>0?Math.max(1,Math.ceil(ledM*1.1/5)):0;
-  const lista=ASIS_FUENTES[o.uso], fuente=ledM>0?(lista.find(f=>f[1]>=ledM*ASIS_REGLAS.wattsPorMetro*ASIS_REGLAS.margenFuente)||lista[lista.length-1]):null;
-  const nEsc=piezas.reduce((a,p)=>a+ALU_REGLAS.escuadrasPorPieza+(p.h>ALU_REGLAS.escuadrasExtraSiAltoCm?1:0),0);
+  const usado=nest.hojas.length ? (nest.hojas.length-1)+nest.hojas[nest.hojas.length-1].usedY/hoja.h : 0, frac=Math.ceil(usado*(1+R.mermaFrente)*100)/100;
+  const lg=p=>{ let t=0; for(let i=1;i<p.length;i++) t+=Math.hypot(p[i][0]-p[i-1][0],p[i][1]-p[i-1][1]); return t/1000; };
+  const ledM=o.luz ? piezas.reduce((a,p)=>a+(p.contornos&&p.contornos.length ? p.contornos.filter(c=>c.tipo!=="hueco").reduce((b,c)=>b+lg(c.pts),0) : p.perM),0) : 0;
+  const nEsc=nLetras*R.escuadrasPorLetra+nMen*R.escuadrasPorMenor;
   const rows=[{id:uid(), desc:hoja.desc, matPick:hoja.enCatalogo?hoja.desc:"", qty:frac, unitPrice:hoja.costo}];
-  if(tiras.length) rows.push({id:uid(), desc:`Tira de aluminio ${o.alu==="dorado"?"dorado":"natural"} ${o.tira} cm × 2.44 m (${tpH} por hoja)`, matPick:"", qty:tiras.length, unitPrice:Math.round(precioTira*100)/100});
+  if(tiras.length) rows.push({id:uid(), desc:`Tira de aluminio ${o.alu==="dorado"?"dorado":"natural"} ${o.tira} cm × ${largo} m (${tpH} por hoja, con corte)`, matPick:"", qty:Math.round(mTira/largo*100)/100, unitPrice:precioTira});
   if(o.pintar) rows.push(_wizFila("pintura",1,faltan));
-  if(ledM>0){ rows.push(_wizFila(o.uso==="exterior"?"led para exterior":"Tira COB 12V interior (rollo 5 m)",rollos,faltan)); rows.push(_wizFila(fuente[0],1,faltan)); rows.push(_wizFila("Cable cal 22 cobre (para letrero)",Math.ceil(5+piezas.length),faltan)); }
-  rows.push(_wizFila("silicon",Math.max(1,Math.ceil(piezas.length/10)),faltan), _wizFila("kola Loca",1,faltan), _wizFila("Papel para plantilla",1,faltan));
-  rows.push(_wizFila("Escuadra natural",nEsc,faltan), _wizFila("tornillos para letreros",nEsc,faltan), _wizFila("tornillo para taquete",nEsc,faltan), _wizFila("Taquete de madera",nEsc,faltan));
-  if(ledM>0 && Number(o.instalacion)>0) rows.push(_wizFila("Cable THW cal 14 (instalación)",10,faltan), _wizFila("Apagador sencillo con placa",1,faltan), _wizFila("Grapas para cable",1,faltan));
-  const hSug={router:Math.round((ALU_REGLAS.routerBaseH+per*ALU_REGLAS.routerHporM)*10)/10, hab:Math.round((ALU_REGLAS.habBaseH+per*ALU_REGLAS.habHporM3D+piezas.length*ALU_REGLAS.habHporPieza+ledM*ALU_REGLAS.habHporMLed)*2)/2};
-  return {rows, faltan, hSug, extra:{tiras, nest, hoja, frac, ledM, rollos, nEsc, tpH}};
+  let fuente=null;
+  if(ledM>0){ const lista=R.fuentes[o.uso]||R.fuentes.interior, f=lista.find(x=>ledM<=x[0]), g=lista[lista.length-1];
+    fuente=f?[f[1],1,f[2]]:[g[1],Math.ceil(ledM/g[0]),g[2]];
+    rows.push(fila("Tira LED 12V (metro)", ledM, R.ledPrecioM), fila(fuente[0], fuente[1], fuente[2])); }
+  rows.push(_wizFila("Cable cal 22 cobre (para letrero)", piezas.length*R.cablePorLetraM, faltan), fila("Cinta de aislar",1,R.precioCinta));
+  rows.push(_wizFila("silicon", eq/R.siliconLetrasPorCartucho, faltan), _wizFila("kola Loca",1,faltan), _wizFila("Papel para plantilla",1,faltan));
+  rows.push(_wizFila("Escuadra natural",nEsc,faltan), fila("Taquete de plástico",nEsc*R.taquetesPorEsc,R.precioTaquete), _wizFila("tornillo para taquete",nEsc*R.tornillosPorEsc,faltan), fila('Remache 1/8"',nEsc*R.remachesPorEsc,R.precioRemache));
+  const extras=[];
+  if(o.inst){ const dias=Math.max(1,Number(o.dias)||1), per=_aluPersonas(Number(o.ancho)||0), km=Number(o.km)||0;
+    if(ledM>0) rows.push(_wizFila("Cable THW cal 14 (instalación)",10,faltan), _wizFila("Apagador sencillo con placa",1,faltan), _wizFila("Grapas para cable",1,faltan));
+    extras.push({id:uid(), label:`Instalación (${per} personas × ${dias} día${dias>1?"s":""})`, amount:per*R.instPersonaDia*dias});
+    if(o.andamio) extras.push({id:uid(), label:`Renta de andamio (${dias} día${dias>1?"s":""})`, amount:R.andamioDia*dias});
+    if(km>0) extras.push({id:uid(), label:`Gasolina (${km} km ida y vuelta)`, amount:km*2*R.gasolinaKm}); }
+  const hSug={router:Math.round((R.routerFijoMin+eq*R.routerMinPorLetra)/60*10)/10, hab:Math.round(eq*R.habMinPorLetra/60*4)/4};
+  return {rows, faltan, hSug, extras, extra:{tiras, nest, hoja, frac, ledM, nEsc, tpH, eq, largo, mTira, nLetras, nMen, fuente}};
 }
 function _wizCalcPlanas(piezas, o){
   const faltan=[], mat=WIZ_PLANAS.find(x=>x[0]===o.material)||WIZ_PLANAS[0];
@@ -10082,7 +10107,7 @@ function _wizHtmlPlano(res, titulo, tiraCm){
   const pl=_wizPlano(res), ex=res.extra, mat=ex.hoja?ex.hoja.desc:ex.mat[0];
   const hojas=pl.hojas.map((hj,i)=>`<section class="hoja"><h2>${escapeHTML(titulo)}</h2><div class="sub">${escapeHTML(mat)} · lámina ${pl.W} × ${pl.H} cm · ${pl.hojas.length>1?`hoja ${i+1} de ${pl.hojas.length}`:"1 hoja"} · se usa ${ex.frac} hoja en total</div>
     <div class="fila"><div class="dib">${_wizSvgPlano(hj,pl.W,pl.H,i,true)}</div><table><tr><th>#</th><th>Pieza</th><th>Medida (cm)</th></tr>${hj.slice().sort((a,b)=>a.n-b.n).map(p=>`<tr><td><b>${p.n}</b></td><td>${escapeHTML(p.label)}${p.rot?" ↻":""}</td><td>${p.wr} × ${p.hr}</td></tr>`).join("")}</table></div></section>`).join("");
-  const tiras=ex.tiras&&ex.tiras.length?`<section class="hoja"><h2>Tiras de ${tiraCm} cm × 2.44 m: ${ex.tiras.length}</h2><div class="sub">Corte de cada tira: letra y largo en cm (incluye 5 cm de traslape por tramo)</div>${_svgTiras(ex.tiras,2.44)}</section>`:"";
+  const tiras=ex.tiras&&ex.tiras.length?`<section class="hoja"><h2>Tiras de ${tiraCm} cm × ${ex.largo||2.44} m: ${ex.tiras.length}</h2><div class="sub">Corte de cada tira: letra y largo en cm (incluye 5 cm de traslape por tramo)</div>${_svgTiras(ex.tiras,ex.largo||2.44)}</section>`:"";
   return `<html><head><title>Plano de corte</title><style>@page{size:letter landscape;margin:10mm}body{font-family:Arial,sans-serif;color:#0f172a}.hoja{page-break-after:always}.hoja:last-child{page-break-after:auto}h2{font-size:16px;margin:0 0 2px}.sub{font-size:11px;color:#475569;margin-bottom:8px}.dib{width:100%;margin-bottom:8px}table{font-size:11px;border-collapse:collapse;width:auto}td,th{border:1px solid #cbd5e1;padding:3px 6px;text-align:left}.nota{font-size:10px;color:#64748b;margin-top:6px}</style></head><body>${hojas}${tiras}<div class="nota">↻ = pieza girada 90°. El DXF va en milímetros, tamaño real (capas HOJA y CORTE).</div></body></html>`;
 }
 
@@ -10122,7 +10147,7 @@ function openCotizadorLetrero(q, p){
   const old=document.getElementById("_wizModal"); if(old) old.remove();
   const st={ paso:nuevo?0:1, cliente:"", tel:"", proyecto:"", entrega:"", notasP:"", proyectoId:"", hecho:null, tipo:null, fuente:"archivo", file:null, texto:"", fam:"Cinzel", ancho:0, piezas:null, anchoTotal:0, altoTotal:0, leyendo:false,
     foto:null, fotoNombre:"", neon:null, color:"blanco", base:"transparente", uso:"interior", montaje:"pared", caja:ASIS_CAJAS[1][0], colores:2, kit:true, bandera:true, negocio:(p&&p.name||"").split("·")[0].trim(),
-    alu:"natural", tira:5, luz:true, pintar:false, material:WIZ_PLANAS[0][0], pintarPlanas:true, montajePlanas:"cinta", instalacion:800, utilidad:Number(q.marginPct)||60, horas:{}, modo:(q.products||[]).length?"sumar":"reemplazar" };
+    alu:"natural", tira:5, inst3d:true, dias:1, km:0, andamio:false, luz:true, pintar:false, material:WIZ_PLANAS[0][0], pintarPlanas:true, montajePlanas:"cinta", instalacion:800, utilidad:Number(q.marginPct)||60, horas:{}, modo:(q.products||[]).length?"sumar":"reemplazar" };
   const ov=document.createElement("div"); ov.id="_wizModal";
   ov.style.cssText="position:fixed;inset:0;background:rgba(2,6,23,.6);display:flex;align-items:center;justify-content:center;z-index:9998;padding:12px;";
   document.body.appendChild(ov);
@@ -10145,11 +10170,11 @@ function openCotizadorLetrero(q, p){
       r={rows:a.products, routes:a.routes, extras:a.extras, faltan:a.faltan, nombre:a.nombre, notas:a.notas};
     } else {
       const piezas=st.piezas.map(x=>({...x}));
-      const c = st.tipo==="3d" ? _wizCalc3D(piezas,{alu:st.alu, tira:st.tira, luz:st.luz, uso:st.uso, pintar:st.pintar, instalacion:ins}) : _wizCalcPlanas(piezas,{material:st.material, pintar:st.pintarPlanas, montaje:st.montajePlanas});
+      const c = st.tipo==="3d" ? _wizCalc3D(piezas,{alu:st.alu, tira:st.tira, luz:st.luz, uso:st.uso, pintar:st.pintar, inst:st.inst3d, dias:st.dias, km:st.km, andamio:st.andamio, ancho:st.anchoTotal}) : _wizCalcPlanas(piezas,{material:st.material, pintar:st.pintarPlanas, montaje:st.montajePlanas});
       c.extra.piezas=piezas; c.extra.sep=st.tipo==="3d"?ALU_REGLAS.sepFrenteCm:1; const routes=[_asisRuta("Router de Cama",c.hSug.router), _asisRuta("Habilitado de letreros",c.hSug.hab)];
       const mat=(WIZ_PLANAS.find(x=>x[0]===st.material)||WIZ_PLANAS[0])[1], txt=st.fuente==="texto"&&st.texto?` "${st.texto}"`:"";
       const nombre = st.tipo==="3d" ? `Letras 3D de aluminio ${st.alu==="dorado"?"dorado":"natural"}${txt}${st.luz?" con luz":""} · ${st.anchoTotal} x ${st.altoTotal} cm` : `Letras planas de ${mat}${txt} · ${st.anchoTotal} x ${st.altoTotal} cm`;
-      r={rows:c.rows, routes, extras: ins>0?[{id:uid(),label:"Instalación",amount:ins}]:[], faltan:c.faltan, nombre, extra:c.extra, hSug:c.hSug};
+      r={rows:c.rows, routes, extras: c.extras || (ins>0?[{id:uid(),label:"Instalación",amount:ins}]:[]), faltan:c.faltan, nombre, extra:c.extra, hSug:c.hSug};
     }
     r.routes.forEach(x=>{ if(st.horas[x.routeName]!=null) x.hours=st.horas[x.routeName]; });
     r.tot=quoteSellTotals({products:r.rows, routes:r.routes, extras:r.extras, marginPct:Number(st.utilidad)||60, qty:1});
@@ -10162,7 +10187,7 @@ function openCotizadorLetrero(q, p){
       ? `Letras con volumen (3D) en aluminio ${st.alu==="dorado"?"dorado":"natural"}, de ${med} aproximadamente, cortadas a la medida en router CNC.${st.luz?" Por detrás llevan luz LED cálida que ilumina la pared alrededor de las letras (efecto halo): de día se ven elegantes y de noche hacen que tu negocio se distinga.":" Dan presencia y profundidad a tu fachada o recepción."}`
       : `Letras y figuras planas de ${mat}, de ${med} aproximadamente, cortadas a la medida en router CNC${st.pintarPlanas?" y pintadas en los colores de tu marca":""}. Un acabado limpio y profesional, ideal para muros y recepciones.`;
     const inc = st.tipo==="3d"
-      ? [`${n} pieza(s) 3D de aluminio ${st.alu==="dorado"?"dorado":"natural"}, cortadas en router CNC`, st.luz?"Iluminación LED cálida por detrás (efecto halo)":"", st.luz?"Fuente de poder, cableado y apagador":"", "Montaje con escuadras y taquetes", Number(st.instalacion)>0?"Instalación":""]
+      ? [`${n} pieza(s) 3D de aluminio ${st.alu==="dorado"?"dorado":"natural"}, cortadas en router CNC`, st.luz?"Iluminación LED cálida por detrás (efecto halo)":"", st.luz?"Fuente de poder, cableado y apagador":"", "Montaje con escuadras y taquetes", st.inst3d?"Instalación":""]
       : [`${n} pieza(s) de ${mat}, cortadas en router CNC`, st.pintarPlanas?"Pintura en tus colores":"", st.montajePlanas==="separadores"?"Separadores de acero inoxidable":"Pegado firme a la pared", Number(st.instalacion)>0?"Instalación":""];
     return [r.nombre,"","Cómo se verá:",vis,"","Incluye:",...inc.filter(Boolean).map(x=>"• "+x),"","Diseño previo para tu aprobación antes de fabricar."].join("\n");
   };
@@ -10200,8 +10225,12 @@ function openCotizadorLetrero(q, p){
       ${fld("Montaje",sel("_wzMont",st.montaje,[["pared","Pared (chapetones)"],["colgar","Colgante (cadena)"],["ninguno","Sin montaje"]]))}${comunes}</div>`;
     if(st.tipo==="caja") return `<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;align-items:end;">${comunes}<div style="display:flex;flex-direction:column;gap:6px;">${chk("_wzBand",st.bandera,"Tipo bandera (doble vista)")}${chk("_wzKit",st.kit,"Kit eléctrico (cable, apagador, grapas)")}</div></div>`;
     if(st.tipo==="3d") return `<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;align-items:end;">
-      ${fld("Aluminio",sel("_wzAlu",st.alu,[["natural","Natural (hoja 0.90×2.44)"],["dorado","Dorado (hoja 1.22×2.44)"]]))}${fld("Fondo de la letra (tira)",sel("_wzTira",st.tira,[[5,"5 cm"],[10,"10 cm"]]))}${fld("Uso",sel("_wzUso",st.uso,[["interior","Interior"],["exterior","Exterior"]]))}
-      ${comunes}<div style="display:flex;flex-direction:column;gap:6px;">${chk("_wzLuz",st.luz,"Luz LED por detrás (halo)")}${chk("_wzPint",st.pintar,"Pintar")}</div></div>`;
+      ${fld("Aluminio",sel("_wzAlu",st.alu,[["natural","Natural (hoja 0.90×3.00)"],["dorado","Dorado (hoja 1.22×2.44)"]]))}${fld("Fondo de la letra (tira)",sel("_wzTira",st.tira,[[5,"5 cm"],[10,"10 cm"]]))}${fld("Uso",sel("_wzUso",st.uso,[["interior","Interior"],["exterior","Exterior"]]))}
+      ${fld("Utilidad (%) · la decides por cliente",inp("_wzUt",st.utilidad,"number"))}<div style="display:flex;flex-direction:column;gap:6px;">${chk("_wzLuz",st.luz,"Luz LED por detrás (halo)")}${chk("_wzPint",st.pintar,"Pintar")}</div></div>
+      <div style="margin-top:14px;border-top:1px dashed var(--border);padding-top:10px;"><div style="font-size:13px;font-weight:800;margin-bottom:6px;">🧰 Instalación</div>
+        <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;align-items:end;">
+          <div>${chk("_wzInst",st.inst3d,"Incluye instalación")}</div>${fld("Días",inp("_wzDias",st.dias,"number",'min="1"'))}${fld("Km de ida (0 = en la ciudad)",inp("_wzKm",st.km,"number"))}<div>${chk("_wzAnd",st.andamio,"Va alto: renta de andamio")}</div></div>
+        <div style="font-size:11.5px;color:var(--muted);margin-top:6px;">${_aluPersonas(st.anchoTotal||0)} personas (por el ancho de ${st.anchoTotal} cm) × $${ALU_RECETA.instPersonaDia} por día · andamio $${ALU_RECETA.andamioDia} por día · gasolina $${ALU_RECETA.gasolinaKm}/km ida y vuelta. La instalación no lleva utilidad.</div></div>`;
     return `<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;align-items:end;">
       ${fld("Material",sel("_wzMat",st.material,WIZ_PLANAS.map(m=>[m[0],m[1]])))}${fld("Montaje",sel("_wzMontP",st.montajePlanas,[["cinta","Pegado (cinta doble cara)"],["separadores","Con separadores"],["ninguno","Sin montaje"]]))}
       <div>${chk("_wzPintP",st.pintarPlanas,"Pintar")}</div>${comunes}</div>`;
@@ -10210,12 +10239,12 @@ function openCotizadorLetrero(q, p){
     let vistas="";
     if(res.extra&&res.extra.nest){ const h=res.extra.hoja||{w:res.extra.mat[2],h:res.extra.mat[3]}; const pl=_wizPlano(res); vistas+=`<div><div class="field-label">📐 Plano de corte · ${pl.hojas.length} lámina(s) de ${pl.W} × ${pl.H} cm (se usa ${res.extra.frac})</div><div style="display:flex;flex-wrap:wrap;gap:8px;">${pl.hojas.map((hj,i)=>`<div style="width:200px;">${_wizSvgPlano(hj,pl.W,pl.H,i,false)}</div>`).join("")}</div><div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;"><button class="btn small primary" id="_wzDxf">⬇️ DXF para router</button><button class="btn small" id="_wzPrint">🖨️ Imprimir plano</button></div></div>`; }
     if(st.tipo==="3d"&&res.extra.tiras.length){ const ex=res.extra, L=ex.tiras.lazos||[], tc=ALU_REGLAS.traslapeM*100, cm=v=>Math.round(v)+" cm";
-      vistas=`<div class="card" style="padding:12px 14px;"><div style="font-size:14px;font-weight:900;">🧵 Tiras de aluminio: ${ex.tiras.length} de ${st.tira} cm × 2.44 m</div>
+      vistas=`<div class="card" style="padding:12px 14px;"><div style="font-size:14px;font-weight:900;">🧵 Tiras de aluminio de ${st.tira} cm × ${ex.largo} m: se cortan ${ex.tiras.length}, se cobran ${Math.round(ex.mTira/ex.largo*100)/100} (solo los metros usados)</div>
         <div style="font-size:12px;color:var(--muted);margin:3px 0 8px;line-height:1.5;">De cada hoja de ${ex.hoja.w/100} × ${ex.hoja.h/100} m salen <b>${ex.tpH} tiras</b> de ${st.tira} cm. Cada contorno lleva su propia tira: el de afuera de cada letra y <b>cada hueco por separado</b> (el centro de la A, la O, la R…). En cada unión se dejan <b>${tc} cm de traslape</b> para pegar o remachar.</div>
         <table style="width:100%;font-size:12px;border-collapse:collapse;margin-bottom:10px;"><tr style="color:var(--muted);text-align:left;font-size:11px;"><th>Contorno</th><th style="text-align:right;">Largo</th><th style="text-align:right;">Uniones</th><th style="text-align:right;">Traslape</th><th style="text-align:right;">Tira necesaria</th></tr>
         ${L.map(l=>`<tr style="border-top:1px solid var(--border);"><td style="padding:4px 0;">${escapeHTML(l.nombre)}</td><td style="text-align:right;">${cm(l.m*100)}</td><td style="text-align:right;">${l.tramos}</td><td style="text-align:right;">+${cm(l.tramos*tc)}</td><td style="text-align:right;font-weight:700;">${cm(l.m*100+l.tramos*tc)}</td></tr>`).join("")}
         <tr style="border-top:2px solid var(--border);font-weight:800;"><td style="padding:4px 0;">Total</td><td style="text-align:right;">${cm(L.reduce((a,l)=>a+l.m*100,0))}</td><td style="text-align:right;">${L.reduce((a,l)=>a+l.tramos,0)}</td><td style="text-align:right;">+${cm(L.reduce((a,l)=>a+l.tramos*tc,0))}</td><td style="text-align:right;">${cm(L.reduce((a,l)=>a+l.m*100+l.tramos*tc,0))}</td></tr></table>
-        <div style="font-size:11.5px;color:var(--muted);margin-bottom:4px;">Cómo salen de las tiras de 2.44 m (la parte rayada es el traslape):</div>${_svgTiras(ex.tiras,2.44)}
+        <div style="font-size:11.5px;color:var(--muted);margin-bottom:4px;">Cómo salen de las tiras de ${ex.largo} m (la parte rayada es el traslape):</div>${_svgTiras(ex.tiras,ex.largo)}
         <button class="btn small" id="_wzDes" style="margin-top:8px;">📐 Ver desdoblado (dónde doblar cada tira)</button></div>`+vistas; }
     return `<div style="display:flex;flex-direction:column;gap:14px;">
       <div><div class="kpi-box" style="padding:12px 14px;margin-bottom:10px;"><div class="kl">Precio de venta</div><div class="kv" style="font-size:26px;color:var(--accent);">$${money(t.venta)}</div>
@@ -10238,7 +10267,7 @@ function openCotizadorLetrero(q, p){
     return `<div class="card" style="padding:12px;position:sticky;top:0;">${cab}${foto}
       <div style="font-size:11px;color:var(--muted);margin-bottom:4px;">Así se verá (simulación)</div>${_wizMockup(st)}
       <div style="margin-top:8px;">${fila("Medida",`${st.anchoTotal} × ${st.altoTotal} cm`)}${fila("Piezas",st.piezas.length)}${fila("Contorno total",per.toFixed(2)+" m")}
-      ${st.tipo==="3d"?fila("Aluminio",st.alu==="dorado"?"Dorado":"Natural")+fila("Fondo de la letra",st.tira+" cm")+fila("Tiras de 2.44 m",ex.tiras?ex.tiras.length:"—")+fila("Lámina del frente",(ex.frac!=null?ex.frac:"—")+" hoja")+(st.luz?fila("LED (halo)",(ex.ledM||0).toFixed(1)+" m"):""):fila("Material",(ex.frac!=null?ex.frac:"—")+" hoja")}
+      ${st.tipo==="3d"?fila("Aluminio",st.alu==="dorado"?"Dorado":"Natural")+fila("Fondo de la letra",st.tira+" cm")+fila(`Tiras de ${ex.largo||2.44} m (se cobran)`,ex.tiras?Math.round(ex.mTira/ex.largo*100)/100:"—")+fila("Letras equivalentes (30 cm)",ex.eq!=null?ex.eq.toFixed(1):"—")+fila("Lámina del frente",(ex.frac!=null?ex.frac:"—")+" hoja")+(st.luz?fila("LED (halo)",(ex.ledM||0).toFixed(1)+" m"):""):fila("Material",(ex.frac!=null?ex.frac:"—")+" hoja")}
       ${rr?fila("Precio de venta",`<span style="color:var(--accent);">$${money(rr.tot.venta)}</span>`):""}</div></div>`; };
   const pasoCliente=()=>{ const ps=(db.projects||[]).filter(x=>_lineaDe(x)==="letrero").slice(0,40);
     return `<div style="font-size:13px;color:var(--muted);margin-bottom:10px;">¿Para quién es el letrero?</div>
@@ -10300,8 +10329,8 @@ function openCotizadorLetrero(q, p){
     if($w("_wzFile")) $w("_wzFile").onchange=e=>{ const f=e.target.files[0]; if(!f) return; st.file=f; st.piezas=null; if(/\.(dxf|pdf)$/i.test(f.name)) st.ancho=0; else if(!(Number(st.ancho)>0)) st.ancho=100; leer(); };
     if($w("_wzLeer")) $w("_wzLeer").onclick=()=>{ const a=$w("_wzAncho"); if(a) st.ancho=Number(a.value)||0; const t=$w("_wzTexto2"); if(t) st.texto=t.value; const fm=$w("_wzFam"); if(fm) st.fam=fm.value; leer(); };
     if($w("_wzFoto")) $w("_wzFoto").onchange=e=>{ const f=e.target.files[0]; if(!f) return; const rd=new FileReader(); rd.onload=()=>{ st.foto=rd.result; st.fotoNombre=f.name; pintar(); }; rd.readAsDataURL(f); };
-    [["_wzCaja","caja"],["_wzNeg","negocio"],["_wzColor","color"],["_wzBase","base"],["_wzUso","uso"],["_wzMont","montaje"],["_wzAlu","alu"],["_wzMat","material"],["_wzMontP","montajePlanas"],["_wzBand","bandera"],["_wzKit","kit"],["_wzLuz","luz"],["_wzPint","pintar"],["_wzPintP","pintarPlanas"]].forEach(([id,k])=>val(id,k,false));
-    [["_wzCol","colores"],["_wzIns","instalacion"],["_wzUt","utilidad"],["_wzTira","tira"],["_wzAncho","ancho"]].forEach(([id,k])=>val(id,k,true));
+    [["_wzCaja","caja"],["_wzNeg","negocio"],["_wzColor","color"],["_wzBase","base"],["_wzUso","uso"],["_wzMont","montaje"],["_wzAlu","alu"],["_wzMat","material"],["_wzMontP","montajePlanas"],["_wzBand","bandera"],["_wzKit","kit"],["_wzLuz","luz"],["_wzPint","pintar"],["_wzPintP","pintarPlanas"],["_wzInst","inst3d"],["_wzAnd","andamio"]].forEach(([id,k])=>val(id,k,false));
+    [["_wzCol","colores"],["_wzIns","instalacion"],["_wzUt","utilidad"],["_wzTira","tira"],["_wzAncho","ancho"],["_wzDias","dias"],["_wzKm","km"]].forEach(([id,k])=>val(id,k,true));
     if($w("_wzMat")) $w("_wzMat").addEventListener("change",()=>{ st.pintarPlanas=!!(WIZ_PLANAS.find(m=>m[0]===st.material)||[])[4]; });
     ov.querySelectorAll("[data-hora]").forEach(e=>e.onchange=()=>{ st.horas[e.dataset.hora]=Number(e.value)||0; pintar(); });
     if($w("_wzDes")) $w("_wzDes").onclick=()=>openDesdoblado(st.fuente==="archivo"?{file:st.file, ancho:Number(st.ancho)||0}:{texto:st.texto, ancho:Number(st.ancho)||100, fuente:st.fam});
