@@ -10234,7 +10234,25 @@ function openCotizadorLetrero(q, p){
     r.tot=quoteSellTotals({products:r.rows, routes:r.routes, extras:r.extras, marginPct:Number(st.utilidad)||60, qty:1});
     return r;
   };
+  // Desde la foto: describe cada parte (logo, nombre, frase) con su medida, material y si lleva volumen y luz
+  const descFoto=(r)=>{
+    const els=st.elems.filter(e=>e.color&&e.medida), es3d=st.tipo==="3d";
+    const mat = es3d ? `aluminio ${st.alu==="dorado"?"dorado":"natural"}` : (WIZ_PLANAS.find(x=>x[0]===st.material)||WIZ_PLANAS[0])[1];
+    const como=e=>e.tipo==="plana"?"plano":e.tipo==="3d"?"con volumen (3D)":"con volumen (3D) y luz por detrás";
+    const nom=e=>e.nombre.toLowerCase(), lista=a=>a.length>1?a.slice(0,-1).join(", ")+" y "+a[a.length-1]:a[0]||"";
+    const conLuz=els.filter(e=>e.tipo==="3d-luz"), planas=els.filter(e=>e.tipo==="plana"), tres=els.filter(e=>e.tipo!=="plana");
+    let vis=`Como en la imagen: ${lista(els.map(e=>`${nom(e)} (${e.medida[0]} × ${e.medida[1]} cm)`))}, en ${mat}`;
+    vis+= es3d ? (tres.length?`. ${lista(tres.map(nom)).replace(/^./,c=>c.toUpperCase())} ${tres.length>1?"van":"va"} en letras con volumen (3D) con canto de ${st.tira} cm`:"")+(planas.length?`; ${lista(planas.map(nom))} en ${mat} plano`:"")+"." : `, cortado a la medida${st.pintarPlanas?" y pintado en los colores de tu marca":""}.`;
+    if(es3d&&st.luz&&conLuz.length) vis+=` Por detrás de ${lista(conLuz.map(nom))} lleva luz LED cálida que dibuja un halo en la pared: de día se ve elegante y de noche hace que tu negocio se distinga.`;
+    vis+=` Medida total: ${st.anchoTotal} × ${st.altoTotal} cm.`;
+    const inc=els.map(e=>`${e.nombre} de ${e.medida[0]} × ${e.medida[1]} cm en ${mat} ${es3d?como(e):"cortado en router CNC"}`);
+    if(es3d&&st.luz&&conLuz.length) inc.push("Fuente de poder, cableado y apagador");
+    inc.push(es3d?"Montaje con escuadras y taquetes":st.montajePlanas==="separadores"?"Separadores de acero inoxidable":"Pegado firme a la pared");
+    if(es3d?st.inst3d:Number(st.instalacion)>0) inc.push("Instalación");
+    return [r.nombre,"","Cómo se verá:",vis,"","Incluye:",...inc.map(x=>"• "+x),"",(st.foto?"Imagen ilustrativa. ":"")+"Diseño previo para tu aprobación antes de fabricar."].join("\n");
+  };
   const descCliente=(r)=>{
+    if(st.fuente==="foto" && ["3d","planas"].includes(st.tipo) && (st.elems||[]).some(e=>e.medida)) return descFoto(r);
     if(st.tipo==="neon"||st.tipo==="caja") return null; // la arma _qDescAuto con los datos del asistente
     const mat=(WIZ_PLANAS.find(x=>x[0]===st.material)||WIZ_PLANAS[0])[1], n=st.piezas.length, med=`${st.anchoTotal} x ${st.altoTotal} cm`;
     const vis = st.tipo==="3d"
