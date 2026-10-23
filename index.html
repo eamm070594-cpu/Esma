@@ -2562,7 +2562,7 @@ function renderQuotes(p){
       const copy=JSON.parse(JSON.stringify(q));
       copy.id=uid(); copy.status="draft"; copy.createdAt=todayISO();
       copy.name=(q.name||q.createdAt||"Cotización")+" (copia)";
-      copy.code="";
+      db.settings.folioCounter=(Number(db.settings.folioCounter)||0)+1; copy.code=String(db.settings.folioCounter).padStart(4,"0"); delete copy.pipelineStatus; delete copy.sentAt; delete copy.nextFollowUp; delete copy.authorizedAt;
       db.quotes.push(copy); saveQuote(copy); save(); renderProjectsList(); renderMain();
       openQuoteEditor(copy);
     }
@@ -6287,7 +6287,7 @@ function renderDetailFull(p, content){
   content.querySelectorAll("[data-edit-q]").forEach(b=>b.addEventListener("click",()=>{ const q=db.quotes.find(x=>x.id===b.dataset.editQ); if(q) openQuoteEditorPage(q); }));
   content.querySelectorAll("[data-toggle-q]").forEach(b=>b.addEventListener("click",()=>{ const q=db.quotes.find(x=>x.id===b.dataset.toggleQ); if(!q) return; q.status=q.status==="authorized"?"draft":"authorized"; if(q.status==="authorized"){ q.authorizedAt=todayISO(); _onQuoteAuthorized(q.projectId); } else delete q.authorizedAt; saveQuote(q); saveProject(p); save(); renderProjectsPage(); renderDetailFull(p,content); }));
   content.querySelectorAll("[data-del-q]").forEach(b=>b.addEventListener("click",()=>{ if(!confirm("¿Eliminar cotización?")) return; db.quotes=db.quotes.filter(x=>x.id!==b.dataset.delQ); deleteQuote(b.dataset.delQ); save(); renderProjectsPage(); renderDetailFull(p,content); }));
-  content.querySelectorAll("[data-dup-q]").forEach(b=>b.addEventListener("click",()=>{ const q=db.quotes.find(x=>x.id===b.dataset.dupQ); if(!q) return; const copy=JSON.parse(JSON.stringify(q)); copy.id=uid(); copy.status="draft"; copy.createdAt=todayISO(); copy.name=(q.name||"Cotización")+" (copia)"; copy.code=""; db.quotes.push(copy); saveQuote(copy); save(); renderProjectsPage(); renderDetailFull(p,content); openQuoteEditorPage(copy); }));
+  content.querySelectorAll("[data-dup-q]").forEach(b=>b.addEventListener("click",()=>{ const q=db.quotes.find(x=>x.id===b.dataset.dupQ); if(!q) return; const copy=JSON.parse(JSON.stringify(q)); copy.id=uid(); copy.status="draft"; copy.createdAt=todayISO(); copy.name=(q.name||"Cotización")+" (copia)"; db.settings.folioCounter=(Number(db.settings.folioCounter)||0)+1; copy.code=String(db.settings.folioCounter).padStart(4,"0"); delete copy.pipelineStatus; delete copy.sentAt; delete copy.nextFollowUp; delete copy.authorizedAt; db.quotes.push(copy); saveQuote(copy); save(); renderProjectsPage(); renderDetailFull(p,content); openQuoteEditorPage(copy); }));
   content.querySelectorAll("[data-pdf-q]").forEach(b=>b.addEventListener("click",(e)=>{ e.stopPropagation(); const q=db.quotes.find(x=>x.id===b.dataset.pdfQ); if(!q) return; openPDFSelector(q.projectId, q.id); }));
 
   // Menú "más opciones" (3 puntos)
@@ -6326,7 +6326,7 @@ function renderDetailFull(p, content){
       });
       // Actions
       menu.querySelector("[data-act='auth']").addEventListener("click",()=>{ menu.remove(); q.status=isAuth?"draft":"authorized"; if(q.status==="authorized"){ q.authorizedAt=todayISO(); _onQuoteAuthorized(q.projectId); saveProject(p); } else delete q.authorizedAt; saveQuote(q); save(); renderProjectsPage(); renderDetailFull(p,content); });
-      menu.querySelector("[data-act='dup']").addEventListener("click",()=>{ menu.remove(); const copy=JSON.parse(JSON.stringify(q)); copy.id=uid(); copy.status="draft"; copy.createdAt=todayISO(); copy.name=(q.name||"Cotización")+" (copia)"; copy.code=""; db.quotes.push(copy); saveQuote(copy); save(); renderProjectsPage(); renderDetailFull(p,content); openQuoteEditorPage(copy); });
+      menu.querySelector("[data-act='dup']").addEventListener("click",()=>{ menu.remove(); const copy=JSON.parse(JSON.stringify(q)); copy.id=uid(); copy.status="draft"; copy.createdAt=todayISO(); copy.name=(q.name||"Cotización")+" (copia)"; db.settings.folioCounter=(Number(db.settings.folioCounter)||0)+1; copy.code=String(db.settings.folioCounter).padStart(4,"0"); delete copy.pipelineStatus; delete copy.sentAt; delete copy.nextFollowUp; delete copy.authorizedAt; db.quotes.push(copy); saveQuote(copy); save(); renderProjectsPage(); renderDetailFull(p,content); openQuoteEditorPage(copy); });
       menu.querySelector("[data-act='refphoto']").addEventListener("click",()=>{ menu.remove(); const inp=document.createElement("input"); inp.type="file"; inp.accept="image/*"; inp.onchange=()=>{ const file=inp.files?.[0]; if(!file) return; const reader=new FileReader(); reader.onload=(ev)=>{ q.refPhoto=ev.target.result; saveQuote(q); save(); renderDetailFull(p,content); }; reader.readAsDataURL(file); }; inp.click(); });
       const delRefBtn=menu.querySelector("[data-act='delref']"); if(delRefBtn) delRefBtn.addEventListener("click",()=>{ menu.remove(); q.refPhoto=""; saveQuote(q); save(); renderDetailFull(p,content); });
       menu.querySelector("[data-act='del']").addEventListener("click",()=>{ menu.remove(); if(!confirm("¿Eliminar cotización?")) return; db.quotes=db.quotes.filter(x=>x.id!==qid); deleteQuote(qid); save(); renderProjectsPage(); renderDetailFull(p,content); });
