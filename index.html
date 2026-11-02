@@ -6032,6 +6032,42 @@ function openProjectDetail(pid, tab){
   renderProjectDetail();
 }
 
+// ── Cobro y cierre: botones grandes para marcar pago y terminar (arriba del detalle del proyecto)
+function _cobroCard(p, venta, isDone){
+  const pay=p.payStatus||"", ant=Number(p.anticipo||0);
+  const falta = pay==="pagado" ? 0 : Math.max(0, venta-(pay==="anticipo"?ant:0));
+  const b=(tipo,ico,txt,color)=>{ const on = tipo==="anticipo" ? pay==="anticipo" : pay===tipo;
+    return `<button class="btn" onclick="_pdSetPago('${p.id}','${tipo}')" style="flex-direction:column;justify-content:center;gap:2px;padding:14px 6px;min-height:72px;font-size:14px;font-weight:800;border-radius:14px;${on?`background:${color};color:#fff;border-color:${color};`:""}"><span style="font-size:22px;">${ico}</span>${txt}</button>`; };
+  return `<div class="card" style="padding:14px;margin-bottom:12px;border-left:4px solid ${falta>0?"var(--amber)":"var(--green)"};">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
+      <span class="card-sec">💵 Cobro y cierre</span>
+      <span style="font-size:20px;font-weight:900;color:${falta>0?"var(--amber)":"var(--green)"};">${venta>0?(falta>0?"Falta cobrar $"+money(falta):"✅ Cobrado completo"):"Sin cotización autorizada"}</span>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">
+      ${b("","⏳","Sin pago","#b45309")}
+      ${b("anticipo","💰",pay==="anticipo"&&ant?"Anticipo $"+money(ant):"Anticipo","#2563eb")}
+      ${b("pagado","✅","Pagado","#16a34a")}
+    </div>
+    <div id="pdAntBox" style="display:none;gap:8px;margin-top:8px;align-items:center;">
+      <div class="field" style="flex:1;margin:0;"><input id="pdAntIn" type="number" step="0.01" min="0" placeholder="¿Cuánto te han pagado en total?" value="${ant||""}"></div>
+      <button class="btn primary" style="padding:12px 18px;font-weight:800;border-radius:12px;" onclick="_pdGuardarAnticipo('${p.id}')">Guardar</button>
+    </div>
+    <button class="btn" onclick="document.getElementById('btnMarkDone').click()" style="width:100%;justify-content:center;margin-top:8px;padding:14px;font-size:15px;font-weight:800;border-radius:14px;${isDone?"color:var(--amber);":"background:#0f172a;color:#fff;border-color:#0f172a;"}">${isDone?"↩ Reabrir proyecto (está terminado)":"🏁 Terminar proyecto"}</button>
+  </div>`;
+}
+function _pdSetPago(pid, tipo){
+  const p=db.projects.find(x=>x.id===pid); if(!p) return;
+  if(tipo==="anticipo"){ const el=document.getElementById("pdAntBox"); if(el){ el.style.display=el.style.display==="flex"?"none":"flex"; const i=document.getElementById("pdAntIn"); if(i) i.focus(); } return; }
+  p.payStatus = tipo; if(tipo==="") p.anticipo=0;
+  saveProject(p); save(); renderProjectsPage(); renderProjectDetail();
+}
+function _pdGuardarAnticipo(pid){
+  const p=db.projects.find(x=>x.id===pid); if(!p) return;
+  const v=Number((document.getElementById("pdAntIn")||{}).value||0); if(!(v>0)) return;
+  const venta=projectAuthorizedTotal(pid);
+  p.anticipo=v; p.payStatus = (venta>0 && v>=venta) ? "pagado" : "anticipo";
+  saveProject(p); save(); renderProjectsPage(); renderProjectDetail();
+}
 function renderProjectDetail(){
   const p=db.projects.find(x=>x.id===currentProjectId);
   if(!p){ showPage("projects"); return; }
@@ -6111,6 +6147,8 @@ function renderDetailFull(p, content){
         #detailContent .qrow-act{grid-column:1/-1;justify-content:flex-end;}
       }
     </style>
+
+    ${_cobroCard(p, authTotal, isDone)}
 
     <!-- KPIs -->
     <div class="detail-kpi-grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px;">
@@ -7496,6 +7534,15 @@ function openToolsMenu(){
 
 // Override syncStatusUpdate
 
+// Liga directa a un proyecto (la usa ESMA Finanzas): index.html#p=<id>
+function _abrirProyectoDeLiga(){
+  const m=/^#p=([A-Za-z0-9_-]+)/.exec(location.hash||""); if(!m) return;
+  const pid=m[1]; let n=0;
+  const t=setInterval(()=>{
+    if(db.projects && db.projects.some(p=>p.id===pid)){ clearInterval(t); history.replaceState(null,"",location.pathname); try{ openProjectDetail(pid); }catch(e){ console.error(e); } }
+    else if(++n>40) clearInterval(t);
+  },250);
+}
 async function _afterIntro(){
   // Called after intro finishes — show login form or go straight to app
   load();
@@ -7511,7 +7558,7 @@ async function _afterIntro(){
     if(modal){ modal.classList.remove("show"); modal.style.display="none"; }
     document.getElementById("homeScreen").classList.remove("show");
     document.getElementById("app").style.display="";
-    buildTopbar(); showApp();
+    buildTopbar(); showApp(); _abrirProyectoDeLiga();
   } else {
     document.getElementById("homeScreen").classList.remove("show");
     document.getElementById("app").style.display="none";
@@ -7545,7 +7592,7 @@ function bootNew(){
     document.getElementById("loginModal").style.display="none";
     document.getElementById("homeScreen").classList.remove("show");
     document.getElementById("app").style.display="";
-    buildTopbar(); showApp();
+    buildTopbar(); showApp(); _abrirProyectoDeLiga();
   });
   document.getElementById("loginEmail").addEventListener("keydown",(e)=>{ if(e.key==="Enter") document.getElementById("loginPass").focus(); });
   document.getElementById("loginPass").addEventListener("keydown",(e)=>{ if(e.key==="Enter") document.getElementById("btnLogin").click(); });

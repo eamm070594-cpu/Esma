@@ -2833,11 +2833,11 @@ function fxEventos(){
     if(c.ahorroPct>0) ev.push({fecha:f, monto:-su.monto*c.ahorroPct/100, concepto:'Ahorro: págate primero ('+c.ahorroPct+'%)', tipo:'ahorro', fijo:true});
   }));
 
-  (db.porCobrar||[]).filter(x=>!x.cobrado&&Number(x.monto)>0).forEach(x=>{
+  (db.porCobrar||[]).filter(x=>!x.cobrado&&Number(x.monto)>0&&!x.anterior).forEach(x=>{
     const f=(x.fecha&&x.fecha>=hoy)?x.fecha:hoy;
     if(f>fin) return;
     const m=Number(x.monto);
-    ev.push({fecha:f, monto:m, concepto:'Cobro '+(x.cliente||'cliente')+(x.concepto?' · '+x.concepto:''), tipo:'cobro', fijo:false, vencido:x.fecha&&x.fecha<hoy});
+    ev.push({ref:x.id, fecha:f, monto:m, concepto:'Cobro '+(x.cliente||'cliente')+(x.concepto?' · '+x.concepto:''), tipo:'cobro', fijo:false, vencido:x.fecha&&x.fecha<hoy});
     if(c.pctImpuestos>0) ev.push({fecha:f, monto:-m*c.pctImpuestos/100, concepto:'Apartar '+c.pctImpuestos+'% impuestos ('+(x.cliente||'cobro')+')', tipo:'impuestos', fijo:true});
   });
 
@@ -3201,6 +3201,7 @@ function fxSheetCobro(){
 }
 function fxCobrado(id){
   const x=(db.porCobrar||[]).find(y=>y.id===id); if(!x) return;
+  if(x.esma) return esmaAcciones(id);
   const opts=(db.cuentas||[]).map(c=>`<option value="${c.id}">${esc(c.nombre)}</option>`).join('');
   openSheet('Registrar cobro',`
     <div style="font-size:13px;margin-bottom:6px;"><b>${esc(x.cliente||'Cliente')}</b> · ${fxM(x.monto)}</div>
@@ -4278,9 +4279,63 @@ function esmaCobros(){
     const fecha=p.finEtapa==='entregado'?'':(p.deliveryDate||p.delivery||'');
     const id='esma_'+p.id+'_'+Math.round(pend);
     if(hechos.includes(id)) return;
-    out.push({id, esma:true, cliente:p.client||'Cliente ESMA', concepto:(p.name||'Proyecto')+(p.finEtapa==='entregado'?' · ya entregado, cobrar saldo':' · en producción'), monto:pend, fecha:fecha||(p.finEtapa==='entregado'?(p.deliveryDate||hoy):''), tipoPago:cobrado>0?'Anticipo recibido '+fxM0(cobrado)+' de '+fxM0(venta):'Sin anticipo · venta '+fxM0(venta)});
+    const inicioMes=hoy.slice(0,8)+'01', fRef=p.deliveryDate||p.delivery||'';
+    out.push({id, esma:true, pid:p.id, venta, etapa:p.finEtapa, anterior:!!(fRef&&fRef<inicioMes), cliente:p.client||'Cliente ESMA', concepto:(p.name||'Proyecto')+(p.finEtapa==='entregado'?' · ya entregado, cobrar saldo':' · en producción'), monto:pend, fecha:fecha||(p.finEtapa==='entregado'?(p.deliveryDate||hoy):''), tipoPago:cobrado>0?'Anticipo recibido '+fxM0(cobrado)+' de '+fxM0(venta):'Sin anticipo · venta '+fxM0(venta)});
   });
   return out;
+}
+function esmaAcciones(id){
+  const x=(db.porCobrar||[]).find(y=>y.id===id); if(!x||!x.pid) return;
+  const opts=(db.cuentas||[]).map(c=>`<option value="${c.id}">${esc(c.nombre)}</option>`).join('');
+  const big='padding:14px;font-size:15px;font-weight:800;border-radius:14px;width:100%;';
+  openSheet('🏭 '+(x.cliente||'Proyecto'),`
+    <div style="font-size:14px;font-weight:700;">${esc(x.concepto||'')}</div>
+    <div style="font-size:12px;color:var(--muted);margin:2px 0 10px;">Venta ${fxM0(x.venta||0)} · ${esc(x.tipoPago||'')}${x.anterior?' · <b style="color:var(--amber);">de meses anteriores</b>':''}</div>
+    <div style="font-size:26px;font-weight:900;margin-bottom:12px;">Falta cobrar ${fxM0(x.monto)}</div>
+    <div style="display:grid;gap:8px;">
+      <div class="flabel">¿A qué cuenta entró el dinero?</div>
+      <div class="field" style="margin:0;"><select id="ea_cta"><option value="">— Solo marcarlo, no mover saldo —</option>${opts}</select></div>
+      <button class="btn primary" style="${big}" onclick="esmaCobrar('${id}',true)">✅ Ya me pagó todo</button>
+      <div style="display:grid;grid-template-columns:1fr auto;gap:8px;">
+        <div class="field" style="margin:0;"><span class="ico">$</span><input type="number" step="0.01" id="ea_monto" placeholder="Monto del abono"></div>
+        <button class="btn" style="padding:12px 16px;font-weight:800;border-radius:14px;" onclick="esmaCobrar('${id}',false)">💰 Abono</button>
+      </div>
+      <a class="btn" style="${big}text-align:center;text-decoration:none;display:block;" href="./#p=${x.pid}">📂 Ver el proyecto en ESMA</a>
+      <button class="btn danger" style="${big}" onclick="esmaCerrarSinCobro('${id}')">🚫 Cerrar sin cobrar</button>
+    </div>
+    <div id="ea_msg" style="font-size:12px;margin-top:8px;"></div>
+    <div style="font-size:11px;color:var(--muted);margin-top:8px;">Lo que marques aquí se guarda también en tu sistema de gestión ESMA.</div>`,
+  [{label:'Cerrar',cls:'',action:closeSheet}]);
+}
+async function esmaGuardarProyecto(pid,campos){
+  await _nube.fs.collection('projects').doc(pid).set(campos,{merge:true});
+  const p=_esma.proyectos.find(y=>y.id===pid); if(p) Object.assign(p,campos);
+  esmaAplicar(); save(); closeSheet(); nubeRepintar();
+}
+async function esmaCobrar(id,todo){
+  const x=(db.porCobrar||[]).find(y=>y.id===id); if(!x) return;
+  const msg=document.getElementById('ea_msg');
+  const monto=todo?Number(x.monto):parseFloat(document.getElementById('ea_monto').value)||0;
+  if(!(monto>0)){ msg.innerHTML='<b style="color:var(--red);">Escribe el monto del abono.</b>'; return; }
+  const cid=document.getElementById('ea_cta').value, fecha=fxToday(), venta=Number(x.venta||0);
+  const recibido=Math.round(Math.min(venta, venta-Number(x.monto)+monto)*100)/100, falta=Math.max(0,Math.round((venta-recibido)*100)/100);
+  msg.textContent='Guardando…';
+  try{
+    // Primero ESMA; si falla no se registra nada aquí
+    await _nube.fs.collection('projects').doc(x.pid).set(falta>0?{payStatus:'anticipo',anticipo:recibido,finPorCobrar:falta}:{payStatus:'pagado',finPorCobrar:0,pagadoAt:fecha},{merge:true});
+  }catch(e){ msg.innerHTML='<b style="color:var(--red);">No se pudo guardar en ESMA ('+((e&&e.code)||(e&&e.message))+').</b>'; return; }
+  db.ingresos=db.ingresos||[];
+  db.ingresos.push({id:uid(),tipo:'emprendimiento',fecha,monto,destino:cid?'cuenta:'+cid:'',concepto:(x.cliente||'')+' · '+String(x.concepto||'').split(' · ')[0],tipoPago:falta>0?'Abono':'Liquidación'});
+  if(cid){ const c=db.cuentas.find(y=>y.id===cid); if(c){ c.saldo=Number(c.saldo||0)+monto; c.movimientos=c.movimientos||[]; c.movimientos.push({id:uid(),tipo:'deposito',concepto:'Cobro '+(x.cliente||''),fecha,monto,origenIngreso:true}); } }
+  const p=_esma.proyectos.find(y=>y.id===x.pid); if(p) Object.assign(p,falta>0?{payStatus:'anticipo',anticipo:recibido,finPorCobrar:falta}:{payStatus:'pagado',finPorCobrar:0});
+  esmaAplicar(); save(); closeSheet(); nubeRepintar();
+  fxToast(falta>0?'✅ Abono de '+fxM0(monto)+' registrado. Falta '+fxM0(falta)+'.':'✅ Marcado como pagado en ESMA.');
+}
+async function esmaCerrarSinCobro(id){
+  const x=(db.porCobrar||[]).find(y=>y.id===id); if(!x) return;
+  if(!confirm('¿Cerrar «'+(x.cliente||'proyecto')+'» sin cobrar?')) return;
+  try{ await esmaGuardarProyecto(x.pid,{payStatus:'pagado',finPorCobrar:0,cerradoSinCobro:true,pagadoAt:fxToday()}); fxToast('Cerrado. Ya no aparece por cobrar.'); }
+  catch(e){ fxToast('⚠️ No se pudo guardar en ESMA ('+((e&&e.code)||(e&&e.message))+').',7000); }
 }
 function esmaAplicar(){
   db.porCobrar=(db.porCobrar||[]).filter(x=>!x.esma).concat(esmaCobros());
@@ -4512,11 +4567,11 @@ var _dvAcc=[];
 function dvEsma(hoy,finMes){
   hoy=hoy||fxToday(); finMes=finMes||fxS(new Date(fxD(hoy).getFullYear(),fxD(hoy).getMonth()+1,0));
   const items=(db.porCobrar||[]).filter(x=>!x.cobrado&&Number(x.monto)>0).slice().sort((a,b)=>(a.fecha||'9').localeCompare(b.fecha||'9'));
-  const esma=items.filter(x=>x.esma);
+  const esma=items.filter(x=>x.esma&&!x.anterior), previos=items.filter(x=>x.esma&&x.anterior);
   const sum=a=>a.reduce((s,x)=>s+Number(x.monto||0),0);
   const venc=esma.filter(x=>x.fecha&&x.fecha<hoy), mes=esma.filter(x=>!x.fecha||x.fecha<=finMes);
   const fijosMes=fxEventos().ev.filter(e=>e.monto<0&&e.fijo&&e.fecha<=finMes&&/^ESMA · /.test(e.concepto)).reduce((s,e)=>s-e.monto,0);
-  return {items,esma,total:sum(esma),vencido:sum(venc),nVenc:venc.length,mes:sum(mes),nMes:mes.length,fijosMes,otros:sum(items.filter(x=>!x.esma)),ok:typeof _esma!=='undefined'&&_esma.ok};
+  return {items,esma,previos,totPrevios:sum(previos),total:sum(esma),vencido:sum(venc),nVenc:venc.length,mes:sum(mes),nMes:mes.length,fijosMes,otros:sum(items.filter(x=>!x.esma)),ok:typeof _esma!=='undefined'&&_esma.ok};
 }
 // Proyección del mes: lo que tienes + lo que va a entrar − lo que falta pagar
 function dvMes(D){
@@ -4532,7 +4587,7 @@ function dvMes(D){
     diario:D.P.gv.semanal/7*diasRest, diasRest};
   m.entra=m.sueldo+m.esma;
   m.queda=m.tienes+m.entra-m.pagar-m.ahorro-m.diario;
-  m.lista=ev.filter(e=>e.monto>0).map(e=>({fecha:e.fecha,concepto:e.concepto,monto:e.monto,tipo:e.tipo,vencido:e.vencido}));
+  m.lista=ev.filter(e=>e.monto>0).map(e=>({ref:e.ref,fecha:e.fecha,concepto:e.concepto,monto:e.monto,tipo:e.tipo,vencido:e.vencido}));
   return m;
 }
 function dvMesCard(D,acc){
@@ -4541,7 +4596,7 @@ function dvMesCard(D,acc){
   // Cada renglón es un desplegable: al tocarlo muestra de dónde sale el número
   const fila=(t,v,c,b,det)=>`<details class="dvx"><summary class="tl"><span><span class="dvx-f">▸</span> ${t}</span><b style="white-space:nowrap;${c?'color:'+c+';':''}">${b?'':(v>=0?'+':'−')}${fxM0(Math.abs(v))}</b></summary><div class="dvx-b">${det||'<div style="font-size:12px;color:var(--muted);">Nada este mes.</div>'}</div></details>`;
   const ctas=(db.cuentas||[]).filter(x=>!fxEsAhorro(x.id)&&!fxEsVales(x.id)).map(x=>sub(esc(x.nombre),fxM0(Number(x.saldo||0)))).join('');
-  const ent=t=>m.lista.filter(e=>t(e)).map(e=>sub((e.vencido?'<span class="badge red">atrasado</span> ':'')+fxCorta(e.fecha)+' · '+esc(e.concepto),'+'+fxM0(e.monto))).join('');
+  const ent=t=>m.lista.filter(e=>t(e)).map(e=>(e.ref&&String(e.ref).startsWith('esma_')?`<div style="cursor:pointer;" onclick="esmaAcciones('${e.ref}')">`:'<div>')+sub((e.vencido?'<span class="badge red">atrasado</span> ':'')+fxCorta(e.fecha)+' · '+esc(e.concepto),'+'+fxM0(e.monto))+'</div>').join('');
   const ahorro=D.P.ev.filter(e=>e.tipo==='ahorro'&&e.fecha<=m.finMes).map(e=>sub(fxCorta(e.fecha)+' · '+esc(e.concepto),fxM0(-e.monto))).join('');
   return `<div class="card" style="border-left:4px solid ${ok?'var(--green)':'var(--red)'};">
     <div class="card-title">📊 ¿Alcanza este mes? (al ${fxCorta(m.finMes)}) <span style="font-size:11px;font-weight:600;color:var(--muted);">· toca un renglón para ver el detalle</span></div>
@@ -4575,17 +4630,20 @@ function dvEsmaCard(D,acc){
       <div><div class="dt-l">Le quedaría a ESMA</div><div class="dt-v" style="font-size:18px;color:${neto>=0?'var(--green)':'var(--red)'};">${fxM0(neto)}</div><div class="dt-s">si cobras todo a tiempo</div></div>
       <div><div class="dt-l">Total por cobrar</div><div class="dt-v" style="font-size:18px;">${fxM0(E.total)}</div><div class="dt-s">ventas autorizadas sin liquidar</div></div>
     </div>
-    ${prox.map(x=>`<div class="tl"><span>${x.fecha?(x.fecha<D.hoy?'<span class="badge red">atrasado</span> ':fxCorta(x.fecha)+' · '):''}${esc(x.cliente)} <span style="color:var(--muted);">${esc(x.concepto||'')}</span></span><b style="color:var(--green);white-space:nowrap;">+${fxM0(x.monto)}</b></div>`).join('')}
+    ${prox.map(x=>`<div class="tl" style="cursor:pointer;" onclick="event.stopPropagation();esmaAcciones('${x.id}')"><span>${x.fecha?(x.fecha<D.hoy?'<span class="badge red">atrasado</span> ':fxCorta(x.fecha)+' · '):''}${esc(x.cliente)} <span style="color:var(--muted);">${esc(x.concepto||'')}</span></span><b style="color:var(--green);white-space:nowrap;">+${fxM0(x.monto)}</b></div>`).join('')}
+    ${E.previos.length?`<div style="font-size:12px;background:var(--amber-light);color:var(--amber);border-radius:10px;padding:8px 10px;margin-top:8px;font-weight:700;">🗂 ${E.previos.length} cobro${E.previos.length===1?'':'s'} de meses anteriores por revisar (${fxM0(E.totPrevios)}) · no cuentan en tus números. Toca para cerrarlos.</div>`:''}
     ${!E.ok?'<div style="font-size:11px;color:var(--amber);margin-top:6px;">No se pudo leer ESMA ahora; se muestran los últimos datos.</div>':''}
   </div>`;
 }
 function dvDetalleEsma(){
   const hoy=fxToday(), E=dvEsma(hoy);
-  const fila=x=>`<div class="tl"><span>${x.fecha?(x.fecha<hoy?'<span class="badge red">atrasado</span> ':'')+fxCorta(x.fecha):'sin fecha'} · <b>${esc(x.cliente)}</b><br><span style="font-size:11px;color:var(--muted);">${esc(x.concepto||'')} · ${esc(x.tipoPago||'')}</span></span><b style="color:var(--green);white-space:nowrap;">${fxM0(x.monto)}</b></div>`;
+  const fila=x=>`<div class="tl" style="cursor:pointer;" onclick="esmaAcciones('${x.id}')"><span>${x.fecha?(x.fecha<hoy?'<span class="badge red">atrasado</span> ':'')+fxCorta(x.fecha):'sin fecha'} · <b>${esc(x.cliente)}</b><br><span style="font-size:11px;color:var(--muted);">${esc(x.concepto||'')} · ${esc(x.tipoPago||'')}</span></span><b style="color:var(--green);white-space:nowrap;">${fxM0(x.monto)}</b></div>`;
   openSheet('🏭 ESMA: por cobrar',`
     <div style="font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:10px;">Viene de tu sistema de gestión ESMA, con la misma regla de su pantalla <b>Hoy</b>: proyectos <b>vendidos en producción</b> (venta autorizada − anticipo) y <b>entregados con anticipo</b> («Cobrar saldo»). No entran cotizaciones sin autorizar, perdidas, pagadas ni entregadas sin anticipo. Si alguno ya no se va a cobrar, márcalo como <b>Pagado</b> en ESMA y desaparece aquí y allá.</div>
+    <div style="font-size:12px;font-weight:800;margin:4px 0;">De este mes en adelante · toca uno para cobrarlo o cerrarlo</div>
     ${E.esma.length?E.esma.map(fila).join(''):'<div style="font-size:13px;">No hay ventas de ESMA pendientes de cobro.</div>'}
     <div class="tl" style="border-top:2px solid var(--border);"><b>Total por cobrar</b><b>${fxM0(E.total)}</b></div>
+    ${E.previos.length?`<div style="font-size:12px;font-weight:800;margin:14px 0 4px;color:var(--amber);">🗂 De meses anteriores (no cuentan) · revisa si ya te pagaron</div>${E.previos.map(fila).join('')}`:''}
     <div style="font-size:11px;color:var(--muted);margin-top:10px;">Cuando te paguen, márcalo en ESMA como <b>Pagado</b> (o con su anticipo) y aquí se actualiza solo. También puedes registrarlo aquí en <b>Plan de flujo → ✓</b> para que entre a tu cuenta.</div>`,
   [{label:'Cerrar',cls:'',action:closeSheet},{label:'Abrir ESMA',cls:'primary',action:()=>{ location.href='./'; }}]);
 }
