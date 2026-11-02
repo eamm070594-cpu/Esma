@@ -4563,6 +4563,76 @@ function dvCalcular(){
   return {c,hoy,P,L,I,T,faltaMes,pagosMes,vencidos,deudaTarj,extraNoPago,R,nivel};
 }
 var _dvAcc=[];
+// ── Histórico mes a mes: ¿me queda dinero? (personal) y ¿ESMA es rentable? (negocio)
+function dvEsNegocio(g){ return g.categoria==='Negocio'||/^ESMA · /.test(g.concepto||''); }
+function dvHistorico(){
+  const hoy=fxToday(), mesHoy=hoy.slice(0,7);
+  const mesesDe=a=>a.map(x=>String(x||'').slice(0,7)).filter(m=>/^\d{4}-\d{2}$/.test(m)&&m<=mesHoy);
+  const proys=(typeof _esma!=='undefined'?_esma.proyectos:[]).filter(p=>Number(p.ventaAutorizada)>0&&['vendido','entregado'].includes(p.finEtapa));
+  const fechaP=p=>p.deliveryDate||p.delivery||String(p.createdAt||'').slice(0,10);
+  let meses=[...new Set([...mesesDe((db.gastos||[]).map(g=>g.fecha)),...mesesDe((db.ingresos||[]).map(i=>i.fecha)),...mesesDe(proys.map(fechaP)),mesHoy])].sort().slice(-6);
+  const fijosEsmaMes=(db.pagos||[]).filter(p=>p.recurrente&&p.ambito==='esma').reduce((s,p)=>s+fjMensual(p),0);
+  const sum=(a,fn)=>a.reduce((s,x)=>s+Number(fn(x)||0),0);
+  const filas=meses.map(m=>{
+    const ing=(db.ingresos||[]).filter(i=>String(i.fecha||'').startsWith(m));
+    const gas=(db.gastos||[]).filter(g=>String(g.fecha||'').startsWith(m));
+    const entro=sum(ing.filter(i=>i.tipo!=='emprendimiento'),i=>i.monto);
+    const gasto=sum(gas.filter(g=>!dvEsNegocio(g)),g=>g.monto);
+    const pm=proys.filter(p=>String(fechaP(p)).startsWith(m));
+    const ventas=sum(pm,p=>p.ventaAutorizada), costo=sum(pm,p=>p.costoAutorizado);
+    const sinCosto=pm.filter(p=>p.costoAutorizado==null).length;
+    const gastoNeg=sum(gas.filter(dvEsNegocio).filter(g=>!/^ESMA · /.test(g.concepto||'')),g=>g.monto); // compras del negocio fuera de los fijos
+    const utilidad=ventas-costo-fijosEsmaMes-gastoNeg;
+    return {m, entro, gasto, queda:entro-gasto, completo:entro>0&&gasto>0, ventas, costo, fijos:fijosEsmaMes, gastoNeg, utilidad, nProy:pm.length, sinCosto,
+      cobrado:sum(ing.filter(i=>i.tipo==='emprendimiento'),i=>i.monto), deuda:(db.snapshots||{})[m]};
+  });
+  return {filas, fijosEsmaMes};
+}
+function dvHistCard(){
+  const H=dvHistorico(); if(!H.filas.length) return '';
+  const nm=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+  const mes=m=>nm[Number(m.slice(5,7))-1]+' '+m.slice(2,4);
+  const col=v=>v>=0?'var(--green)':'var(--red)';
+  const firma=v=>(v<0?'−':'')+fxM0(Math.abs(v));
+  const barra=(v,max)=>`<div style="height:6px;border-radius:3px;background:var(--bg3);margin-top:3px;"><div style="height:6px;border-radius:3px;width:${max?Math.min(100,Math.abs(v)/max*100):0}%;background:${col(v)};"></div></div>`;
+  // Personal
+  const P=H.filas.filter(r=>r.entro>0||r.gasto>0);
+  const comp=P.filter(r=>r.completo);
+  const promP=comp.length?comp.reduce((s,r)=>s+r.queda,0)/comp.length:null;
+  const maxP=Math.max(1,...P.map(r=>Math.abs(r.queda)));
+  const verP=promP==null?'<span style="color:var(--muted);">Aún no hay un mes con sueldo y gastos registrados completos.</span>'
+    :promP>=0?`✅ En promedio <b>te quedan ${fxM0(promP)}</b> al mes.`:`🚨 En promedio <b>gastas ${fxM0(-promP)} más</b> de lo que te entra.`;
+  // ESMA
+  const mesHoy=fxToday().slice(0,7), E=H.filas;
+  const ult=E.filter(r=>r.m<mesHoy).slice(-3); /* solo meses cerrados */ const promE=ult.length?ult.reduce((s,r)=>s+r.utilidad,0)/ult.length:0;
+  const maxE=Math.max(1,...E.map(r=>Math.abs(r.utilidad)));
+  const verE=!ult.length?'<span style="color:var(--muted);">Todavía no hay un mes cerrado para medirlo.</span>':promE>=0?`✅ <b>ESMA es rentable:</b> en los últimos ${ult.length} meses dejó en promedio <b>${fxM0(promE)}</b> al mes.`:`🚨 <b>ESMA no es rentable todavía:</b> en los últimos ${ult.length} meses perdió en promedio <b>${fxM0(-promE)}</b> al mes.`;
+  const th='style="text-align:right;padding:4px 6px;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;white-space:nowrap;"';
+  const td='style="text-align:right;padding:6px;white-space:nowrap;"';
+  return `<div class="card">
+    <div class="card-title">📈 Cómo vas mes a mes</div>
+    <details class="dvx" open><summary class="tl"><span><span class="dvx-f">▸</span> <b>👤 Tú: ¿te queda dinero?</b></span><span></span></summary>
+      <div class="dvx-b">
+        <div style="font-size:13px;margin:4px 0 8px;">${verP}</div>
+        ${P.length?`<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:12.5px;min-width:340px;">
+          <tr><th style="text-align:left;padding:4px 6px;font-size:10px;color:var(--muted);">MES</th><th ${th}>Entró</th><th ${th}>Gastaste</th><th ${th}>Te quedó</th><th ${th}>Deuda tarjetas</th></tr>
+          ${P.map(r=>`<tr style="border-top:1px solid var(--border);"><td style="padding:6px;font-weight:700;">${mes(r.m)}${r.completo?'':' <span style="font-size:10px;color:var(--muted);font-weight:500;">(incompleto)</span>'}</td><td ${td}>${fxM0(r.entro)}</td><td ${td}>${fxM0(r.gasto)}</td><td ${td}><b style="color:${col(r.queda)};">${firma(r.queda)}</b>${barra(r.queda,maxP)}</td><td ${td}>${r.deuda!=null?fxM0(r.deuda):'—'}</td></tr>`).join('')}
+        </table></div>`:''}
+        <div style="font-size:11px;color:var(--muted);margin-top:6px;line-height:1.4;">Entró = sueldo y vales registrados. Gastaste = tus gastos registrados (sin los del negocio). «Incompleto» = ese mes falta capturar el sueldo o los gastos.</div>
+      </div>
+    </details>
+    <details class="dvx" open><summary class="tl"><span><span class="dvx-f">▸</span> <b>🏭 ESMA: ¿es rentable?</b></span><span></span></summary>
+      <div class="dvx-b">
+        <div style="font-size:13px;margin:4px 0 8px;">${verE}</div>
+        <div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:12.5px;min-width:420px;">
+          <tr><th style="text-align:left;padding:4px 6px;font-size:10px;color:var(--muted);">MES</th><th ${th}>Vendió</th><th ${th}>Costo</th><th ${th}>Fijos</th><th ${th}>Ganó</th><th ${th}>Cobrado</th></tr>
+          ${E.map(r=>`<tr style="border-top:1px solid var(--border);"><td style="padding:6px;font-weight:700;">${mes(r.m)} <span style="font-size:10px;color:var(--muted);font-weight:500;">${r.nProy} proy.${r.m===mesHoy?' · en curso':''}</span></td><td ${td}>${fxM0(r.ventas)}</td><td ${td}>${fxM0(r.costo)}${r.sinCosto?'<span title="Sin costo calculado todavía" style="color:var(--amber);"> *</span>':''}</td><td ${td}>${fxM0(r.fijos+r.gastoNeg)}</td><td ${td}><b style="color:${col(r.utilidad)};">${firma(r.utilidad)}</b>${barra(r.utilidad,maxE)}</td><td ${td}>${r.cobrado?fxM0(r.cobrado):'—'}</td></tr>`).join('')}
+        </table></div>
+        <div style="font-size:11px;color:var(--muted);margin-top:6px;line-height:1.4;">Vendió = venta autorizada de los proyectos vendidos o entregados ese mes (por fecha de entrega), sale de tu sistema ESMA. Costo = materiales, mano de obra y extras de esas cotizaciones. Fijos = renta, luz y nómina de ESMA (${fxM0(H.fijosEsmaMes)} al mes) más compras del negocio registradas aquí. Ganó = vendió − costo − fijos. El promedio usa solo meses cerrados. Los fijos se toman como los tienes hoy en «Gastos fijos».</div>
+      </div>
+    </details>
+  </div>`;
+}
 // Gasto libre al día: el máximo «d» tal que, gastando d diario, tu saldo nunca baja del colchón
 // en lo que queda del mes, con todos los pagos en su fecha. ESMA cuenta al 50% por si se atrasa.
 function dvGastoLibre(D){
@@ -4631,7 +4701,7 @@ function dvMes(D){
 }
 function dvMesCard(D,acc){
   const m=dvMes(D); const ok=m.queda>=0;
-  const sub=(t,v)=>`<div class="tl" style="font-size:12px;"><span>${t}</span><b style="white-space:nowrap;">${v}</b></div>`;
+  const sub=(t,v)=>`<div class="tl" style="font-size:12px;"><span>${t}</span><span style="white-space:nowrap;color:var(--muted);">${v}</span></div>`;
   // Cada renglón es un desplegable: al tocarlo muestra de dónde sale el número
   const fila=(t,v,c,b,det)=>`<details class="dvx"><summary class="tl"><span><span class="dvx-f">▸</span> ${t}</span><b style="white-space:nowrap;${c?'color:'+c+';':''}">${b?'':(v>=0?'+':'−')}${fxM0(Math.abs(v))}</b></summary><div class="dvx-b">${det||'<div style="font-size:12px;color:var(--muted);">Nada este mes.</div>'}</div></details>`;
   const ctas=(db.cuentas||[]).filter(x=>!fxEsAhorro(x.id)&&!fxEsVales(x.id)).map(x=>sub(esc(x.nombre),fxM0(Number(x.saldo||0)))).join('');
@@ -4652,9 +4722,9 @@ function dvMesCard(D,acc){
 // Pagos del mes agrupados por tipo (se usa en el desplegable y en la ventana de «Falta pagar»)
 function dvPagosHtml(D){
   const grupos=[['💳 Tarjetas (saldo total a su fecha de pago)',e=>e.tipo==='tarjeta'],['🏦 Créditos y deudas',e=>e.tipo==='credito'],['🏭 Gastos fijos ESMA',e=>e.tipo==='pago'&&/^ESMA · /.test(e.concepto)],['🏠 Gastos fijos personales',e=>e.tipo==='pago'&&!/^ESMA · /.test(e.concepto)]];
-  const fila=e=>`<div class="tl" style="font-size:12px;"><span>${e.vencido?'<span class="badge red">vencido</span> ':''}${fxCorta(e.fecha)} · ${esc(e.concepto.replace(/^ESMA · /,''))}</span><b style="white-space:nowrap;">${fxM0(-e.monto)}</b></div>`;
+  const fila=e=>`<div class="tl" style="font-size:12px;padding-left:8px;"><span>${e.vencido?'<span class="badge red">vencido</span> ':''}${fxCorta(e.fecha)} · ${esc(e.concepto.replace(/^ESMA · /,''))}</span><span style="white-space:nowrap;color:var(--muted);">${fxM0(-e.monto)}</span></div>`;
   return grupos.map(([t,f])=>{ const L=D.pagosMes.filter(f); if(!L.length) return ''; const tot=-L.reduce((s,e)=>s+e.monto,0);
-    return `<div style="margin-bottom:10px;"><div style="display:flex;justify-content:space-between;font-weight:800;font-size:12px;margin-bottom:2px;"><span>${t}</span><span>${fxM0(tot)}</span></div>${L.map(fila).join('')}</div>`; }).join('');
+    return `<div style="margin-bottom:12px;"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:7px 10px;margin-bottom:4px;"><span style="font-weight:800;font-size:12.5px;">${t}</span><span style="white-space:nowrap;background:var(--red-light);color:var(--red);font-weight:900;font-size:13.5px;padding:3px 10px;border-radius:999px;">Total ${fxM0(tot)}</span></div>${L.map(fila).join('')}</div>`; }).join('');
 }
 function dvEsmaCard(D,acc){
   const E=dvEsma(D.hoy);
@@ -4742,6 +4812,8 @@ function renderDashLibre(){
         <div class="card-title">📅 Esta semana</div>
         ${prox.length?prox.map(e=>`<div class="tl"><span>${fxDiff(D.hoy,e.fecha)<=0?'<b>Hoy</b>':fxCorta(e.fecha)} · ${esc(e.concepto)}${e.vencido?' <span class="badge red">vencido</span>':''}</span><b style="color:${e.monto>0?'var(--green)':'var(--text)'};white-space:nowrap;">${e.monto>0?'+':''}${fxM0(e.monto)}</b></div>`).join(''):'<div style="font-size:12px;color:var(--muted);">Nada programado en los próximos 7 días.</div>'}
       </div>
+
+      ${dvHistCard()}
 
       ${top?`<div class="card" style="cursor:pointer;" ${acc(()=>goPage('tarjetas'))}><div style="font-size:13px;">💳 <b>Si vas a comprar hoy, usa ${esc(top.t.nombre)}${esc(ccSuf(top.t))}</b>: lo pagas hasta el <b>${fxCorta(top.pagaEl)}</b> (${top.diasFin} días).</div></div>`:''}`;
     const sub2=document.getElementById('dashSub'); if(sub2){ const n=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']; const d=fxD(D.hoy); sub2.textContent=`Hoy ${d.getDate()} ${n[d.getMonth()]} · actualizado con tus datos`; }
