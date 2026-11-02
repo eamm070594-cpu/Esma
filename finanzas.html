@@ -313,13 +313,14 @@ tbody tr:last-child td{border-bottom:none;}
     <div class="sb-sep"></div>
     <button class="sb-item" onclick="sbToggle(false);fxSheetConfig()"><span class="sb-ico">💼</span>Mi sueldo y ahorro</button>
     <button class="sb-item" onclick="sbToggle(false);nubeImportarSheet()"><span class="sb-ico">📥</span>Importar respaldo</button><button class="sb-item" onclick="sbToggle(false);nubeDescargar()"><span class="sb-ico">💾</span>Descargar respaldo</button>
-    <a class="sb-item" href="./" style="text-decoration:none;"><span class="sb-ico">🏭</span>Abrir app ESMA</a>
+    <a class="sb-item" href="./" style="text-decoration:none;"><span class="sb-ico">🏭</span>← Regresar a ESMA Operaciones</a>
     <button class="sb-item" onclick="if(confirm('¿Cerrar sesión?')) fbSalir()"><span class="sb-ico">🚪</span>Cerrar sesión</button>
     
   </aside>
   <div class="topbar">
     <button class="sb-burger" onclick="sbToggle(true)" aria-label="Menú">☰</button>
     <div class="tlogo">💼</div>
+    <a href="./" class="btn small" title="Regresar a ESMA Operaciones" style="text-decoration:none;white-space:nowrap;font-weight:800;">← ESMA</a>
     <div class="ttitle">ESMA Finanzas</div>
     <div class="tmonth" id="topMonth">—</div>
     <span id="nubeEstado" class="logout-btn" style="cursor:default;">🔒 …</span>
@@ -4485,10 +4486,102 @@ function dvCalcular(){
   if(!c.cuentaAhorro) R.push(['warn','No estás ahorrando todavía.',()=>fxSheetConfig()]);
   else if(I.metaEmergencia>0) R.push(I.ahorroSaldo>=I.metaEmergencia?['ok','Tu fondo de emergencia está completo.']:['warn',`Ahorro: llevas ${fxM0(I.ahorroSaldo)} de ${fxM0(I.metaEmergencia)} (3 meses de gastos).`]);
   if(fijosEsma>0) R.push(cobradoEsma>=fijosEsma?['ok',`ESMA cubre sus gastos fijos (${fxM0(fijosEsma)}/mes).`]:['bad',`ESMA no cubre sus fijos: cobra ${fxM0(cobradoEsma)} y gasta ${fxM0(fijosEsma)} al mes.`,()=>goPage('fijos')]);
+  const E=dvEsma(hoy,finMes);
+  if(E.vencido>0) R.push(['warn',`ESMA: tienes ${fxM0(E.vencido)} por cobrar de proyectos ya entregados (${E.nVenc}).`,()=>dvDetalleEsma()]);
   const nivel=R.some(r=>r[0]==='bad')?'bad':R.some(r=>r[0]==='warn')?'warn':'ok';
   return {c,hoy,P,L,I,T,faltaMes,pagosMes,vencidos,deudaTarj,extraNoPago,R,nivel};
 }
 var _dvAcc=[];
+// ESMA: lo que falta cobrar de ventas autorizadas (viene de los proyectos de ESMA) y sus gastos fijos del mes
+function dvEsma(hoy,finMes){
+  hoy=hoy||fxToday(); finMes=finMes||fxS(new Date(fxD(hoy).getFullYear(),fxD(hoy).getMonth()+1,0));
+  const items=(db.porCobrar||[]).filter(x=>!x.cobrado&&Number(x.monto)>0).slice().sort((a,b)=>(a.fecha||'9').localeCompare(b.fecha||'9'));
+  const esma=items.filter(x=>x.esma);
+  const sum=a=>a.reduce((s,x)=>s+Number(x.monto||0),0);
+  const venc=esma.filter(x=>x.fecha&&x.fecha<hoy), mes=esma.filter(x=>!x.fecha||x.fecha<=finMes);
+  const fijosMes=fxEventos().ev.filter(e=>e.monto<0&&e.fijo&&e.fecha<=finMes&&/^ESMA · /.test(e.concepto)).reduce((s,e)=>s-e.monto,0);
+  return {items,esma,total:sum(esma),vencido:sum(venc),nVenc:venc.length,mes:sum(mes),nMes:mes.length,fijosMes,otros:sum(items.filter(x=>!x.esma)),ok:typeof _esma!=='undefined'&&_esma.ok};
+}
+// Proyección del mes: lo que tienes + lo que va a entrar − lo que falta pagar
+function dvMes(D){
+  D=D||dvCalcular();
+  const finMes=fxS(new Date(fxD(D.hoy).getFullYear(),fxD(D.hoy).getMonth()+1,0));
+  const ev=D.P.ev.filter(e=>e.fecha<=finMes);
+  const sum=f=>ev.filter(f).reduce((s,e)=>s+e.monto,0);
+  const diasRest=fxDiff(D.hoy,finMes)+1;
+  const m={finMes, tienes:D.P.saldoIni,
+    sueldo:sum(e=>e.tipo==='sueldo'), nSueldo:ev.filter(e=>e.tipo==='sueldo').length,
+    esma:sum(e=>e.tipo==='cobro'),
+    pagar:D.faltaMes, ahorro:-sum(e=>e.tipo==='ahorro'),
+    diario:D.P.gv.semanal/7*diasRest, diasRest};
+  m.entra=m.sueldo+m.esma;
+  m.queda=m.tienes+m.entra-m.pagar-m.ahorro-m.diario;
+  m.lista=ev.filter(e=>e.monto>0).map(e=>({fecha:e.fecha,concepto:e.concepto,monto:e.monto,tipo:e.tipo,vencido:e.vencido}));
+  return m;
+}
+function dvMesCard(D,acc){
+  const m=dvMes(D); const ok=m.queda>=0;
+  const fila=(t,v,c,b)=>`<div class="tl"><span>${t}</span><b style="white-space:nowrap;${c?'color:'+c+';':''}">${b?'':(v>=0?'+':'−')}${fxM0(Math.abs(v))}</b></div>`;
+  return `<div class="card" style="cursor:pointer;border-left:4px solid ${ok?'var(--green)':'var(--red)'};" ${acc(()=>dvDetalleMes())}>
+    <div class="card-title" style="display:flex;justify-content:space-between;"><span>📊 ¿Alcanza este mes? (al ${fxCorta(m.finMes)})</span><span style="font-size:12px;color:var(--muted);">ver detalle ›</span></div>
+    ${fila('Tienes hoy en tus cuentas',m.tienes,'',true)}
+    ${fila('💼 Sueldo que va a entrar ('+m.nSueldo+' pago'+(m.nSueldo===1?'':'s')+')',m.sueldo,'var(--green)')}
+    ${fila('🏭 Cobros de ESMA y clientes este mes',m.esma,'var(--green)')}
+    ${fila('Falta pagar (fijos, tarjetas, créditos)',-m.pagar,'var(--red)')}
+    ${m.ahorro>0?fila('Ahorro programado',-m.ahorro,'var(--muted)'):''}
+    ${m.diario>0?fila('Gasto del día a día ('+m.diasRest+' días, estimado)',-m.diario,'var(--muted)'):''}
+    <div class="tl" style="border-top:2px solid var(--border);font-size:15px;"><b>${ok?'✅ Te sobran':'🚨 Te faltan'}</b><b style="color:${ok?'var(--green)':'var(--red)'};">${fxM0(Math.abs(m.queda))}</b></div>
+    ${!ok&&m.esma>0&&m.queda+m.esma>=0?'<div style="font-size:11px;color:var(--amber);margin-top:4px;">Depende de que ESMA cobre a tiempo.</div>':''}
+  </div>`;
+}
+function dvDetalleMes(){
+  const m=dvMes();
+  const filas=m.lista.map(e=>`<div class="tl"><span>${e.vencido?'<span class="badge red">atrasado</span> ':''}${fxCorta(e.fecha)} · ${esc(e.concepto)}</span><b style="color:var(--green);white-space:nowrap;">+${fxM0(e.monto)}</b></div>`).join('');
+  openSheet('Lo que entra este mes · '+fxM0(m.entra),`
+    ${filas||'<div style="font-size:13px;">No hay ingresos programados para lo que queda del mes.</div>'}
+    <div style="font-size:11px;color:var(--muted);line-height:1.5;margin-top:10px;"><b>Sueldo:</b> según «Mi sueldo y ahorro» (los que ya llegaron no se cuentan otra vez).<br><b>ESMA:</b> ventas autorizadas pendientes de cobro, en su fecha de entrega (las atrasadas se cuentan hoy).<br><b>Vales</b> no se cuentan porque solo sirven para súper.</div>`,
+  [{label:'Cerrar',cls:'',action:closeSheet},{label:'Falta pagar',cls:'',action:()=>{ closeSheet(); dvDetallePagos(); }},{label:'Mi sueldo',cls:'primary',action:()=>{ closeSheet(); fxSheetConfig(); }}]);
+}
+function dvEsmaCard(D,acc){
+  const E=dvEsma(D.hoy);
+  if(!E.esma.length&&!E.fijosMes) return '';
+  const neto=E.mes-E.fijosMes;
+  const prox=E.esma.slice(0,4);
+  return `<div class="card" style="cursor:pointer;" ${acc(()=>dvDetalleEsma())}>
+    <div class="card-title" style="display:flex;justify-content:space-between;"><span>🏭 ESMA este mes</span><span style="font-size:12px;color:var(--muted);">ver detalle ›</span></div>
+    <div class="dt-grid" style="margin-bottom:8px;">
+      <div><div class="dt-l">Por cobrar este mes</div><div class="dt-v" style="font-size:18px;color:var(--green);">${fxM0(E.mes)}</div><div class="dt-s">${E.nMes} proyecto${E.nMes===1?'':'s'}${E.vencido>0?` · <b style="color:var(--amber);">${fxM0(E.vencido)} atrasado</b>`:''}</div></div>
+      <div><div class="dt-l">Fijos ESMA del mes</div><div class="dt-v" style="font-size:18px;">${fxM0(E.fijosMes)}</div><div class="dt-s">renta, luz, nómina…</div></div>
+      <div><div class="dt-l">Le quedaría a ESMA</div><div class="dt-v" style="font-size:18px;color:${neto>=0?'var(--green)':'var(--red)'};">${fxM0(neto)}</div><div class="dt-s">si cobras todo a tiempo</div></div>
+      <div><div class="dt-l">Total por cobrar</div><div class="dt-v" style="font-size:18px;">${fxM0(E.total)}</div><div class="dt-s">ventas autorizadas sin liquidar</div></div>
+    </div>
+    ${prox.map(x=>`<div class="tl"><span>${x.fecha?(x.fecha<D.hoy?'<span class="badge red">atrasado</span> ':fxCorta(x.fecha)+' · '):''}${esc(x.cliente)} <span style="color:var(--muted);">${esc(x.concepto||'')}</span></span><b style="color:var(--green);white-space:nowrap;">+${fxM0(x.monto)}</b></div>`).join('')}
+    ${!E.ok?'<div style="font-size:11px;color:var(--amber);margin-top:6px;">No se pudo leer ESMA ahora; se muestran los últimos datos.</div>':''}
+  </div>`;
+}
+function dvDetalleEsma(){
+  const hoy=fxToday(), E=dvEsma(hoy);
+  const fila=x=>`<div class="tl"><span>${x.fecha?(x.fecha<hoy?'<span class="badge red">atrasado</span> ':'')+fxCorta(x.fecha):'sin fecha'} · <b>${esc(x.cliente)}</b><br><span style="font-size:11px;color:var(--muted);">${esc(x.concepto||'')} · ${esc(x.tipoPago||'')}</span></span><b style="color:var(--green);white-space:nowrap;">${fxM0(x.monto)}</b></div>`;
+  openSheet('🏭 ESMA: por cobrar',`
+    <div style="font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:10px;">Sale de tus proyectos de ESMA con cotización <b>autorizada</b>: venta autorizada − anticipo recibido. Si el proyecto está marcado <b>Pagado</b> en ESMA ya no aparece. La fecha es la de entrega. Proyectos entregados hace más de 6 meses sin marcar no se cuentan.</div>
+    ${E.esma.length?E.esma.map(fila).join(''):'<div style="font-size:13px;">No hay ventas de ESMA pendientes de cobro.</div>'}
+    <div class="tl" style="border-top:2px solid var(--border);"><b>Total por cobrar</b><b>${fxM0(E.total)}</b></div>
+    <div style="font-size:11px;color:var(--muted);margin-top:10px;">Cuando te paguen, márcalo en ESMA como <b>Pagado</b> (o con su anticipo) y aquí se actualiza solo. También puedes registrarlo aquí en <b>Plan de flujo → ✓</b> para que entre a tu cuenta.</div>`,
+  [{label:'Cerrar',cls:'',action:closeSheet},{label:'Abrir ESMA',cls:'primary',action:()=>{ location.href='./'; }}]);
+}
+// Detalle de «Falta pagar este mes»: cada pago agrupado por tipo
+function dvDetallePagos(){
+  const D=dvCalcular();
+  const grupos=[['💳 Tarjetas (saldo total a su fecha de pago)',e=>e.tipo==='tarjeta'],['🏦 Créditos y deudas',e=>e.tipo==='credito'],['🏭 Gastos fijos ESMA',e=>e.tipo==='pago'&&/^ESMA · /.test(e.concepto)],['🏠 Gastos fijos personales',e=>e.tipo==='pago'&&!/^ESMA · /.test(e.concepto)]];
+  const fila=e=>`<div class="tl"><span>${e.vencido?'<span class="badge red">vencido</span> ':''}${fxCorta(e.fecha)} · ${esc(e.concepto.replace(/^ESMA · /,''))}</span><b style="white-space:nowrap;">${fxM0(-e.monto)}</b></div>`;
+  const html=grupos.map(([t,f])=>{ const L=D.pagosMes.filter(f); if(!L.length) return ''; const tot=-L.reduce((s,e)=>s+e.monto,0);
+    return `<div style="margin-bottom:14px;"><div style="display:flex;justify-content:space-between;font-weight:800;font-size:13px;margin-bottom:4px;"><span>${t}</span><span>${fxM0(tot)}</span></div>${L.map(fila).join('')}</div>`; }).join('');
+  const tarj=D.pagosMes.some(e=>e.tipo==='tarjeta');
+  openSheet('Falta pagar este mes · '+fxM0(D.faltaMes),`
+    ${html||'<div style="font-size:13px;">No tienes pagos pendientes este mes.</div>'}
+    ${tarj?'<div style="font-size:11px;color:var(--muted);line-height:1.5;">En tarjetas se cuenta <b>todo lo que debes</b> en cada una (límite − disponible). Si el saldo o la fecha de pago no son los de hoy, corrígelos en <b>Tarjetas</b> y este total se ajusta.</div>':''}`,
+  [{label:'Cerrar',cls:'',action:closeSheet},{label:'Ir a Tarjetas',cls:'',action:()=>{ closeSheet(); goPage('tarjetas'); }},{label:'Gastos fijos',cls:'primary',action:()=>{ closeSheet(); goPage('fijos'); }}]);
+}
 function renderDashLibre(){
   const el=document.getElementById('dashLibre'); if(!el) return;
   try{
@@ -4517,10 +4610,14 @@ function renderDashLibre(){
 
       <div class="dt-grid">
         <div class="dt" ${acc(()=>goPage('flujo'))}><div class="dt-l">Puedes gastar hoy</div><div class="dt-v" style="color:${D.L.libre<0?'var(--red)':D.L.porDia<100?'var(--amber)':'var(--green)'};">${D.L.libre>0?fxM0(D.L.porDia):'$0'}</div><div class="dt-s">${D.L.libre>0?`${fxM0(D.L.libre)} hasta el ${fxCorta(D.L.hasta)}`:`Te faltan ${fxM0(-D.L.libre)}`}</div></div>
-        <div class="dt" ${acc(()=>goPage('fijos'))}><div class="dt-l">Falta pagar este mes</div><div class="dt-v" style="color:${D.faltaMes>0?'var(--text)':'var(--green)'};">${fxM0(D.faltaMes)}</div><div class="dt-s">${D.pagosMes.length} pago${D.pagosMes.length===1?'':'s'}: fijos, tarjetas y créditos</div></div>
+        <div class="dt" ${acc(()=>dvDetallePagos())}><div class="dt-l">Falta pagar este mes ›</div><div class="dt-v" style="color:${D.faltaMes>0?'var(--text)':'var(--green)'};">${fxM0(D.faltaMes)}</div><div class="dt-s">${D.pagosMes.length} pago${D.pagosMes.length===1?'':'s'}: fijos, tarjetas y créditos</div></div>
         <div class="dt" ${acc(()=>goPage('tarjetas'))}><div class="dt-l">Debes en tarjetas</div><div class="dt-v">${fxM0(D.deudaTarj)}</div><div class="dt-s">${D.deudaTarj>0?`Si no pagas: <b style="color:var(--red);">+${fxM0(D.extraNoPago)}</b>`:'Sin deuda'}</div></div>
         <div class="dt" ${acc(()=>fxSheetConfig())}><div class="dt-l">Ahorro</div><div class="dt-v" style="color:var(--green);">${fxM0(fxSaldoAhorro())}</div><div class="dt-s">${D.c.cuentaAhorro?`Meta: ${fxM0(D.I.metaEmergencia)}`:'Elige tu cuenta de ahorro'}${fxSaldoVales()>0?` · 🛒 ${fxM0(fxSaldoVales())} vales`:''}</div></div>
       </div>
+
+      ${dvMesCard(D,acc)}
+
+      ${dvEsmaCard(D,acc)}
 
       ${todo.length?`<div class="card"><div class="card-title">👉 Qué hacer</div>
         ${todo.slice(0,4).map((x,i)=>`<div class="todo" style="background:${bg[x.n]};cursor:pointer;" ${acc(x.fn)}><div class="todo-n" style="background:${col[x.n]};">${i+1}</div><div class="todo-t" style="color:${col[x.n]};">${x.t}</div><span style="font-size:18px;color:${col[x.n]};">›</span></div>`).join('')}</div>`:''}
