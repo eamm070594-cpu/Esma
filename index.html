@@ -2095,9 +2095,11 @@ async function _syncVentaAutorizada(){
       const etapa = _pm(p).etapa, pay = p.payStatus||"", ant = pay==="anticipo" ? Math.min(Number(p.anticipo||0), v) : 0;
       let pend = 0;
       if(pay!=="pagado" && v>0 && (etapa==="vendido" || (etapa==="entregado" && pay==="anticipo"))) pend = Math.round((v-ant)*100)/100;
-      if(Number(p.ventaAutorizada||0)===v && p.finPorCobrar===pend && p.finEtapa===etapa) continue;
-      p.ventaAutorizada = v; p.finPorCobrar = pend; p.finEtapa = etapa;
-      await firestore.collection('projects').doc(p.id).set({ventaAutorizada:v, finPorCobrar:pend, finEtapa:etapa}, {merge:true});
+      // Costo real de lo vendido (materiales + mano de obra/rutas + extras de terceros) para la rentabilidad en Finanzas
+      const costo = Math.round(db.quotes.filter(q=>q.projectId===p.id && q.status==="authorized").reduce((s2,q)=>s2+quoteSellTotals(q).costo*(Number(q.qty)||1),0)*100)/100;
+      if(Number(p.ventaAutorizada||0)===v && p.finPorCobrar===pend && p.finEtapa===etapa && p.costoAutorizado===costo) continue;
+      p.ventaAutorizada = v; p.finPorCobrar = pend; p.finEtapa = etapa; p.costoAutorizado = costo;
+      await firestore.collection('projects').doc(p.id).set({ventaAutorizada:v, finPorCobrar:pend, finEtapa:etapa, costoAutorizado:costo}, {merge:true});
     }catch(e){ console.error("ventaAutorizada error:", e); }
   }
 }
