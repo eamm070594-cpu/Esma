@@ -2063,7 +2063,25 @@ function subscribeFirestoreRealtime(){
     snap.docChanges().forEach(c=>_mergeFirestoreDocChange(db.quotes, c));
     try{ renderDashboardPage(); }catch(e){}
     try{ if(currentPage==="hoy") renderHoyPage(); if(currentPage==="tablero") renderTableroPage(); }catch(e){}
+    _programarVentaAutorizada();
   }, err=>console.error("Firestore quotes listener error:", err));
+}
+
+// ── Enlace con ESMA Finanzas: cada proyecto guarda su venta autorizada
+// (projectAuthorizedTotal) en el campo ventaAutorizada, para que la app de
+// finanzas calcule lo cobrado y lo pendiente sin recalcular cotizaciones.
+let _ventaAutTimer = null;
+function _programarVentaAutorizada(){ clearTimeout(_ventaAutTimer); _ventaAutTimer = setTimeout(_syncVentaAutorizada, 5000); }
+async function _syncVentaAutorizada(){
+  if(!firestore || !db.projects || !db.projects.length) return;
+  for(const p of db.projects){
+    try{
+      const v = Math.round(projectAuthorizedTotal(p.id)*100)/100;
+      if(!isFinite(v) || Number(p.ventaAutorizada||0) === v) continue;
+      p.ventaAutorizada = v;
+      await firestore.collection('projects').doc(p.id).set({ventaAutorizada:v}, {merge:true});
+    }catch(e){ console.error("ventaAutorizada error:", e); }
+  }
 }
 
 // Auto-pull cada 60s si no hubo cambios locales recientes y no hay sync en curso
