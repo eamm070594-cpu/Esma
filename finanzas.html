@@ -2617,9 +2617,16 @@ function fxSaldoAhorro(){ const c=(db.cuentas||[]).find(x=>fxEsAhorro(x.id)); re
 
 // ── Sueldo fijo: se registra solo en cada día de pago (no lo captures a mano)
 // El sueldo puede caer repartido en varias cuentas (ej. Banorte + Santander)
+// Pagos de sueldo al mes según la frecuencia (semanal ≈ 4.33)
+function fxPagosMes(b){ return b.semanal?52/12:(b.dias.length||1); }
 function fxDepositos(c){
   c=c||fxCfg();
-  if(Array.isArray(c.sueldoDepositos)&&c.sueldoDepositos.length) return c.sueldoDepositos.filter(d=>Number(d.monto)>0);
+  if(Array.isArray(c.sueldoDepositos)&&c.sueldoDepositos.length){
+    const L=c.sueldoDepositos.filter(d=>Number(d.monto)>0);
+    if(!c.sueldoMensual) return L;
+    const n=fxPagosMes(fxSueldoBase(c)); // montos guardados al mes → lo que cae en cada pago
+    return L.map(d=>({...d,monto:Math.round(Number(d.monto)/n*100)/100}));
+  }
   if(Number(c.sueldoMonto)>0) return [{cuentaId:c.sueldoCuenta||'',monto:Number(c.sueldoMonto)}];
   return [];
 }
@@ -2719,6 +2726,7 @@ function fxSueldo(){
   const c=fxCfg(); const b=fxSueldoBase(c);
   if(Number(c.sueldoMonto)>0 && (b.semanal||b.dias.length)){
     const m=Number(c.sueldoMonto);
+    if(c.sueldoMensual) return {monto:Math.round(m/fxPagosMes(b)*100)/100, ...b, auto:false, porMes:m};
     return {monto:m, ...b, auto:false, porMes:b.semanal?m*52/12:m*b.dias.length};
   }
   const desde=fxAddDays(fxToday(),-120);
@@ -3426,7 +3434,9 @@ function fxSubtabs(grupo,page){
 function fxSheetConfig(){
   const c=fxCfg();
   const ctas=(sel)=>'<option value="">— Elige —</option>'+(db.cuentas||[]).map(x=>`<option value="${x.id}" ${x.id===sel?'selected':''}>${esc(x.nombre)}</option>`).join('');
-  let deps=fxDepositos(c); let propuesta=false;
+  let deps=(c.sueldoDepositos||[]).filter(d=>Number(d.monto)>0).map(d=>({...d})); let propuesta=false;
+  if(deps.length&&!c.sueldoMensual){ const n=fxPagosMes(fxSueldoBase(c)); deps=deps.map(d=>({...d,monto:Math.round(Number(d.monto)*n*100)/100})); }
+  if(!deps.length&&Number(c.sueldoMonto)>0) deps=[{cuentaId:c.sueldoCuenta||'',monto:c.sueldoMensual?Number(c.sueldoMonto):Number(c.sueldoMonto)*fxPagosMes(fxSueldoBase(c))}];
   if(!deps.length){ deps=fxDepositosDetectados(); propuesta=deps.length>0; }
   if(!deps.length) deps=[{cuentaId:'',monto:''}];
   window._fxDeps=deps.map(d=>({...d}));
@@ -3434,7 +3444,7 @@ function fxSheetConfig(){
   const frec=c.sueldoFrec||(su.auto&&su.semanal?'semanal':'dias'); const dsem=c.sueldoDiaSemana!=null?Number(c.sueldoDiaSemana):(su.semanal?su.diaSemana:5);
   window._fxFrecTg=v=>{ document.getElementById('fxc_w_dias').style.display=v==='semanal'?'none':'block'; document.getElementById('fxc_w_sem').style.display=v==='semanal'?'block':'none'; fxDepTotal(); };
   openSheet('Mi sueldo y ahorro',`
-    <div class="card-title" style="margin:0 0 4px;">💼 Mi sueldo (lo que te depositan cada pago)</div>
+    <div class="card-title" style="margin:0 0 4px;">💼 Mi sueldo AL MES (cuánto te cae en cada cuenta en todo el mes)</div>
     ${propuesta?'<div style="font-size:12px;background:var(--accent-light);padding:8px 10px;border-radius:10px;margin-bottom:6px;">Lo llené con tu último sueldo registrado. Revísalo y guarda.</div>':''}
     <div id="fxc_deps"></div>
     <button type="button" class="btn small" style="margin-top:8px;" onclick="window._fxDeps.push({cuentaId:'',monto:''});fxDepRows();">＋ Me pagan también en otra cuenta</button>
@@ -3482,7 +3492,7 @@ function fxSheetConfig(){
       if(deps.length && deps.some(d=>!d.cuentaId)){ alert('Elige la cuenta de cada depósito.'); return; }
       const cambio=JSON.stringify(deps)!==JSON.stringify(c.sueldoDepositos||[])||nuevosDias!==c.sueldoDias||nFrec!==c.sueldoFrec||nDsem!==c.sueldoDiaSemana;
       if(total>0 && (nuevosDias||nFrec==='semanal') && (cambio||!c.sueldoDesde)) c.sueldoDesde=fxToday();
-      c.sueldoDepositos=deps; c.sueldoMonto=total||null; c.sueldoCuenta=deps[0]?deps[0].cuentaId:null; c.sueldoDias=nuevosDias;
+      c.sueldoDepositos=deps; c.sueldoMonto=total||null; c.sueldoMensual=true; c.sueldoCuenta=deps[0]?deps[0].cuentaId:null; c.sueldoDias=nuevosDias;
       c.sueldoFrec=nFrec==='semanal'?'semanal':'dias'; c.sueldoDiaSemana=nDsem;
       c.sueldoAuto=document.getElementById('fxc_auto').checked;
       c.ahorroPct=Math.max(0,Math.min(60,parseFloat(document.getElementById('fxc_ahpct').value)||0));
@@ -3508,7 +3518,7 @@ function fxDepLeer(){
 function fxDepRows(){
   const box=document.getElementById('fxc_deps'); if(!box) return;
   if(box.children.length) fxDepLeer();
-  const opts=sel=>'<option value="">— Cuenta —</option>'+(db.cuentas||[]).filter(x=>!fxEsAhorro(x.id)).map(x=>`<option value="${x.id}" ${x.id===sel?'selected':''}>${esc(x.nombre)}</option>`).join('');
+  const opts=sel=>'<option value="">— Cuenta —</option>'+(db.cuentas||[]).filter(x=>!fxEsAhorro(x.id)||x.id===sel).map(x=>`<option value="${x.id}" ${x.id===sel?'selected':''}>${esc(x.nombre)}${fxEsAhorro(x.id)?' (es tu cuenta de ahorro)':''}</option>`).join('');
   box.innerHTML=window._fxDeps.map((d,i)=>`<div data-i="${i}" style="display:grid;grid-template-columns:1.2fr 1fr auto;gap:6px;align-items:center;margin-top:6px;">
     <div class="field" style="margin:0;"><select>${opts(d.cuentaId)}</select></div>
     <div class="field" style="margin:0;"><span class="ico">$</span><input type="number" step="0.01" value="${d.monto}" placeholder="Monto" oninput="fxDepTotal()"></div>
@@ -3519,12 +3529,12 @@ function fxDepRows(){
 function fxDepTotal(){
   const t=[...document.querySelectorAll('#fxc_deps input')].reduce((s,i)=>s+(parseFloat(i.value)||0),0);
   const semanal=((document.getElementById('fxc_frec')||{}).value)==='semanal';
-  const el=document.getElementById('fxc_total'); if(el) el.textContent=t>0?`Total depositado ${semanal?'cada semana':'por pago'}: ${fxM(t)}`:'';
+  const el=document.getElementById('fxc_total'); if(el) el.textContent=t>0?`Sueldo al mes: ${fxM(t)} → cada pago ≈ ${fxM(t/(semanal?52/12:((document.getElementById('fxc_dias')||{}).value||'').split(',').filter(x=>parseInt(x)>0).length||1))}`:'';
   const dias=(document.getElementById('fxc_dias')||{}).value||'';
   const nPagos=semanal?52/12:(dias.split(',').filter(x=>parseInt(x)>0).length||2);
   const vm=parseFloat((document.getElementById('fxc_vmonto')||{}).value)||0; const vd=((document.getElementById('fxc_vdias')||{}).value||'').split(',').filter(x=>parseInt(x)>0).length||1;
   const em=document.getElementById('fxc_total_mes');
-  if(em) em.innerHTML=(t>0||vm>0)?`Sueldo total al mes: ${fxM(t*nPagos+vm*(vm?vd:0))} <span style="font-weight:600;color:var(--muted);">(${fxM(t*nPagos)} en cuentas + ${fxM(vm*(vm?vd:0))} en vales)</span>`:'';
+  if(em) em.innerHTML=(t>0||vm>0)?`Total al mes: ${fxM(t+vm*(vm?vd:0))} <span style="font-weight:600;color:var(--muted);">(${fxM(t)} en cuentas + ${fxM(vm*(vm?vd:0))} en vales)</span>`:'';
 }
 
 // ── Arranque
@@ -4256,19 +4266,19 @@ async function esmaLeer(){
     _esma.proyectos=snap.docs.map(d=>({id:d.id,...d.data()})); _esma.ok=true;
   }catch(e){ _esma.ok=false; console.error('ESMA:',e); }
 }
+// Lo pendiente lo calcula el sistema de gestión ESMA (campo finPorCobrar, misma regla que su pantalla «Hoy»):
+// vendido en producción → venta − anticipo; entregado con anticipo → saldo; todo lo demás → nada.
 function esmaCobros(){
-  const hoy=fxToday(), limite=fxAddDays(hoy,-180), hechos=(db.esmaCobrados||[]);
+  const hoy=fxToday(), hechos=(db.esmaCobrados||[]);
   const out=[];
   _esma.proyectos.forEach(p=>{
-    const venta=Number(p.ventaAutorizada||0); if(!(venta>0)) return;
-    if(p.payStatus==='pagado') return;
-    const cobrado=p.payStatus==='anticipo'?Number(p.anticipo||0):0;
-    const pend=Math.round((venta-cobrado)*100)/100; if(!(pend>0)) return;
-    const fecha=p.deliveryDate||p.delivery||'';
-    if(fecha && fecha<limite) return; // proyectos muy viejos sin marcar: no ensuciar la proyección
+    if(p.finPorCobrar==null) return; // ESMA aún no lo ha calculado
+    const venta=Number(p.ventaAutorizada||0), pend=Number(p.finPorCobrar||0); if(!(pend>0)) return;
+    const cobrado=Math.max(0,venta-pend);
+    const fecha=p.finEtapa==='entregado'?'':(p.deliveryDate||p.delivery||'');
     const id='esma_'+p.id+'_'+Math.round(pend);
     if(hechos.includes(id)) return;
-    out.push({id, esma:true, cliente:p.client||'Cliente ESMA', concepto:(p.name||'Proyecto')+(cobrado>0?' · saldo':''), monto:pend, fecha, tipoPago:cobrado>0?'Saldo (anticipo '+fxM0(cobrado)+')':'Sin anticipo'});
+    out.push({id, esma:true, cliente:p.client||'Cliente ESMA', concepto:(p.name||'Proyecto')+(p.finEtapa==='entregado'?' · ya entregado, cobrar saldo':' · en producción'), monto:pend, fecha:fecha||(p.finEtapa==='entregado'?(p.deliveryDate||hoy):''), tipoPago:cobrado>0?'Anticipo recibido '+fxM0(cobrado)+' de '+fxM0(venta):'Sin anticipo · venta '+fxM0(venta)});
   });
   return out;
 }
@@ -4563,7 +4573,7 @@ function dvDetalleEsma(){
   const hoy=fxToday(), E=dvEsma(hoy);
   const fila=x=>`<div class="tl"><span>${x.fecha?(x.fecha<hoy?'<span class="badge red">atrasado</span> ':'')+fxCorta(x.fecha):'sin fecha'} · <b>${esc(x.cliente)}</b><br><span style="font-size:11px;color:var(--muted);">${esc(x.concepto||'')} · ${esc(x.tipoPago||'')}</span></span><b style="color:var(--green);white-space:nowrap;">${fxM0(x.monto)}</b></div>`;
   openSheet('🏭 ESMA: por cobrar',`
-    <div style="font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:10px;">Sale de tus proyectos de ESMA con cotización <b>autorizada</b>: venta autorizada − anticipo recibido. Si el proyecto está marcado <b>Pagado</b> en ESMA ya no aparece. La fecha es la de entrega. Proyectos entregados hace más de 6 meses sin marcar no se cuentan.</div>
+    <div style="font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:10px;">Viene de tu sistema de gestión ESMA, con la misma regla de su pantalla <b>Hoy</b>: proyectos <b>vendidos en producción</b> (venta autorizada − anticipo) y <b>entregados con anticipo</b> («Cobrar saldo»). No entran cotizaciones sin autorizar, perdidas, pagadas ni entregadas sin anticipo. Si alguno ya no se va a cobrar, márcalo como <b>Pagado</b> en ESMA y desaparece aquí y allá.</div>
     ${E.esma.length?E.esma.map(fila).join(''):'<div style="font-size:13px;">No hay ventas de ESMA pendientes de cobro.</div>'}
     <div class="tl" style="border-top:2px solid var(--border);"><b>Total por cobrar</b><b>${fxM0(E.total)}</b></div>
     <div style="font-size:11px;color:var(--muted);margin-top:10px;">Cuando te paguen, márcalo en ESMA como <b>Pagado</b> (o con su anticipo) y aquí se actualiza solo. También puedes registrarlo aquí en <b>Plan de flujo → ✓</b> para que entre a tu cuenta.</div>`,
