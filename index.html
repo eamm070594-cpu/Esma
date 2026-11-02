@@ -5701,10 +5701,10 @@ function renderFichaView(box, allProjects){
 // ── PROYECTOS v2: lista de trabajo por prioridad + tablero (embudo) ──
 // Etapa comercial de cada proyecto y su siguiente acción. Prioridad: menor = más urgente.
 const ETAPAS = {
-  cotizar:   {label:"Por cotizar", color:"#64748b", bg:"rgba(100,116,139,.13)"},
-  cotizado:  {label:"Cotizado",    color:"#2563eb", bg:"rgba(37,99,235,.12)"},
-  vendido:   {label:"Vendido",     color:"#16a34a", bg:"rgba(22,163,74,.13)"},
-  entregado: {label:"Entregado",   color:"#7c3aed", bg:"rgba(124,58,237,.12)"},
+  cotizar:   {label:"📝 Por cotizar", color:"#64748b", bg:"rgba(100,116,139,.13)"},
+  cotizado:  {label:"📤 Cotizado",    color:"#2563eb", bg:"rgba(37,99,235,.12)"},
+  vendido:   {label:"🔨 Vendido",     color:"#16a34a", bg:"rgba(22,163,74,.13)"},
+  entregado: {label:"✅ Entregado",   color:"#7c3aed", bg:"rgba(124,58,237,.12)"},
   perdido:   {label:"Perdido",     color:"#dc2626", bg:"rgba(220,38,38,.10)"},
   dormido:   {label:"Sin respuesta", color:"#94a3b8", bg:"rgba(148,163,184,.16)"},
 };
@@ -5755,12 +5755,36 @@ function _pm(p){
 }
 
 let _pv2Filtro = "activos", _pv2Busca = "";
+// Pasos del proceso (tarjetas grandes) y filtros secundarios (botones chicos)
+const PV2_PASOS = [
+  ["activos","⚡","Pendientes","Todo lo que sigue abierto"],
+  ["cotizar","📝","1 · Por cotizar","Falta hacer la cotización"],
+  ["cotizado","📤","2 · Cotizado","Esperando que el cliente acepte"],
+  ["vendido","🔨","3 · Vendido","En producción o por entregar"],
+  ["entregado","✅","4 · Entregado","Ya terminados"],
+  ["cobrar","💰","Por cobrar","Vendidos o entregados con saldo"],
+];
+const PV2_OTROS = [["dormidos","😴 Sin respuesta"],["perdido","❌ Perdidos"],["todos","📋 Todos"]];
+// Lo que falta cobrar de un proyecto (misma regla que «Hoy» y que ESMA Finanzas)
+function _pendCobro(m){
+  if(!["vendido","entregado"].includes(m.etapa)) return 0;
+  const pay=m.p.payStatus||""; if(pay==="pagado") return 0;
+  const v=projectAuthorizedTotal(m.p.id); if(!(v>0)) return 0;
+  if(m.etapa==="entregado" && pay!=="anticipo") return 0;
+  return Math.max(0, v-(pay==="anticipo"?Number(m.p.anticipo||0):0));
+}
+// Miniatura del letrero: foto de la cotización autorizada, si no de cualquier cotización, si no foto del proyecto
+function _thumbDe(m){
+  const qs=m.quotes||[]; const q=qs.find(x=>x.status==="authorized"&&x.refPhoto)||qs.find(x=>x.refPhoto);
+  if(q) return q.refPhoto;
+  const ph=(m.p.photos||[])[0]; return ph ? (ph.url||ph) : "";
+}
 const PV2_FILTROS = [["activos","Activos"],["cotizar","Por cotizar"],["cotizado","Cotizados"],["vendido","Vendidos"],["dormidos","😴 Sin respuesta +"+PV2_SIN_MOV_DIAS+" días"],["entregado","Entregados"],["perdido","Perdidos"],["todos","Todos"]];
 
 function renderProjectsPage(){
   const box=document.getElementById("projV2"); if(!box || !db) return;
   const todos=db.projects.map(_pm);
-  const cuenta=k=>todos.filter(m=>k==="todos" || (k==="dormidos" ? m.estancado
+  const cuenta=k=>todos.filter(m=>k==="todos" || (k==="cobrar" ? _pendCobro(m)>0 : k==="dormidos" ? m.estancado
     : k==="activos" ? ["cotizar","cotizado","vendido"].includes(m.etapa) && !m.estancado
     : m.etapa===k && !m.estancado));
   const cnt=document.getElementById("projCount");
@@ -5770,20 +5794,31 @@ function renderProjectsPage(){
     box.dataset.ready="1";
     box.innerHTML=`
       <style>
-        #projV2 .pv-row{display:grid;grid-template-columns:6px minmax(0,2.2fr) 110px minmax(0,1.6fr) 110px 120px 92px;gap:12px;align-items:center;padding:10px 14px;border-bottom:1px solid var(--border);cursor:pointer;}
+        #projV2 .pv-pasos{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px;}
+        #projV2 .pv-paso{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;padding:10px 12px;border-radius:14px;border:1.5px solid var(--border);background:var(--card);cursor:pointer;font-family:inherit;color:var(--text);min-width:0;}
+        #projV2 .pv-paso:hover{border-color:var(--accent);}
+        #projV2 .pv-paso.on{background:var(--accent);border-color:var(--accent);color:#fff;}
+        #projV2 .pv-paso .pv-p-ico{font-size:20px;line-height:1;}
+        #projV2 .pv-paso .pv-p-t{font-size:13px;font-weight:800;}
+        #projV2 .pv-paso .pv-p-d{font-size:10.5px;opacity:.75;line-height:1.25;}
+        #projV2 .pv-paso .pv-p-n{font-size:18px;font-weight:900;margin-top:2px;}
+        #projV2 .pv-paso .pv-p-m{font-size:11px;font-weight:700;opacity:.8;}
+        #projV2 .pv-thumb{width:48px;height:48px;border-radius:10px;object-fit:cover;background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:20px;}
+        @media(max-width:900px){ #projV2 .pv-pasos{grid-template-columns:repeat(2,minmax(0,1fr));} }
+        #projV2 .pv-row{display:grid;grid-template-columns:6px 48px minmax(0,2.2fr) 110px minmax(0,1.6fr) 110px 120px 92px;gap:12px;align-items:center;padding:10px 14px;border-bottom:1px solid var(--border);cursor:pointer;}
         #projV2 .pv-row:hover{background:var(--bg3);}
         #projV2 .pv-head{font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);cursor:default;background:var(--bg3);}
         #projV2 .pv-head:hover{background:var(--bg3);}
         #projV2 .pv-chip{display:inline-block;font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:999px;white-space:nowrap;}
         @media(max-width:900px){
-          #projV2 .pv-row{grid-template-columns:6px minmax(0,1fr) auto;}
+          #projV2 .pv-row{grid-template-columns:6px 48px minmax(0,1fr) auto;}
           #projV2 .pv-row > .pv-hide{display:none;}
           #projV2 .pv-head{display:none;}
         }
       </style>
       <div class="card" style="padding:10px 12px;margin-bottom:10px;position:sticky;top:0;z-index:4;">
         <div class="field" style="margin-bottom:8px;"><span class="ico">🔎</span><input id="pv2Search" placeholder="Buscar por proyecto, cliente, teléfono o folio…  (atajo: /)" autocomplete="off"></div>
-        <div id="pv2Chips" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
+        <div id="pv2Chips"></div>
       </div>
       <div class="card" style="padding:0;overflow:hidden;" id="pv2List"></div>`;
     const inp=document.getElementById("pv2Search");
@@ -5793,11 +5828,11 @@ function renderProjectsPage(){
     document.addEventListener("keydown",e=>{ if(e.key==="/" && currentPage==="projects" && document.activeElement!==inp && !/INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName||"")){ e.preventDefault(); inp.focus(); } });
   }
   // Chips con conteo y monto
-  document.getElementById("pv2Chips").innerHTML = PV2_FILTROS.map(([k,l])=>{
-    const arr=cuenta(k); const tot=arr.reduce((s,m)=>s+m.monto,0);
-    const on=_pv2Filtro===k;
-    return `<button class="btn small ${on?"primary":""}" data-pv2f="${k}">${l} <b style="margin-left:4px;">${arr.length}</b>${["cotizado","vendido","dormidos"].includes(k)&&tot?`<span style="margin-left:6px;opacity:.75;">$${money(tot).split(".")[0]}</span>`:""}</button>`;
-  }).join("");
+  document.getElementById("pv2Chips").innerHTML = `<div class="pv-pasos">${PV2_PASOS.map(([k,ico,t,d])=>{
+    const arr=cuenta(k); const tot=k==="cobrar"?arr.reduce((s,m)=>s+_pendCobro(m),0):arr.reduce((s,m)=>s+m.monto,0);
+    return `<button class="pv-paso ${_pv2Filtro===k?"on":""}" data-pv2f="${k}"><span class="pv-p-ico">${ico}</span><span class="pv-p-t">${t}</span><span class="pv-p-d">${d}</span><span class="pv-p-n">${arr.length}</span>${tot&&k!=="cotizar"?`<span class="pv-p-m">$${money(tot).split(".")[0]}</span>`:""}</button>`;
+  }).join("")}</div>
+  <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;align-items:center;"><span style="font-size:11px;color:var(--muted);font-weight:700;">Otros:</span>${PV2_OTROS.map(([k,l])=>`<button class="btn small ${_pv2Filtro===k?"primary":""}" data-pv2f="${k}">${l} <b style="margin-left:4px;">${cuenta(k).length}</b></button>`).join("")}</div>`;
   document.querySelectorAll("#pv2Chips [data-pv2f]").forEach(b=>b.onclick=()=>{ _pv2Filtro=b.dataset.pv2f; renderProjectsPage(); });
 
   // Búsqueda: busca en todo (ignora el filtro si hay texto)
@@ -5811,14 +5846,17 @@ function renderProjectsPage(){
   const list=document.getElementById("pv2List");
   if(!items.length){ list.innerHTML=`<div style="padding:28px;text-align:center;color:var(--muted);font-size:13px;">${t?"Sin resultados para “"+escapeHTML(_pv2Busca)+"”.":"No hay proyectos en este filtro."}</div>`; return; }
   const ayuda = _pv2Filtro==="dormidos" && !t ? `<div style="padding:10px 14px;font-size:12px;color:var(--muted);background:var(--bg3);border-bottom:1px solid var(--border);">Proyectos sin venta con más de ${PV2_SIN_MOV_DIAS} días sin movimiento (sin cotización nueva, envío ni seguimiento). No cuentan en Activos. Si alguno revive, dale <b>↩ Reactivar</b>, registra un seguimiento o márcalo como perdido.</div>` : "";
-  list.innerHTML = ayuda + `<div class="pv-row pv-head"><span></span><span>Proyecto</span><span class="pv-hide">Etapa</span><span class="pv-hide">Siguiente acción</span><span class="pv-hide">Fecha</span><span style="text-align:right;">Monto</span><span class="pv-hide"></span></div>` +
+  list.innerHTML = ayuda + `<div class="pv-row pv-head"><span></span><span></span><span>Proyecto</span><span class="pv-hide">Etapa</span><span class="pv-hide">Siguiente acción</span><span class="pv-hide">Fecha</span><span style="text-align:right;">Monto</span><span class="pv-hide"></span></div>` +
     items.map(m=>{
       const e=ETAPAS[m.estancado?"dormido":m.etapa]; const tono=TONOS[m.tono]||TONOS.muted;
       return `<div class="pv-row" data-open-p="${m.p.id}"${m.estancado?' style="opacity:.8;"':""}>
         <span style="width:6px;height:34px;border-radius:3px;background:${m.prio<=8?tono:"transparent"};"></span>
+        ${(()=>{ const th=_thumbDe(m); return th?`<img class="pv-thumb" src="${escapeAttr(th)}" loading="lazy" alt="">`:`<span class="pv-thumb">🪧</span>`; })()}
         <div style="min-width:0;">
           <div style="font-size:13.5px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${(LINEAS.find(x=>x[0]===_lineaDe(m.p))||["",""])[1].split(" ")[0]} ${escapeHTML(m.p.name||"Proyecto")}</div>
           <div style="font-size:11.5px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHTML(m.p.client||"Sin cliente")}${m.p.phone?" · "+escapeHTML(m.p.phone):""}</div>
+          ${(()=>{ const q=(m.quotes||[]).find(x=>x.status==="authorized")||(m.quotes||[])[0]; const d=(q&&q.name)||m.p.notes||""; return d?`<div style="font-size:11.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHTML(String(d).slice(0,120))}</div>`:""; })()}
+          ${_pv2Filtro==="cobrar"&&_pendCobro(m)>0?`<div style="font-size:11.5px;font-weight:800;color:var(--amber);">Falta cobrar $${money(_pendCobro(m)).split(".")[0]}</div>`:""}
           <div class="pv-mob" style="font-size:11px;font-weight:700;color:${tono};margin-top:2px;">${escapeHTML(m.accion)}</div>
         </div>
         <span class="pv-hide"><span class="pv-chip" style="color:${e.color};background:${e.bg};">${e.label}</span></span>
