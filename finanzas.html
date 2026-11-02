@@ -4563,6 +4563,45 @@ function dvCalcular(){
   return {c,hoy,P,L,I,T,faltaMes,pagosMes,vencidos,deudaTarj,extraNoPago,R,nivel};
 }
 var _dvAcc=[];
+// Gasto libre al día: el máximo «d» tal que, gastando d diario, tu saldo nunca baja del colchón
+// en lo que queda del mes, con todos los pagos en su fecha. ESMA cuenta al 50% por si se atrasa.
+function dvGastoLibre(D){
+  D=D||dvCalcular();
+  const c=fxCfg(), hoy=D.hoy, colchon=Number(c.colchon||0);
+  const finMes=fxS(new Date(fxD(hoy).getFullYear(),fxD(hoy).getMonth()+1,0));
+  const ev=D.P.ev.filter(e=>e.fecha<=finMes&&e.tipo!=='tarjeta-est').map(e=>e.tipo==='cobro'?{...e,monto:e.monto*0.5}:e)
+    .sort((a,b)=>a.fecha.localeCompare(b.fecha));
+  const fechas=[...new Set(ev.map(e=>e.fecha<hoy?hoy:e.fecha).concat([finMes]))].sort();
+  let mejor=null;
+  fechas.forEach(t=>{
+    const B=D.P.saldoIni+ev.filter(e=>(e.fecha<hoy?hoy:e.fecha)<=t).reduce((s,e)=>s+e.monto,0);
+    const dias=fxDiff(hoy,t)+1, d=(B-colchon)/dias;
+    if(!mejor||d<mejor.d) mejor={d,t,B,dias};
+  });
+  const dia=Math.max(0,Math.floor(mejor.d/10)*10);
+  const gastadoHoy=(db.gastos||[]).filter(g=>g.fecha===hoy).reduce((s,g)=>s+Number(g.monto||0),0);
+  const dow=fxD(hoy).getDay(), finSem=fxAddDays(hoy,(7-dow)%7); // hasta el domingo
+  const diasSem=Math.min(fxDiff(hoy,finSem)+1, fxDiff(hoy,finMes)+1);
+  const pagosLim=ev.filter(e=>(e.fecha<hoy?hoy:e.fecha)===mejor.t&&e.monto<0).map(e=>e.concepto.replace(/^ESMA · /,''));
+  return {dia, semana:dia*diasSem, diasSem, gastadoHoy, colchon, limite:mejor.t, saldoLim:mejor.B, falta:mejor.d<0?Math.ceil(-mejor.d*mejor.dias):0, pagosLim, finMes};
+}
+function dvGastoCard(D,acc){
+  const G=dvGastoLibre(D);
+  const ok=G.dia>0;
+  return `<div class="card" style="border-left:4px solid ${ok?'var(--green)':'var(--red)'};cursor:pointer;" ${acc(()=>goPage('gasto'))}>
+    <div class="dt-l">💸 Para comidas e imprevistos</div>
+    <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-top:2px;">
+      <div style="font-size:30px;font-weight:900;letter-spacing:-.5px;color:${ok?'var(--green)':'var(--red)'};">${fxM0(G.dia)}</div>
+      <div style="font-size:14px;font-weight:700;">puedes gastar hoy</div>
+    </div>
+    <div style="font-size:13px;margin-top:4px;line-height:1.45;">
+      ${ok?`Esta semana (hasta el domingo): <b>${fxM0(G.semana)}</b> en total.`
+        :(G.saldoLim>=0?`Hoy no hay margen: al ${fxCorta(G.limite)}, ya pagado todo, te quedarían <b>${fxM0(G.saldoLim)}</b> y tu colchón es de <b>${fxM0(G.colchon)}</b>. Gasta solo lo indispensable. <a href="#" onclick="event.preventDefault();event.stopPropagation();fxSheetConfig()">Ajustar colchón</a>`:`Hoy no hay margen: al ${fxCorta(G.limite)} te faltarían <b>${fxM0(-G.saldoLim)}</b> para cubrir tus pagos${G.pagosLim.length?' ('+esc(G.pagosLim.slice(0,2).join(', '))+(G.pagosLim.length>2?'…':'')+')':''}, sin contar el colchón.`)}
+      ${G.gastadoHoy>0?`<br>Hoy llevas registrados <b>${fxM0(G.gastadoHoy)}</b>.`:''}
+    </div>
+    <div style="font-size:11px;color:var(--muted);margin-top:6px;line-height:1.4;">Ya descuenta tus fijos, tarjetas, créditos y ahorro en su fecha, y deja un colchón de ${fxM0(G.colchon)}. Cuenta tu sueldo completo y solo la mitad de lo que ESMA tiene por cobrar. Toca para registrar un gasto.</div>
+  </div>`;
+}
 // ESMA: lo que falta cobrar de ventas autorizadas (viene de los proyectos de ESMA) y sus gastos fijos del mes
 function dvEsma(hoy,finMes){
   hoy=hoy||fxToday(); finMes=finMes||fxS(new Date(fxD(hoy).getFullYear(),fxD(hoy).getMonth()+1,0));
@@ -4683,8 +4722,10 @@ function renderDashLibre(){
         <div class="vd-chk">${D.R.map(r=>`<div><span>${ico[r[0]]}</span><span>${esc(r[1])}</span></div>`).join('')}</div>
       </div>
 
+      ${dvGastoCard(D,acc)}
+
       <div class="dt-grid">
-        <div class="dt" ${acc(()=>goPage('flujo'))}><div class="dt-l">Puedes gastar hoy</div><div class="dt-v" style="color:${D.L.libre<0?'var(--red)':D.L.porDia<100?'var(--amber)':'var(--green)'};">${D.L.libre>0?fxM0(D.L.porDia):'$0'}</div><div class="dt-s">${D.L.libre>0?`${fxM0(D.L.libre)} hasta el ${fxCorta(D.L.hasta)}`:`Te faltan ${fxM0(-D.L.libre)}`}</div></div>
+        ${(()=>{ const M=dvMes(D); return `<div class="dt" ${acc(()=>goPage('flujo'))}><div class="dt-l">Al cerrar el mes</div><div class="dt-v" style="color:${M.queda>=0?'var(--green)':'var(--red)'};">${M.queda>=0?'':'−'}${fxM0(Math.abs(M.queda))}</div><div class="dt-s">${M.queda>=0?'te sobraría':'te faltaría'} si cobras y pagas todo a tiempo</div></div>`; })()}
         <div class="dt" ${acc(()=>dvDetallePagos())}><div class="dt-l">Falta pagar este mes ›</div><div class="dt-v" style="color:${D.faltaMes>0?'var(--text)':'var(--green)'};">${fxM0(D.faltaMes)}</div><div class="dt-s">${D.pagosMes.length} pago${D.pagosMes.length===1?'':'s'}: fijos, tarjetas y créditos</div></div>
         <div class="dt" ${acc(()=>goPage('tarjetas'))}><div class="dt-l">Debes en tarjetas</div><div class="dt-v">${fxM0(D.deudaTarj)}</div><div class="dt-s">${D.deudaTarj>0?`Si no pagas: <b style="color:var(--red);">+${fxM0(D.extraNoPago)}</b>`:'Sin deuda'}</div></div>
         <div class="dt" ${acc(()=>fxSheetConfig())}><div class="dt-l">Ahorro</div><div class="dt-v" style="color:var(--green);">${fxM0(fxSaldoAhorro())}</div><div class="dt-s">${D.c.cuentaAhorro?`Meta: ${fxM0(D.I.metaEmergencia)}`:'Elige tu cuenta de ahorro'}${fxSaldoVales()>0?` · 🛒 ${fxM0(fxSaldoVales())} vales`:''}</div></div>
