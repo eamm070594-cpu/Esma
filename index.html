@@ -5851,7 +5851,7 @@ function renderProjectsPage(){
       const e=ETAPAS[m.estancado?"dormido":m.etapa]; const tono=TONOS[m.tono]||TONOS.muted;
       return `<div class="pv-row" data-open-p="${m.p.id}"${m.estancado?' style="opacity:.8;"':""}>
         <span style="width:6px;height:34px;border-radius:3px;background:${m.prio<=8?tono:"transparent"};"></span>
-        ${(()=>{ const th=_thumbDe(m); return th?`<img class="pv-thumb" src="${escapeAttr(th)}" loading="lazy" alt="" onerror="this.outerHTML='<span class=&quot;pv-thumb&quot;>🪧</span>'">`:`<span class="pv-thumb">🪧</span>`; })()}
+        ${(()=>{ const th=_thumbDe(m); return th?`<img class="pv-thumb" src="${escapeAttr(th)}" loading="lazy" alt="">`:`<span class="pv-thumb">🪧</span>`; })()}
         <div style="min-width:0;">
           <div style="font-size:13.5px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${(LINEAS.find(x=>x[0]===_lineaDe(m.p))||["",""])[1].split(" ")[0]} ${escapeHTML(m.p.name||"Proyecto")}</div>
           <div style="font-size:11.5px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHTML(m.p.client||"Sin cliente")}${m.p.phone?" · "+escapeHTML(m.p.phone):""}</div>
@@ -7572,6 +7572,15 @@ function openToolsMenu(){
 
 // Override syncStatusUpdate
 
+// Fotos en imgbb: cuando su servidor falla manda su logo (180×180) o un error, y el navegador
+// se queda con eso guardado. Se vuelve a pedir la foto real hasta 3 veces, saltando la caché.
+(function(){
+  const reintentar=i=>{ const n=Number(i.dataset.rt||0); if(n>=3) return; i.dataset.rt=n+1;
+    setTimeout(()=>{ i.src=i.src.split("?")[0]+"?r="+Date.now(); }, 1500*(n+1)); };
+  const esIbb=i=>!!(i&&i.tagName==="IMG"&&String(i.src||"").indexOf("//i.ibb.co/")>=0);
+  document.addEventListener("load",e=>{ const i=e.target; if(esIbb(i)&&i.naturalWidth===180&&i.naturalHeight===180) reintentar(i); },true);
+  document.addEventListener("error",e=>{ const i=e.target; if(esIbb(i)) reintentar(i); },true);
+})();
 // Liga directa a un proyecto (la usa ESMA Finanzas): index.html#p=<id>
 function _abrirProyectoDeLiga(){
   const m=/^#p=([A-Za-z0-9_-]+)/.exec(location.hash||""); if(!m) return;
