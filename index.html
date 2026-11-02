@@ -5851,7 +5851,7 @@ function renderProjectsPage(){
       const e=ETAPAS[m.estancado?"dormido":m.etapa]; const tono=TONOS[m.tono]||TONOS.muted;
       return `<div class="pv-row" data-open-p="${m.p.id}"${m.estancado?' style="opacity:.8;"':""}>
         <span style="width:6px;height:34px;border-radius:3px;background:${m.prio<=8?tono:"transparent"};"></span>
-        ${(()=>{ const th=_thumbDe(m); return th?`<img class="pv-thumb" src="${escapeAttr(th)}" loading="lazy" alt="">`:`<span class="pv-thumb">🪧</span>`; })()}
+        ${(()=>{ const th=_thumbDe(m); return th?`<img class="pv-thumb" src="${escapeAttr(th)}" loading="lazy" alt="" onerror="this.outerHTML='<span class=&quot;pv-thumb&quot;>🪧</span>'">`:`<span class="pv-thumb">🪧</span>`; })()}
         <div style="min-width:0;">
           <div style="font-size:13.5px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${(LINEAS.find(x=>x[0]===_lineaDe(m.p))||["",""])[1].split(" ")[0]} ${escapeHTML(m.p.name||"Proyecto")}</div>
           <div style="font-size:11.5px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHTML(m.p.client||"Sin cliente")}${m.p.phone?" · "+escapeHTML(m.p.phone):""}</div>
