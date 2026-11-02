@@ -975,6 +975,14 @@ tbody tr:hover td{background:rgba(13,148,136,.03);}
       <i class="ti ti-scale s-ico"></i>Costos / PE
     </button>
 
+    <div class="s-divider"></div>
+
+    <!-- FINANZAS (confidencial, con PIN) -->
+    <div class="s-tile-section">Finanzas</div>
+    <button class="s-tile-full" id="snav-finanzas" onclick="location.href='finanzas.html'">
+      <i class="ti ti-lock s-ico"></i>ESMA Finanzas
+    </button>
+
     <div class="sidebar-footer">
       <div id="sidebarUserInfo" style="display:flex;align-items:center;gap:10px;padding:10px 14px 10px;border-bottom:1px solid rgba(255,255,255,.06);margin-bottom:2px;">
         <div style="width:30px;height:30px;border-radius:6px;background:linear-gradient(135deg,#1d4ed8,#2563eb);display:grid;place-items:center;flex-shrink:0;">
@@ -1172,6 +1180,8 @@ tbody tr:hover td{background:rgba(13,148,136,.03);}
 
   <!-- DROPDOWN: Más -->
   <div class="nav-dropdown" id="dd-more">
+    <div class="nav-dd-item" onclick="closeAllDropdowns();location.href='finanzas.html'"><i class="ti ti-lock dd-ico"></i>ESMA Finanzas</div>
+    <div class="nav-dd-divider"></div>
     <div class="nav-dd-item" style="display:none" onclick="closeAllDropdowns();mNavGo('bom')"><i class="ti ti-package dd-ico"></i>BOM Materiales</div>
     <div class="nav-dd-item" onclick="closeAllDropdowns();mShowSection('materiales')"><i class="ti ti-database dd-ico"></i>Catálogo de costos</div>
     <div class="nav-dd-divider"></div>

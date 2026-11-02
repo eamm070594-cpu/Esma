@@ -4136,6 +4136,16 @@ renderDashLibre();
     <button type="submit" class="btn primary" style="padding:12px;font-weight:800;">Entrar</button>
     <div id="fbErr" style="font-size:12px;color:var(--red);min-height:16px;"></div>
   </form>
+  <form id="fbPin" style="display:none;width:100%;max-width:260px;flex-direction:column;gap:10px;margin-top:6px;" onsubmit="event.preventDefault();pinEnviar();">
+    <input type="password" id="pin1" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="PIN" autocomplete="off" style="padding:12px;border-radius:12px;border:1px solid var(--border);font:inherit;font-size:22px;letter-spacing:8px;text-align:center;background:var(--card);color:var(--text);">
+    <input type="password" id="pin2" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="Repite el PIN" autocomplete="off" style="display:none;padding:12px;border-radius:12px;border:1px solid var(--border);font:inherit;font-size:22px;letter-spacing:8px;text-align:center;background:var(--card);color:var(--text);">
+    <button type="submit" class="btn primary" id="pinBtn" style="padding:12px;font-weight:800;">Desbloquear</button>
+    <div id="pinErr" style="font-size:12px;color:var(--red);min-height:16px;"></div>
+    <div style="display:flex;justify-content:space-between;gap:10px;font-size:12px;">
+      <a href="./" style="color:var(--muted);">← ESMA Operaciones</a>
+      <a href="#" id="pinOlvide" onclick="event.preventDefault();pinOlvide();" style="color:var(--muted);">¿Olvidaste tu PIN?</a>
+    </div>
+  </form>
 </div>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
@@ -4273,7 +4283,74 @@ function fbPantalla(titulo,sub,login){
   document.getElementById('nubeCargaTxt').textContent=titulo;
   document.getElementById('nubeCargaSub').textContent=sub||'';
   document.getElementById('fbLogin').style.display=login?'flex':'none';
+  document.getElementById('fbPin').style.display='none';
 }
+// ── PIN de Finanzas: segundo candado después del login de ESMA.
+// Se guarda solo su huella (SHA-256 con sal) en finanzas/<uid>/datos/pin.
+// Se pide una vez por pestaña y otra vez si la app estuvo en segundo plano más de 5 min.
+const PIN_SES='esmaFinPinOk';
+var _pin={doc:null,crear:false,ok:null,fallos:0,espera:0};
+async function pinHash(pin,sal){ const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(sal+':'+pin)); return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join(''); }
+function pinSesionOk(){ try{ return sessionStorage.getItem(PIN_SES)===_nube.uid; }catch(e){ return false; } }
+function pinModo(crear){
+  _pin.crear=crear;
+  document.getElementById('nubeCarga').style.display='flex';
+  document.getElementById('fbLogin').style.display='none';
+  document.getElementById('fbPin').style.display='flex';
+  document.getElementById('nubeCargaTxt').textContent=crear?'Crea tu PIN de Finanzas':'ESMA Finanzas';
+  document.getElementById('nubeCargaSub').textContent=crear?'De 4 a 6 números. Lo pedirá cada vez que entres a Finanzas.':'Escribe tu PIN.';
+  document.getElementById('pin2').style.display=crear?'':'none';
+  document.getElementById('pinBtn').textContent=crear?'Guardar PIN':'Desbloquear';
+  document.getElementById('pinOlvide').style.display=crear?'none':'';
+  document.getElementById('pin1').value=''; document.getElementById('pin2').value=''; document.getElementById('pinErr').textContent='';
+  setTimeout(()=>document.getElementById('pin1').focus(),50);
+}
+function pinPedir(){
+  return new Promise(async (res,rej)=>{
+    if(pinSesionOk()) return res();
+    try{ const d=await nubeCol().doc('pin').get(); _pin.doc=d.exists?d.data():null; }catch(e){ return rej(e); }
+    _pin.ok=res; pinModo(!_pin.doc);
+  });
+}
+async function pinEnviar(){
+  const err=document.getElementById('pinErr'), p1=document.getElementById('pin1').value.trim(), p2=document.getElementById('pin2').value.trim();
+  err.textContent='';
+  if(Date.now()<_pin.espera){ err.textContent='Demasiados intentos. Espera '+Math.ceil((_pin.espera-Date.now())/1000)+' s.'; return; }
+  if(!/^[0-9]{4,6}$/.test(p1)){ err.textContent='El PIN debe tener de 4 a 6 números.'; return; }
+  try{
+    if(_pin.crear){
+      if(p1!==p2){ err.textContent='Los dos PIN no coinciden.'; return; }
+      const sal=[...crypto.getRandomValues(new Uint8Array(16))].map(x=>x.toString(16).padStart(2,'0')).join('');
+      _pin.doc={h:await pinHash(p1,sal),s:sal,fecha:new Date().toISOString()};
+      await nubeCol().doc('pin').set(_pin.doc);
+    } else if(await pinHash(p1,_pin.doc.s)!==_pin.doc.h){
+      _pin.fallos++; document.getElementById('pin1').value='';
+      if(_pin.fallos>=5){ _pin.espera=Date.now()+60000; _pin.fallos=0; err.textContent='PIN incorrecto. Espera 1 minuto.'; }
+      else err.textContent='PIN incorrecto.';
+      return;
+    }
+  }catch(e){ err.textContent='No se pudo guardar el PIN ('+((e&&e.code)||(e&&e.message))+').'; return; }
+  try{ sessionStorage.setItem(PIN_SES,_nube.uid); }catch(e){}
+  _pin.fallos=0; document.getElementById('fbPin').style.display='none';
+  const r=_pin.ok; _pin.ok=null; if(r) r();
+}
+// Olvidé mi PIN: se confirma con la contraseña de ESMA y se crea uno nuevo
+function pinOlvide(){
+  const f=document.getElementById('fbPin');
+  document.getElementById('nubeCargaTxt').textContent='Confirma tu contraseña de ESMA';
+  document.getElementById('nubeCargaSub').textContent='Para crear un PIN nuevo.';
+  f.style.display='none';
+  const l=document.getElementById('fbLogin'); l.style.display='flex';
+  const u=firebase.auth().currentUser; document.getElementById('fbEmail').value=(u&&u.email)||''; document.getElementById('fbEmail').readOnly=true;
+  l.onsubmit=async ev=>{ ev.preventDefault(); const e2=document.getElementById('fbErr'); e2.textContent='';
+    try{ await u.reauthenticateWithCredential(firebase.auth.EmailAuthProvider.credential(u.email,document.getElementById('fbPass').value));
+      document.getElementById('fbPass').value=''; l.style.display='none'; pinModo(true); }
+    catch(e){ e2.textContent='Contraseña incorrecta.'; } };
+}
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState==='hidden'){ _pin.oculto=Date.now(); return; }
+  if(_pin.oculto&&Date.now()-_pin.oculto>5*60000&&window._nubeLista){ try{ sessionStorage.removeItem(PIN_SES); }catch(e){} location.reload(); }
+});
 async function fbEntrar(){
   const err=document.getElementById('fbErr'); err.textContent='';
   try{ await firebase.auth().signInWithEmailAndPassword(document.getElementById('fbEmail').value.trim(), document.getElementById('fbPass').value); }
@@ -4285,7 +4362,10 @@ async function nubeIniciar(user){
   const lento=setTimeout(()=>{ document.getElementById('nubeCargaSub').textContent='Esto está tardando más de lo normal. Revisa tu conexión.'; },10000);
   _nube.uid=user.uid;
   try{
-    const [r]=await Promise.all([nubeLeer(), esmaLeer()]); clearTimeout(lento);
+    clearTimeout(lento);
+    await pinPedir();
+    fbPantalla('Cargando tus datos…','');
+    const [r]=await Promise.all([nubeLeer(), esmaLeer()]);
     db=r.datos; _nube.ult=r.ult; window._nubeLista=true;
     esmaAplicar();
     _fxAvisoSueldo=fxAutoSueldo();
