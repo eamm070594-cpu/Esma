@@ -3639,6 +3639,10 @@ function ccSheetTarjeta(id){
       <div><div class="flabel">Pago mínimo</div><div class="field"><span class="ico">$</span><input type="number" id="cc_pmin" step="0.01" value="${t&&t.pagoMin!=null?t.pagoMin:''}" placeholder="Del estado"></div></div>
     </div>
     <div class="frow">
+      <div><div class="flabel">¿Cómo la pagas?</div><div class="field"><select id="cc_mens"><option value="0" ${t&&simEsMens(t)?'':'selected'}>Normal (total o mínimo)</option><option value="1" ${t&&simEsMens(t)?'selected':''}>Mensualidad fija (ya trae intereses)</option></select></div></div>
+      <div><div class="flabel">Mensualidad</div><div class="field"><span class="ico">$</span><input type="number" id="cc_cuota" step="0.01" value="${t&&t.cuota!=null?t.cuota:''}" placeholder="Si es fija"></div></div>
+    </div>
+    <div class="frow">
       <div><div class="flabel">Tasa anual % (opcional)</div><div class="field"><input type="number" id="cc_tasa" value="${t&&t.tasaAnual?t.tasaAnual:''}" placeholder="Ej. 58"></div></div>
       <div><div class="flabel">Uso</div><div class="field"><select id="cc_tipo"><option value="p" ${t&&t.esNegocio?'':'selected'}>👤 Personal</option><option value="n" ${t&&t.esNegocio?'selected':''}>🏢 Negocio</option></select></div></div>
     </div>
@@ -3658,6 +3662,8 @@ function ccSheetTarjeta(id){
       if(dp>=1&&dp<=31){ o.diaPago=dp; o.fechaPago=fxNextMonthly(dp,hoy); }
       const pni=document.getElementById('cc_pni').value, pmin=document.getElementById('cc_pmin').value;
       o.pagoNoInt=pni===''?null:Math.max(0,parseFloat(pni)||0); o.pagoMin=pmin===''?null:Math.max(0,parseFloat(pmin)||0);
+      const cuo=document.getElementById('cc_cuota').value;
+      o.mensualidad=document.getElementById('cc_mens').value==='1'; o.cuota=cuo===''?null:Math.max(0,parseFloat(cuo)||0);
       o.tasaAnual=parseFloat(document.getElementById('cc_tasa').value)||o.tasaAnual||null;
       o.esNegocio=document.getElementById('cc_tipo').value==='n';
       if(window._ccColor!==undefined){ o.color=window._ccColor==='auto'?null:parseInt(window._ccColor); window._ccColor=undefined; }
@@ -4146,6 +4152,8 @@ function fjAbonar(id){
 // ── SIMULADOR "¿Qué pasa si pago todo, el mínimo o no pago?" + calendario del mes (pedido del dueño 04/11/2026)
 // Usa por tarjeta: pagoNoInt y pagoMin del estado de cuenta (si no están: deuda y mínimo estimado), tasaAnual y comisionTardio.
 let _simOpt='total', _simCard={}, _simOpen={};
+// Departamentales que el dueño paga en mensualidad fija (Suburbia, Deportenis…): no entran a las 3 simulaciones.
+function simEsMens(t){ return t.mensualidad!=null ? !!t.mensualidad : /suburbia|deportenis|liverpool|coppel|palacio|sears/i.test(t.nombre||''); }
 function simMinEst(b,tasa,lim){ const tm=tasa/100/12; return Math.min(b+b*tm*1.16, Math.max(0.015*b+b*tm*1.16, 0.0125*Number(lim||0), Math.min(b,200))); }
 function simDatos(){
   const hoy=fxToday();
@@ -4155,7 +4163,8 @@ function simDatos(){
     const tasa=Number(t.tasaAnual||60), com=t.comisionTardio!=null?Number(t.comisionTardio):450;
     const minEst=t.pagoMin==null;
     const min=Math.min(total, minEst?simMinEst(total,tasa,t.limite):Number(t.pagoMin));
-    return {t,cy,total,min,minEst,totEst:t.pagoNoInt==null,tasa,com,dias:fxDiff(hoy,cy.pagoProx)};
+    const mens=simEsMens(t), cuota=t.cuota!=null?Number(t.cuota):t.pagoMin!=null?Number(t.pagoMin):null;
+    return {t,cy,total,min,minEst,totEst:t.pagoNoInt==null,tasa,com,mens,cuota,dias:fxDiff(hoy,cy.pagoProx)};
   }).filter(x=>x&&x.dias<=40).sort((a,b)=>a.cy.pagoProx<b.cy.pagoProx?-1:1);
 }
 function simCalc(x,opt){
@@ -4171,12 +4180,15 @@ function simHTML(){
   const L=simDatos(); if(!L.length) return '';
   const m2=n=>'$'+Number(n).toLocaleString('es-MX',{minimumFractionDigits:2,maximumFractionDigits:2});
   const caja=(db.cuentas||[]).filter(c=>!fxEsVales(c.id)).reduce((s,c)=>s+Number(c.saldo||0),0);
-  const conPago=L.filter(x=>x.total>0), sinPago=L.filter(x=>x.total<=0);
+  const MS=L.filter(x=>x.mens), N=L.filter(x=>!x.mens);
+  const conPago=N.filter(x=>x.total>0), sinPago=N.filter(x=>x.total<=0);
+  const totMens=MS.reduce((s,x)=>s+(x.cuota||0),0);
   let tp=0,te=0,td=0; const R={};
   conPago.forEach(x=>{ const o=_simCard[x.t.id]||_simOpt; const r=simCalc(x,o); R[x.t.id]={r,o}; tp+=r.pago; te+=r.extra; td+=r.deuda; });
   const mixto=Object.keys(_simCard).length>0;
-  const falta=tp-caja, noPaga=conPago.some(x=>R[x.t.id].o==='nada');
-  let msg=(falta>0?`Tienes ${fxM0(caja)} en tus cuentas: te faltan <b>${fxM0(falta)}</b> para hacer estos pagos.`:`Tienes ${fxM0(caja)} en tus cuentas: te alcanza y te sobran ${fxM0(-falta)}.`)
+  const falta=tp+totMens-caja, noPaga=conPago.some(x=>R[x.t.id].o==='nada');
+  const conM=totMens>0?` (incluye ${fxM0(totMens)} de mensualidades)`:'';
+  let msg=(falta>0?`Tienes ${fxM0(caja)} en tus cuentas: te faltan <b>${fxM0(falta)}</b> para hacer estos pagos${conM}.`:`Tienes ${fxM0(caja)} en tus cuentas: te alcanza${conM} y te sobran ${fxM0(-falta)}.`)
     +(te>0?` Pero esta opción te cuesta <b>${fxM0(te)}</b> extra solo este mes, y la deuda sigue.`:'')+(noPaga?' ⚠️ No pagar te reporta al Buró de Crédito.':'');
   const bad=falta>0||te>0;
   const btn=(o,t,s)=>`<button onclick="simSet('${o}')" class="sim-b${!mixto&&_simOpt===o?' on':''}"><b>${t}</b><span>${s}</span></button>`;
@@ -4209,6 +4221,7 @@ function simHTML(){
   const porDia={};
   L.forEach(x=>{ const nm=x.t.nombre+(x.t.terminacion?' '+String(x.t.terminacion).slice(-4):'');
     if(x.cy.corteProx) add(x.cy.corteProx,'c','Corte '+nm);
+    if(x.mens){ add(x.cy.pagoProx,'q',nm+' '+(x.cuota!=null?fxM0(x.cuota):'$?')); if(x.cuota) porDia[x.cy.pagoProx]=(porDia[x.cy.pagoProx]||0)+x.cuota; return; }
     if(x.total<=0){ add(x.cy.pagoProx,'z',nm+': $0'); return; }
     const p=R[x.t.id].r.pago; add(x.cy.pagoProx,'p',nm+(p>0?' '+fxM0(p):': sin pago ⚠️'));
     if(p>0) porDia[x.cy.pagoProx]=(porDia[x.cy.pagoProx]||0)+p; });
@@ -4229,9 +4242,15 @@ function simHTML(){
     <div class="sim-t">Toca una tarjeta para ver cómo se calcula. Puedes cambiar la opción de cada una.</div>
     ${filas}
     ${sinPago.length?`<div class="sim-t" style="margin-top:8px;">✅ Sin pago este periodo: ${sinPago.map(x=>esc(x.t.nombre)+esc(ccSuf(x.t))).join(', ')}</div>`:''}
+    ${MS.length?`<div class="sim-div">
+      <div class="card-title" style="margin:0;">📆 Mensualidades fijas <span style="font-weight:600;color:var(--muted);font-size:12px;">· ya traen sus intereses, no entran a la simulación</span></div>
+      ${MS.map(x=>`<div class="sim-mr"><div><b>${esc(x.t.nombre)}${esc(ccSuf(x.t))}</b><small>Pagar antes del ${fxCorta(x.cy.pagoProx)}</small></div>
+        <b>${x.cuota!=null?fxM0(x.cuota):`<span style="color:var(--amber);font-size:12px;" onclick="ccSheetTarjeta('${x.t.id}')">Captura la mensualidad ✏️</span>`}</b></div>`).join('')}
+      <div class="sim-mr" style="border:none;"><b>Total mensualidades</b><b>${fxM0(totMens)}</b></div>
+    </div>`:''}
     <div class="card-title" style="margin-top:16px;">📅 ${meses[mo]}</div>
     ${cal}
-    <div class="sim-t">🔴 pago · 🟡 tener el dinero listo · 🔵 corte · 🟢 sin pago${fuera.length?` · Pagos del mes siguiente: ${fuera.map(x=>esc(x.t.nombre)+' '+fxCorta(x.cy.pagoProx)).join(', ')}`:''}</div>
+    <div class="sim-t">🔴 pago · 🟣 mensualidad fija · 🟡 tener el dinero listo · 🔵 corte · 🟢 sin pago${fuera.length?` · Pagos del mes siguiente: ${fuera.map(x=>esc(x.t.nombre)+' '+fxCorta(x.cy.pagoProx)).join(', ')}`:''}</div>
     <div class="sim-t">Intereses = lo que no pagas × tasa anual ÷ 12, más 16% de IVA. Si no pagas ni el mínimo se suma la comisión por atraso. Es aproximado: el banco calcula sobre el saldo de cada día.</div>
   </div>`;
 }
@@ -4257,6 +4276,9 @@ function simHTML(){
   .sim-day{border:1px solid var(--border);border-radius:7px;min-height:62px;padding:3px;font-size:11px;background:var(--card)}
   .sim-day.hoy{outline:2px solid var(--accent)}.sim-day.pas{opacity:.5}.sim-n{font-weight:800;color:var(--muted);font-size:11px}
   .sim-ev{display:block;margin-top:2px;border-radius:4px;padding:1px 3px;font-size:9.5px;font-weight:700;line-height:1.2}
+  .sim-div{margin-top:14px;padding:12px;border-radius:12px;border:1.5px dashed var(--purple);background:rgba(124,58,237,.05)}
+  .sim-mr{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);font-size:14px}.sim-mr small{display:block;font-size:11px;color:var(--muted)}
+  .sim-ev.q{background:rgba(124,58,237,.1);color:var(--purple)}
   .sim-ev.p{background:rgba(220,38,38,.1);color:var(--red)}.sim-ev.m{background:rgba(217,119,6,.12);color:var(--amber)}.sim-ev.c{background:rgba(37,99,235,.1);color:var(--accent)}.sim-ev.z{background:rgba(22,163,74,.1);color:var(--green)}
   @media(max-width:600px){.sim-bs,.sim-k{grid-template-columns:1fr}.sim-h{grid-template-columns:1fr 1fr 1fr}.sim-h>div:first-child{grid-column:1/4}.sim-ar{display:none}}`;
   document.head.appendChild(st);
