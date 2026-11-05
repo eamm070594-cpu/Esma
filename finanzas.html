@@ -1267,7 +1267,7 @@ function sheetPagoTarjeta(t){
   const cuentaOpts = db.cuentas.map(c=>`<option value="${esc(c.id)}">${esc(c.nombre)} · $${money(c.saldo)}</option>`).join('');
   openSheet('Pago a '+t.nombre,`
     <div class="flabel">Monto del pago</div>
-    <div class="field"><span class="ico">$</span><input type="number" id="pt_monto" placeholder="0.00" step="0.01" value="${Math.max(0,Number(t.limite||0)-Number(t.disponible||0))}"></div>
+    <div class="field"><span class="ico">$</span><input type="number" id="pt_monto" placeholder="0.00" step="0.01" value="${Math.round(fxPagoMes(t)*100)/100}"></div>
     <div class="flabel">Fecha</div>
     <div class="field"><input type="date" id="pt_fecha" value="${today()}"></div>
     ${cuentaOpts?`<div class="flabel">Descontar de cuenta</div><div class="field"><select id="pt_cuenta"><option value="">No descontar</option>${cuentaOpts}</select></div>`:''}
@@ -1689,7 +1689,7 @@ function renderPagos(){
   const manual=db.pagos.filter(x=>x.tipo!=='tarjeta');
   // Compromisos tarjetas (mínimo sugerido = deuda)
   const tarjetasPagos=db.tarjetas.map(t=>({
-    id:'t_'+t.id, nombre:'Pago '+t.nombre, monto:Math.max(0,Number(t.limite||0)-Number(t.disponible||0)),
+    id:'t_'+t.id, nombre:'Pago '+t.nombre, monto:fxPagoMes(t),
     fecha:t.fechaPago||'', tipo:'tarjeta-auto', tarjetaId:t.id,
     dias:daysUntil(t.fechaPago)
   })).filter(x=>x.monto>0);
@@ -2776,6 +2776,17 @@ function fxCiclo(t){
   return {pagoProx, corteProx, gap, diasFin};
 }
 function fxDeuda(t){ return Math.max(0, Number(t.limite||0)-Number(t.disponible||0)); }
+// Lo que toca pagar ESTE periodo (no toda la deuda): mensualidad fija si es departamental,
+// si no el «pago para no generar intereses» del estado; sin dato, la deuda. Se descuenta lo ya pagado en el periodo.
+function fxPagoMes(t){
+  const mens=typeof simEsMens==='function'&&simEsMens(t);
+  let base=mens?(t.cuota!=null?Number(t.cuota):t.pagoMin!=null?Number(t.pagoMin):fxDeuda(t))
+              :(t.pagoNoInt!=null?Number(t.pagoNoInt):fxDeuda(t));
+  const cy=fxCiclo(t);
+  if(cy){ const desde=fxAddDays(cy.pagoProx,-28);
+    base-=(db.pagos||[]).filter(p=>p.tipo==='tarjeta'&&p.tarjetaId===t.id&&p.fecha&&p.fecha>desde&&p.fecha<=cy.pagoProx).reduce((s,p)=>s+Number(p.monto||0),0); }
+  return Math.max(0,Math.min(base,fxDeuda(t)||base));
+}
 
 // ── Eventos de flujo en el horizonte
 function fxEventos(){
@@ -2784,8 +2795,8 @@ function fxEventos(){
 
   (db.tarjetas||[]).forEach(t=>{
     const cy=fxCiclo(t); if(!cy) return;
-    const deuda=fxDeuda(t);
-    if(deuda>0 && cy.pagoProx<=fin) ev.push({fecha:cy.pagoProx, monto:-deuda, concepto:'Pago total '+t.nombre, tipo:'tarjeta', fijo:true, ref:t.id});
+    const deuda=fxPagoMes(t);
+    if(deuda>0 && cy.pagoProx<=fin) ev.push({fecha:cy.pagoProx, monto:-deuda, concepto:(simEsMens(t)?'Mensualidad ':'Pago ')+t.nombre, tipo:'tarjeta', fijo:true, ref:t.id});
     const mens=gv.credMensual[t.id]||0;
     if(mens>0) fxMonthlyBetween(fxDia(cy.pagoProx), fxAddDays(cy.pagoProx,1), fin)
       .forEach(f=>ev.push({fecha:f, monto:-mens, concepto:'Pago '+t.nombre+' (consumo promedio)', tipo:'tarjeta-est', fijo:false}));
@@ -2949,7 +2960,7 @@ function fxTacticas(P, L, I){
 
   // 3. Pagos de tarjeta próximos: pagar total para no pagar intereses
   (db.tarjetas||[]).forEach(t=>{
-    const cy=fxCiclo(t); const deuda=fxDeuda(t); if(!cy||deuda<=0) return;
+    const cy=fxCiclo(t); const deuda=fxPagoMes(t); if(!cy||deuda<=0||simEsMens(t)) return;
     const dias=fxDiff(hoy,cy.pagoProx);
     if(dias<=10){
       const alcanza=P.saldoIni-L.comprometido+deuda>=deuda;
@@ -3689,7 +3700,7 @@ function ccSheetTarjeta(id){
   const oDL=renderDashLibre; renderDashLibre=function(){
     oDL.apply(this,arguments);
     const el=document.getElementById('dashLibre'); if(!el) return;
-    const filas=(db.tarjetas||[]).map(t=>({t,deuda:fxDeuda(t),cy:fxCiclo(t)})).filter(x=>x.deuda>0)
+    const filas=(db.tarjetas||[]).filter(t=>!simEsMens(t)).map(t=>({t,deuda:fxPagoMes(t),cy:fxCiclo(t)})).filter(x=>x.deuda>0)
       .map(x=>({...x,cs:fxCostos(x.deuda,x.t.tasaAnual||60,x.t.comisionTardio!=null?x.t.comisionTardio:450,x.t.limite)}))
       .sort((a,b)=>(a.cy?a.cy.pagoProx:'9')<(b.cy?b.cy.pagoProx:'9')?-1:1);
     if(!filas.length) return;
@@ -4159,11 +4170,11 @@ function simDatos(){
   const hoy=fxToday();
   return (db.tarjetas||[]).map(t=>{
     const cy=fxCiclo(t); if(!cy) return null;
-    const total=t.pagoNoInt!=null?Number(t.pagoNoInt):fxDeuda(t);
+    const total=fxPagoMes(t);
     const tasa=Number(t.tasaAnual||60), com=t.comisionTardio!=null?Number(t.comisionTardio):450;
     const minEst=t.pagoMin==null;
     const min=Math.min(total, minEst?simMinEst(total,tasa,t.limite):Number(t.pagoMin));
-    const mens=simEsMens(t), cuota=t.cuota!=null?Number(t.cuota):t.pagoMin!=null?Number(t.pagoMin):null;
+    const mens=simEsMens(t), cuota=(t.cuota!=null||t.pagoMin!=null)?total:null;
     return {t,cy,total,min,minEst,totEst:t.pagoNoInt==null,tasa,com,mens,cuota,dias:fxDiff(hoy,cy.pagoProx)};
   }).filter(x=>x&&x.dias<=40).sort((a,b)=>a.cy.pagoProx<b.cy.pagoProx?-1:1);
 }
@@ -4695,7 +4706,7 @@ function dvCalcular(){
   const faltaMes=-pagosMes.reduce((s,e)=>s+e.monto,0);
   const vencidos=P.ev.filter(e=>e.vencido&&e.monto<0);
   const deudaTarj=(db.tarjetas||[]).reduce((s,t)=>s+fxDeuda(t),0);
-  const extraNoPago=(db.tarjetas||[]).filter(t=>fxDeuda(t)>0).reduce((s,t)=>s+fxCostos(fxDeuda(t),t.tasaAnual||60,t.comisionTardio!=null?t.comisionTardio:450,t.limite).noPagar.total,0);
+  const extraNoPago=(db.tarjetas||[]).filter(t=>!simEsMens(t)&&fxPagoMes(t)>0).reduce((s,t)=>s+fxCostos(fxPagoMes(t),t.tasaAnual||60,t.comisionTardio!=null?t.comisionTardio:450,t.limite).noPagar.total,0);
   const roja=P.semanas.find(s=>s.min<0);
   const sueldoOK=Number(c.sueldoMonto)>0&&(c.sueldoDias||c.sueldoFrec==='semanal');
   const fijosEsma=(db.pagos||[]).filter(p=>p.recurrente&&p.ambito==='esma').reduce((s,p)=>s+fjMensual(p),0);
