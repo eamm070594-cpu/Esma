@@ -4300,6 +4300,79 @@ function simHTML(){
     try{ el.innerHTML=simHTML(); }catch(e){ console.error(e); el.innerHTML=''; }
   };
 })();
+
+// ── INICIO: "¿En qué orden pago mis tarjetas?" (pedido del dueño 04/11/2026)
+// Con el dinero que tiene: 1) mínimo o mensualidad de todo lo que vence este mes, por fecha (nada cae en atraso ni Buró);
+// 2) con lo que sobra, completa el «pago para no generar intereses» empezando por la que vence primero.
+let _ordMonto=null;
+function ordPlan(monto){
+  const finMes=fxS(new Date(fxD(fxToday()).getFullYear(),fxD(fxToday()).getMonth()+1,0));
+  const L=(db.tarjetas||[]).map(t=>{ const cy=fxCiclo(t); const total=fxPagoMes(t); if(!cy||total<=0||cy.pagoProx>finMes) return null;
+    const mens=simEsMens(t); const tasa=Number(t.tasaAnual||60);
+    const min=mens?total:Math.min(total,t.pagoMin!=null?Number(t.pagoMin):simMinEst(total,tasa,t.limite));
+    return {t,cy,total,min,mens,minEst:!mens&&t.pagoMin==null,pago:0,tasa}; }).filter(Boolean)
+    .sort((a,b)=>a.cy.pagoProx<b.cy.pagoProx?-1:a.cy.pagoProx>b.cy.pagoProx?1:a.total-b.total);
+  let r=monto;
+  L.forEach(x=>{ const p=Math.min(r,x.min); x.pago+=p; r-=p; });
+  L.forEach(x=>{ const p=Math.min(r,x.total-x.pago); x.pago+=p; r-=p; });
+  return {L,sobra:r,necesita:L.reduce((s,x)=>s+x.total,0)};
+}
+function ordHTML(){
+  const caja=(db.cuentas||[]).filter(c=>!fxEsVales(c.id)).reduce((s,c)=>s+Number(c.saldo||0),0);
+  const monto=_ordMonto!=null?_ordMonto:Math.round(caja);
+  const P=ordPlan(monto); if(!P.L.length) return '';
+  const m2=n=>'$'+Number(n).toLocaleString('es-MX',{minimumFractionDigits:2,maximumFractionDigits:2});
+  let n=0;
+  const filas=P.L.map(x=>{
+    const est=x.pago>=x.total-0.005?'completo':x.pago<=0?'nada':x.pago>=x.min-0.005?(x.pago>x.min+0.005?'parcial':'minimo'):'falta';
+    const falta=x.total-x.pago, interes=falta*x.tasa/100/12*1.16;
+    const tag={completo:['✅ Completo','var(--green)'],minimo:[x.mens?'✅ Mensualidad':'⚠️ Solo el mínimo','var(--amber)'],parcial:['⚠️ Parcial','var(--amber)'],falta:['❌ No alcanza el mínimo','var(--red)'],nada:['❌ Sin dinero','var(--red)']}[est];
+    const nota=est==='completo'?(x.mens?'Mensualidad fija.':'Sin intereses.')
+      :est==='nada'||est==='falta'?`Necesitas ${m2(x.min)} antes del ${fxCorta(x.cy.pagoProx)} para no caer en atraso.`
+      :`Te faltan ${m2(falta)} para no generar intereses (≈ ${fxM0(interes)} de intereses si no los completas).`;
+    if(x.pago>0) n++;
+    return `<div class="ord-r">
+      <div class="ord-n" style="background:${x.pago>0?'var(--accent)':'var(--muted2)'}">${x.pago>0?n:'–'}</div>
+      <div style="flex:1;min-width:0;"><b>${esc(x.t.nombre)}${esc(ccSuf(x.t))}</b> <span style="font-size:11px;color:var(--muted);">· vence ${fxCorta(x.cy.pagoProx)}</span>
+        <div style="font-size:11px;font-weight:700;color:${tag[1]};">${tag[0]}${x.minEst&&est==='minimo'?' (mínimo estimado)':''}</div>
+        <div style="font-size:11px;color:var(--muted);">${nota}</div></div>
+      <div style="text-align:right;"><div style="font-size:16px;font-weight:900;">${fxM0(x.pago)}</div><div style="font-size:10px;color:var(--muted);">de ${fxM0(x.total)}</div>
+        ${x.pago>0?`<button class="btn small" style="margin-top:4px;font-size:11px;padding:3px 8px;" onclick="ordPagar('${x.t.id}',${x.pago.toFixed(2)})">Ya lo pagué</button>`:''}</div>
+    </div>`; }).join('');
+  const falta=P.necesita-monto;
+  return `<div class="card" id="ordCard">
+    <div class="card-title">💳 ¿En qué orden pago mis tarjetas?</div>
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:13px;">Tengo para pagar
+      <div class="field" style="width:150px;margin:0;"><span class="ico">$</span><input type="number" id="ordMonto" value="${monto}" step="100" onchange="_ordMonto=parseFloat(this.value)||0;renderDashLibre();setTimeout(()=>{const c=document.getElementById('ordCard');if(c)c.scrollIntoView({block:'center'});},50);"></div>
+      <span style="font-size:11px;color:var(--muted);">(empieza con lo que tienes en tus cuentas)</span></div>
+    <div style="font-size:12px;margin:8px 0;padding:8px 10px;border-radius:10px;background:${falta>0?'rgba(220,38,38,.08)':'rgba(22,163,74,.08)'};color:${falta>0?'var(--red)':'var(--green)'};font-weight:700;">
+      ${falta>0?`Este mes tus tarjetas piden ${fxM0(P.necesita)}: te faltan ${fxM0(falta)} para dejarlas todas sin intereses.`:`Te alcanza para dejar todas sin intereses y te sobran ${fxM0(P.sobra)}.`}</div>
+    ${filas}
+    <div style="font-size:11px;color:var(--muted);margin-top:8px;">Cómo decide: primero cubre el mínimo o la mensualidad de todo lo que vence este mes (por fecha), para que nada caiga en atraso ni en Buró. Con lo que sobra, completa el pago sin intereses empezando por la que vence primero. Al tocar «Ya lo pagué» se registra el pago y se actualiza todo.</div>
+  </div>`;
+}
+function ordPagar(id,monto){
+  const t=db.tarjetas.find(x=>x.id===id); if(!t) return;
+  selectedTarjetaId=id;
+  // Al registrar, sheetPagoTarjeta repinta el detalle de la tarjeta: aprovechamos para repintar el Inicio.
+  const oR=renderTarjetaDetail; renderTarjetaDetail=function(){ renderTarjetaDetail=oR; try{ oR.apply(this,arguments); }catch(e){} renderDashLibre(); };
+  sheetPagoTarjeta(t); const i=document.getElementById('pt_monto'); if(i) i.value=monto;
+}
+// Se instala al final del último <script>: ahí se declara la versión final de renderDashLibre.
+function ordInstalar(){
+  const st=document.createElement('style'); st.textContent=`
+  .ord-r{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border)}.ord-r:last-of-type{border-bottom:none}
+  .ord-n{width:24px;height:24px;border-radius:50%;color:#fff;font-size:12px;font-weight:900;display:grid;place-items:center;flex-shrink:0}`;
+  document.head.appendChild(st);
+  const oD=renderDashLibre; renderDashLibre=function(){
+    oD.apply(this,arguments);
+    const el=document.getElementById('dashLibre'); if(!el) return;
+    let h=''; try{ h=ordHTML(); }catch(e){ console.error(e); }
+    if(!h) return;
+    const w=document.createElement('div'); w.innerHTML=h; const card=w.firstElementChild;
+    const grid=el.querySelector('.dt-grid'); if(grid) grid.after(card); else el.prepend(card);
+  };
+}
 renderDashLibre();
 </script>
 <div id="nubeCarga" style="position:fixed;inset:0;z-index:600;background:var(--bg);display:flex;align-items:center;justify-content:center;flex-direction:column;gap:10px;font-family:var(--font);color:var(--text);padding:24px max(16px, env(safe-area-inset-right, 0px)) 24px max(16px, env(safe-area-inset-left, 0px));text-align:center;">
@@ -4983,6 +5056,7 @@ function renderDashLibre(){
     const sub2=document.getElementById('dashSub'); if(sub2){ const n=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']; const d=fxD(D.hoy); sub2.textContent=`Hoy ${d.getDate()} ${n[d.getMonth()]} · actualizado con tus datos`; }
   }catch(e){ console.error(e); el.innerHTML='<div class="card">No se pudo armar el resumen: '+esc(e.message)+'</div>'; }
 }
+if(typeof ordInstalar==='function') ordInstalar();
 renderDashLibre();
 </script>
 </html>
