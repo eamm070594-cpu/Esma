@@ -3635,6 +3635,10 @@ function ccSheetTarjeta(id){
       <div><div class="flabel">Día límite de pago</div><div class="field"><input type="number" id="cc_dp" min="1" max="31" value="${dPago}" placeholder="Ej. 30"></div></div>
     </div>
     <div class="frow">
+      <div><div class="flabel">Pago para no generar intereses</div><div class="field"><span class="ico">$</span><input type="number" id="cc_pni" step="0.01" value="${t&&t.pagoNoInt!=null?t.pagoNoInt:''}" placeholder="Del estado"></div></div>
+      <div><div class="flabel">Pago mínimo</div><div class="field"><span class="ico">$</span><input type="number" id="cc_pmin" step="0.01" value="${t&&t.pagoMin!=null?t.pagoMin:''}" placeholder="Del estado"></div></div>
+    </div>
+    <div class="frow">
       <div><div class="flabel">Tasa anual % (opcional)</div><div class="field"><input type="number" id="cc_tasa" value="${t&&t.tasaAnual?t.tasaAnual:''}" placeholder="Ej. 58"></div></div>
       <div><div class="flabel">Uso</div><div class="field"><select id="cc_tipo"><option value="p" ${t&&t.esNegocio?'':'selected'}>👤 Personal</option><option value="n" ${t&&t.esNegocio?'selected':''}>🏢 Negocio</option></select></div></div>
     </div>
@@ -3652,6 +3656,8 @@ function ccSheetTarjeta(id){
       o.limite=lim; o.disponible=Math.max(0,lim-de);
       if(dc>=1&&dc<=31){ o.diaCorte=dc; o.fechaCorte=fxNextMonthly(dc,hoy); }
       if(dp>=1&&dp<=31){ o.diaPago=dp; o.fechaPago=fxNextMonthly(dp,hoy); }
+      const pni=document.getElementById('cc_pni').value, pmin=document.getElementById('cc_pmin').value;
+      o.pagoNoInt=pni===''?null:Math.max(0,parseFloat(pni)||0); o.pagoMin=pmin===''?null:Math.max(0,parseFloat(pmin)||0);
       o.tasaAnual=parseFloat(document.getElementById('cc_tasa').value)||o.tasaAnual||null;
       o.esNegocio=document.getElementById('cc_tipo').value==='n';
       if(window._ccColor!==undefined){ o.color=window._ccColor==='auto'?null:parseInt(window._ccColor); window._ccColor=undefined; }
@@ -4134,6 +4140,131 @@ function fjAbonar(id){
     }
     const libre=[...el.children].find(c=>(c.innerText||'').includes('LIBRE PARA GASTAR')||(c.innerText||'').includes('Libre para gastar'));
     el.insertBefore(div, libre?libre.nextSibling:null);
+  };
+})();
+
+// ── SIMULADOR "¿Qué pasa si pago todo, el mínimo o no pago?" + calendario del mes (pedido del dueño 04/11/2026)
+// Usa por tarjeta: pagoNoInt y pagoMin del estado de cuenta (si no están: deuda y mínimo estimado), tasaAnual y comisionTardio.
+let _simOpt='total', _simCard={}, _simOpen={};
+function simMinEst(b,tasa,lim){ const tm=tasa/100/12; return Math.min(b+b*tm*1.16, Math.max(0.015*b+b*tm*1.16, 0.0125*Number(lim||0), Math.min(b,200))); }
+function simDatos(){
+  const hoy=fxToday();
+  return (db.tarjetas||[]).map(t=>{
+    const cy=fxCiclo(t); if(!cy) return null;
+    const total=t.pagoNoInt!=null?Number(t.pagoNoInt):fxDeuda(t);
+    const tasa=Number(t.tasaAnual||60), com=t.comisionTardio!=null?Number(t.comisionTardio):450;
+    const minEst=t.pagoMin==null;
+    const min=Math.min(total, minEst?simMinEst(total,tasa,t.limite):Number(t.pagoMin));
+    return {t,cy,total,min,minEst,totEst:t.pagoNoInt==null,tasa,com,dias:fxDiff(hoy,cy.pagoProx)};
+  }).filter(x=>x&&x.dias<=40).sort((a,b)=>a.cy.pagoProx<b.cy.pagoProx?-1:1);
+}
+function simCalc(x,opt){
+  const pago=x.total<=0?0:opt==='total'?x.total:opt==='minimo'?x.min:0;
+  const resto=Math.max(0,x.total-pago), tm=x.tasa/100/12;
+  const interes=resto*tm, comision=(opt==='nada'&&x.total>0)?x.com:0, iva=(interes+comision)*0.16;
+  return {pago,resto,interes,comision,iva,extra:interes+comision+iva,deuda:resto+interes+comision+iva,tm};
+}
+function simSet(o){ _simOpt=o; _simCard={}; renderTarjetas(); }
+function simCard(id,o){ _simCard[id]=o; _simOpen[id]=true; renderTarjetas(); }
+function simToggle(id){ _simOpen[id]=!_simOpen[id]; renderTarjetas(); }
+function simHTML(){
+  const L=simDatos(); if(!L.length) return '';
+  const m2=n=>'$'+Number(n).toLocaleString('es-MX',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const caja=(db.cuentas||[]).filter(c=>!fxEsVales(c.id)).reduce((s,c)=>s+Number(c.saldo||0),0);
+  const conPago=L.filter(x=>x.total>0), sinPago=L.filter(x=>x.total<=0);
+  let tp=0,te=0,td=0; const R={};
+  conPago.forEach(x=>{ const o=_simCard[x.t.id]||_simOpt; const r=simCalc(x,o); R[x.t.id]={r,o}; tp+=r.pago; te+=r.extra; td+=r.deuda; });
+  const mixto=Object.keys(_simCard).length>0;
+  const falta=tp-caja, noPaga=conPago.some(x=>R[x.t.id].o==='nada');
+  let msg=(falta>0?`Tienes ${fxM0(caja)} en tus cuentas: te faltan <b>${fxM0(falta)}</b> para hacer estos pagos.`:`Tienes ${fxM0(caja)} en tus cuentas: te alcanza y te sobran ${fxM0(-falta)}.`)
+    +(te>0?` Pero esta opción te cuesta <b>${fxM0(te)}</b> extra solo este mes, y la deuda sigue.`:'')+(noPaga?' ⚠️ No pagar te reporta al Buró de Crédito.':'');
+  const bad=falta>0||te>0;
+  const btn=(o,t,s)=>`<button onclick="simSet('${o}')" class="sim-b${!mixto&&_simOpt===o?' on':''}"><b>${t}</b><span>${s}</span></button>`;
+  const filas=conPago.map(x=>{
+    const {r,o}=R[x.t.id], id=x.t.id, open=!!_simOpen[id];
+    let rows=`<tr><td></td><td>Lo que debes (pago para no generar intereses)${x.totEst?' <i>est.</i>':''}</td><td>${m2(x.total)}</td></tr>
+      <tr><td>−</td><td>Lo que pagas</td><td style="color:var(--green)">${m2(r.pago)}</td></tr>
+      <tr><td>=</td><td>Lo que queda sin pagar</td><td>${m2(r.resto)}</td></tr>`;
+    if(r.resto>0){
+      rows+=`<tr><td>+</td><td>Intereses: ${m2(r.resto)} × ${(r.tm*100).toFixed(2)}% (${x.tasa}% ÷ 12)</td><td style="color:var(--red)">${m2(r.interes)}</td></tr>`;
+      if(r.comision) rows+=`<tr><td>+</td><td>Comisión por no pagar</td><td style="color:var(--red)">${m2(r.comision)}</td></tr>`;
+      rows+=`<tr><td>+</td><td>IVA 16%</td><td style="color:var(--red)">${m2(r.iva)}</td></tr>`;
+    }
+    rows+=`<tr class="sim-tot"><td>=</td><td><b>Debes el próximo mes</b></td><td>${m2(r.deuda)}</td></tr>`;
+    const exp=o==='total'?'Pagas todo: no te cobran nada extra.':o==='minimo'?`Pagas solo ${m2(r.pago)}${x.minEst?' (mínimo estimado: captura el de tu estado)':''}. Por lo que dejas te cobran ${m2(r.extra)} este mes, y se repite cada mes que no la liquides.`:'No pagas: intereses sobre todo + comisión + IVA, y reporte en Buró.';
+    return `<div class="sim-row${open?' open':''}">
+      <div class="sim-h" onclick="if(event.target.tagName!=='SELECT')simToggle('${id}')">
+        <div><b>${esc(x.t.nombre)}${esc(ccSuf(x.t))}</b><small>Pagar antes del ${fxCorta(x.cy.pagoProx)}</small>
+          <select onchange="simCard('${id}',this.value)"><option value="total"${o==='total'?' selected':''}>Pago todo</option><option value="minimo"${o==='minimo'?' selected':''}>Pago el mínimo</option><option value="nada"${o==='nada'?' selected':''}>No pago</option></select></div>
+        <div><small>Pagas</small><b>${fxM0(r.pago)}</b></div>
+        <div><small>Te cobran de más</small><b style="color:${r.extra>0?'var(--red)':'var(--green)'}">${fxM0(r.extra)}</b></div>
+        <div><small>Debes después</small><b>${fxM0(r.deuda)}</b></div>
+        <div class="sim-ar">›</div>
+      </div>
+      <div class="sim-d"><table>${rows}</table><div class="sim-x">${exp}</div></div>
+    </div>`; }).join('');
+  // Calendario del mes en curso
+  const hoy=fxToday(), d0=fxD(hoy), y=d0.getFullYear(), mo=d0.getMonth(), ev={};
+  const add=(f,c,t)=>{ const d=fxD(f); if(d.getFullYear()!==y||d.getMonth()!==mo) return; (ev[d.getDate()]=ev[d.getDate()]||[]).push([c,t]); };
+  const porDia={};
+  L.forEach(x=>{ const nm=x.t.nombre+(x.t.terminacion?' '+String(x.t.terminacion).slice(-4):'');
+    if(x.cy.corteProx) add(x.cy.corteProx,'c','Corte '+nm);
+    if(x.total<=0){ add(x.cy.pagoProx,'z',nm+': $0'); return; }
+    const p=R[x.t.id].r.pago; add(x.cy.pagoProx,'p',nm+(p>0?' '+fxM0(p):': sin pago ⚠️'));
+    if(p>0) porDia[x.cy.pagoProx]=(porDia[x.cy.pagoProx]||0)+p; });
+  Object.keys(porDia).forEach(f=>add(fxAddDays(f,-2),'m','Tener listo '+fxM0(porDia[f])));
+  add(hoy,'m','Hoy tienes '+fxM0(caja));
+  const meses=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  let cal='<div class="sim-cal">'+['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'].map(d=>`<div class="sim-dw">${d}</div>`).join('');
+  const first=(new Date(y,mo,1).getDay()+6)%7, days=new Date(y,mo+1,0).getDate(), hd=d0.getDate();
+  for(let i=0;i<first;i++) cal+='<div></div>';
+  for(let d=1;d<=days;d++) cal+=`<div class="sim-day${d===hd?' hoy':''}${d<hd?' pas':''}"><div class="sim-n">${d}</div>${(ev[d]||[]).map(e=>`<span class="sim-ev ${e[0]}">${esc(e[1])}</span>`).join('')}</div>`;
+  cal+='</div>';
+  const fuera=L.filter(x=>{ const d=fxD(x.cy.pagoProx); return d.getMonth()!==mo; });
+  return `<div class="card sim">
+    <div class="card-title">🧮 ¿Qué pasa si pago todo, el mínimo o no pago?</div>
+    <div class="sim-bs">${btn('total','1 · Pago todo','Pago para no generar intereses')}${btn('minimo','2 · Pago el mínimo','Solo lo que pide el banco')}${btn('nada','3 · No pago','Dejo pasar la fecha')}</div>
+    <div class="sim-k"><div><span>Pagas</span><b>${fxM0(tp)}</b></div><div><span>Te cobran de más</span><b style="color:${te>0?'var(--red)':'var(--green)'}">${fxM0(te)}</b></div><div><span>Sigues debiendo</span><b>${fxM0(td)}</b></div></div>
+    <div class="sim-msg ${bad?'bad':'ok'}">${msg}</div>
+    <div class="sim-t">Toca una tarjeta para ver cómo se calcula. Puedes cambiar la opción de cada una.</div>
+    ${filas}
+    ${sinPago.length?`<div class="sim-t" style="margin-top:8px;">✅ Sin pago este periodo: ${sinPago.map(x=>esc(x.t.nombre)+esc(ccSuf(x.t))).join(', ')}</div>`:''}
+    <div class="card-title" style="margin-top:16px;">📅 ${meses[mo]}</div>
+    ${cal}
+    <div class="sim-t">🔴 pago · 🟡 tener el dinero listo · 🔵 corte · 🟢 sin pago${fuera.length?` · Pagos del mes siguiente: ${fuera.map(x=>esc(x.t.nombre)+' '+fxCorta(x.cy.pagoProx)).join(', ')}`:''}</div>
+    <div class="sim-t">Intereses = lo que no pagas × tasa anual ÷ 12, más 16% de IVA. Si no pagas ni el mínimo se suma la comisión por atraso. Es aproximado: el banco calcula sobre el saldo de cada día.</div>
+  </div>`;
+}
+(function(){
+  const st=document.createElement('style'); st.textContent=`
+  .sim-bs{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  .sim-b{border:2px solid var(--border);background:var(--card);border-radius:12px;padding:10px;text-align:left;cursor:pointer;font-family:var(--font);color:var(--text)}
+  .sim-b b{display:block;font-size:14px}.sim-b span{font-size:11px;color:var(--muted)}.sim-b.on{border-color:var(--accent);background:rgba(37,99,235,.07)}
+  .sim-k{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}.sim-k div{background:var(--bg);border-radius:10px;padding:8px 10px}
+  .sim-k span{display:block;font-size:11px;color:var(--muted)}.sim-k b{font-size:19px;font-weight:900}
+  .sim-msg{margin-top:8px;padding:10px 12px;border-radius:10px;font-size:13px;font-weight:600}.sim-msg.bad{background:rgba(220,38,38,.08);color:var(--red)}.sim-msg.ok{background:rgba(22,163,74,.08);color:var(--green)}
+  .sim-t{font-size:11px;color:var(--muted);margin-top:8px}
+  .sim-row{border:1px solid var(--border);border-radius:12px;margin-top:8px;overflow:hidden}
+  .sim-h{display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr 14px;gap:6px;align-items:center;padding:10px 12px;cursor:pointer}
+  .sim-h small{display:block;font-size:11px;color:var(--muted)}.sim-h b{font-size:14px}
+  .sim-h select{margin-top:4px;font:inherit;font-size:12px;padding:2px 4px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text)}
+  .sim-ar{color:var(--muted);transition:transform .2s}.sim-row.open .sim-ar{transform:rotate(90deg)}
+  .sim-d{display:none;padding:6px 12px 12px;background:var(--bg);border-top:1px dashed var(--border)}.sim-row.open .sim-d{display:block}
+  .sim-d table{width:100%;border-collapse:collapse;font-size:13px}.sim-d td{padding:5px 3px;border-bottom:1px solid var(--border)}
+  .sim-d td:first-child{width:16px;color:var(--muted);font-weight:800}.sim-d td:last-child{text-align:right;font-weight:700;white-space:nowrap}
+  .sim-d tr.sim-tot td{border-top:2px solid var(--text);border-bottom:none}.sim-x{font-size:12px;color:var(--muted);margin-top:6px}
+  .sim-cal{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}.sim-dw{font-size:10px;font-weight:800;color:var(--muted);text-align:center}
+  .sim-day{border:1px solid var(--border);border-radius:7px;min-height:62px;padding:3px;font-size:11px;background:var(--card)}
+  .sim-day.hoy{outline:2px solid var(--accent)}.sim-day.pas{opacity:.5}.sim-n{font-weight:800;color:var(--muted);font-size:11px}
+  .sim-ev{display:block;margin-top:2px;border-radius:4px;padding:1px 3px;font-size:9.5px;font-weight:700;line-height:1.2}
+  .sim-ev.p{background:rgba(220,38,38,.1);color:var(--red)}.sim-ev.m{background:rgba(217,119,6,.12);color:var(--amber)}.sim-ev.c{background:rgba(37,99,235,.1);color:var(--accent)}.sim-ev.z{background:rgba(22,163,74,.1);color:var(--green)}
+  @media(max-width:600px){.sim-bs,.sim-k{grid-template-columns:1fr}.sim-h{grid-template-columns:1fr 1fr 1fr}.sim-h>div:first-child{grid-column:1/4}.sim-ar{display:none}}`;
+  document.head.appendChild(st);
+  const oR=renderTarjetas; renderTarjetas=function(){
+    oR.apply(this,arguments);
+    let el=document.getElementById('tarjetasSim');
+    if(!el){ el=document.createElement('div'); el.id='tarjetasSim'; document.getElementById('tarjetasList').after(el); }
+    try{ el.innerHTML=simHTML(); }catch(e){ console.error(e); el.innerHTML=''; }
   };
 })();
 renderDashLibre();
