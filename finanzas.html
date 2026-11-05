@@ -4966,6 +4966,24 @@ function dvPagosHtml(D){
   return grupos.map(([t,f])=>{ const L=D.pagosMes.filter(f); if(!L.length) return ''; const tot=-L.reduce((s,e)=>s+e.monto,0);
     return `<div style="margin-bottom:12px;"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:7px 10px;margin-bottom:4px;"><span style="font-weight:800;font-size:12.5px;">${t}</span><span style="white-space:nowrap;background:var(--red-light);color:var(--red);font-weight:900;font-size:13.5px;padding:3px 10px;border-radius:999px;">Total ${fxM0(tot)}</span></div>${L.map(fila).join('')}</div>`; }).join('');
 }
+// Meta de ventas de ESMA (pedido del dueño 04/11/2026): cuánto vender para cubrir sus fijos y, después, pagarle su sueldo.
+// Con 60% de utilidad sobre el costo, a ESMA le queda 0.6/1.6 = 37.5% de cada venta.
+const ESMA_MARGEN=0.6/1.6;
+function dvEsmaMetaHTML(D){
+  const fij=fxFijosEsmaMes(); if(!(fij>0)) return '';
+  const sueldo=Number(db.esmaSueldoDueno||0);
+  const fm=dvHistorico().filas.find(f=>f.m===D.hoy.slice(0,7)); const vendido=fm?fm.ventas:0;
+  const barra=(meta,txt,col)=>{ const p=Math.min(100,Math.round(vendido/meta*100)); const falta=Math.max(0,meta-vendido);
+    return `<div style="margin-top:8px;"><div style="display:flex;justify-content:space-between;font-size:12px;"><b>${txt}</b><span>${fxM0(vendido)} de <b>${fxM0(meta)}</b></span></div>
+      <div style="height:9px;border-radius:99px;background:var(--bg3);overflow:hidden;margin-top:4px;"><div style="height:100%;width:${p}%;background:${col};"></div></div>
+      <div style="font-size:11px;color:${falta>0?'var(--red)':'var(--green)'};margin-top:2px;font-weight:700;">${falta>0?`Faltan ${fxM0(falta)} en ventas este mes`:'✅ Meta cumplida'}</div></div>`; };
+  return `<div style="padding:10px 12px;border-radius:12px;background:var(--bg);margin-bottom:8px;" onclick="event.stopPropagation();">
+    <div style="font-size:12px;font-weight:800;">🎯 ¿Cuánto tiene que vender ESMA este mes?</div>
+    ${barra(fij/ESMA_MARGEN,'1 · Que ESMA se pague sola','var(--accent)')}
+    ${sueldo>0?barra((fij+sueldo)/ESMA_MARGEN,`2 · Y que te pague tus ${fxM0(sueldo)}`,'var(--green)'):''}
+    <div style="font-size:10.5px;color:var(--muted);margin-top:6px;">Fijos de ESMA ${fxM0(fij)}/mes (nómina, renta, luz, préstamo). Con 60% de utilidad, a ESMA le queda ~37.5% de cada venta. "Vendido" = proyectos vendidos o entregados este mes en ESMA.</div>
+  </div>`;
+}
 function dvEsmaCard(D,acc){
   const E=dvEsma(D.hoy);
   if(!E.esma.length&&!E.fijosMes) return '';
@@ -4979,6 +4997,7 @@ function dvEsmaCard(D,acc){
       <div><div class="dt-l">Le quedaría a ESMA</div><div class="dt-v" style="font-size:18px;color:${neto>=0?'var(--green)':'var(--red)'};">${fxM0(neto)}</div><div class="dt-s">si cobras todo a tiempo</div></div>
       <div><div class="dt-l">Total por cobrar</div><div class="dt-v" style="font-size:18px;">${fxM0(E.total)}</div><div class="dt-s">ventas autorizadas sin liquidar</div></div>
     </div>
+    ${dvEsmaMetaHTML(D)}
     ${prox.map(x=>`<div class="tl" style="cursor:pointer;" onclick="event.stopPropagation();esmaAcciones('${x.id}')"><span>${x.fecha?(x.fecha<D.hoy?'<span class="badge red">atrasado</span> ':fxCorta(x.fecha)+' · '):''}${esc(x.cliente)} <span style="color:var(--muted);">${esc(x.concepto||'')}</span></span><b style="color:var(--green);white-space:nowrap;">+${fxM0(x.monto)}</b></div>`).join('')}
     ${E.previos.length?`<div style="font-size:12px;background:var(--amber-light);color:var(--amber);border-radius:10px;padding:8px 10px;margin-top:8px;font-weight:700;">🗂 ${E.previos.length} cobro${E.previos.length===1?'':'s'} de meses anteriores por revisar (${fxM0(E.totPrevios)}) · no cuentan en tus números. Toca para cerrarlos.</div>`:''}
     ${!E.ok?'<div style="font-size:11px;color:var(--amber);margin-top:6px;">No se pudo leer ESMA ahora; se muestran los últimos datos.</div>':''}
