@@ -4782,7 +4782,7 @@ function dvCalcular(){
   const extraNoPago=(db.tarjetas||[]).filter(t=>!simEsMens(t)&&fxPagoMes(t)>0).reduce((s,t)=>s+fxCostos(fxPagoMes(t),t.tasaAnual||60,t.comisionTardio!=null?t.comisionTardio:450,t.limite).noPagar.total,0);
   const roja=P.semanas.find(s=>s.min<0);
   const sueldoOK=Number(c.sueldoMonto)>0&&(c.sueldoDias||c.sueldoFrec==='semanal');
-  const fijosEsma=(db.pagos||[]).filter(p=>p.recurrente&&p.ambito==='esma').reduce((s,p)=>s+fjMensual(p),0);
+  const fijosEsma=fxFijosEsmaMes();
   const cobradoEsma=(db.ingresos||[]).filter(i=>i.tipo==='emprendimiento'&&i.fecha>=fxAddDays(hoy,-90)).reduce((s,i)=>s+Number(i.monto||0),0)/3;
   // Revisiones (ok / warn / bad)
   const R=[];
@@ -4801,6 +4801,9 @@ function dvCalcular(){
 }
 var _dvAcc=[];
 // ── Histórico mes a mes: ¿me queda dinero? (personal) y ¿ESMA es rentable? (negocio)
+// Fijos de ESMA al mes: pagos fijos marcados ESMA + cuota de créditos/préstamos marcados ESMA (ej. el préstamo que está a nombre del dueño)
+function fxFijosEsmaMes(){ return (db.pagos||[]).filter(p=>p.recurrente&&p.ambito==='esma').reduce((s,p)=>s+fjMensual(p),0)
+  + (db.creditos||[]).filter(c=>c.ambito==='esma'&&Number(c.pendiente)>0&&c.tipoDeuda!=='proveedor').reduce((s,c)=>s+Number(c.cuota||0),0); }
 function dvEsNegocio(g){ return g.categoria==='Negocio'||/^ESMA · /.test(g.concepto||''); }
 function dvHistorico(){
   const hoy=fxToday(), mesHoy=hoy.slice(0,7);
@@ -4808,7 +4811,7 @@ function dvHistorico(){
   const proys=(typeof _esma!=='undefined'?_esma.proyectos:[]).filter(p=>Number(p.ventaAutorizada)>0&&['vendido','entregado'].includes(p.finEtapa));
   const fechaP=p=>p.deliveryDate||p.delivery||String(p.createdAt||'').slice(0,10);
   let meses=[...new Set([...mesesDe((db.gastos||[]).map(g=>g.fecha)),...mesesDe((db.ingresos||[]).map(i=>i.fecha)),...mesesDe(proys.map(fechaP)),mesHoy])].sort().slice(-6);
-  const fijosEsmaMes=(db.pagos||[]).filter(p=>p.recurrente&&p.ambito==='esma').reduce((s,p)=>s+fjMensual(p),0);
+  const fijosEsmaMes=fxFijosEsmaMes();
   const sum=(a,fn)=>a.reduce((s,x)=>s+Number(fn(x)||0),0);
   const filas=meses.map(m=>{
     const ing=(db.ingresos||[]).filter(i=>String(i.fecha||'').startsWith(m));
